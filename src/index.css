@@ -400,3 +400,151 @@ label.checkbox {
 label.checkbox input {
   width: auto;
 }
+/* Profile dropdown */
+.profile-dropdown {
+    position: relative;
+}
+
+.profile-icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+}
+
+.profile-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.dropdown-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    min-width: 160px;
+    z-index: 100;
+    overflow: hidden;
+}
+
+.dropdown-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 16px;
+    border: none;
+    background: none;
+    font-size: 14px;
+    cursor: pointer;
+    color: var(--text);
+}
+
+.dropdown-menu button:hover {
+    background: #f3f4f6;
+}
+
+.dropdown-menu .dropdown-danger {
+    color: var(--danger);
+    border-top: 1px solid var(--border);
+}
+
+.dropdown-menu .dropdown-danger:hover {
+    background: #fef2f2;
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+}
+
+.modal {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 28px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal h2 {
+    font-size: 20px;
+    margin-bottom: 8px;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.modal-actions .btn {
+    flex: 1;
+}
+
+/* Progress bar */
+.progress-bar {
+    height: 10px;
+    background: #e5e7eb;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 999px;
+    transition: width 0.4s ease;
+}
+
+.home-greeting-card h2 {
+    font-size: 22px;
+    margin-bottom: 0;
+}
+
+.profile-progress-card {
+    margin-bottom: 20px;
+}
+
+/* Coming soon */
+.coming-soon-card {
+    text-align: center;
+    padding: 80px 24px;
+}
+
+.coming-soon-text {
+    font-size: 24px;
+    color: var(--muted);
+    font-weight: 500;
+}
+
+.link-btn {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+}
+
+.link-btn:hover {
+    color: var(--primary-dark);
+}

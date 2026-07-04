@@ -21,10 +21,12 @@ export default function Profile() {
         lifestyle: '',
         locationCity: '',
         locationCountry: '',
+        dateOfBirth: '',
+        gender: '',
         interests: '',
     })
-    const [educations, setEducations] = useState([{ ...emptyEducation }])
 
+    const [educations, setEducations] = useState([emptyEducation])
     const [questions, setQuestions] = useState([])
     const [answers, setAnswers] = useState({}) // questionId -> value
 
@@ -44,6 +46,8 @@ export default function Profile() {
                         lifestyle: p.lifestyle || '',
                         locationCity: p.locationCity || '',
                         locationCountry: p.locationCountry || '',
+                        dateOfBirth: p.dateOfBirth || '',
+                        gender: p.gender || '',
                         interests: (p.interests || []).join(', '),
                     })
                     setPhotoUrl(p.profilePhotoUrl || '')
@@ -71,10 +75,9 @@ export default function Profile() {
             }
         }
         load()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    const handleFormChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
+    const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
 
     const handleEducationChange = (index, field, value) => {
         const next = [...educations]
@@ -105,7 +108,7 @@ export default function Profile() {
         setAnswers({ ...answers, [questionId]: value })
     }
 
-    const toggleMultichoice = (questionId, option) => {
+    const toggleMultiChoice = (questionId, option) => {
         const current = (answers[questionId] || '').split(',').map((s) => s.trim()).filter(Boolean)
         const exists = current.includes(option)
         const next = exists ? current.filter((o) => o !== option) : [...current, option]
@@ -124,6 +127,8 @@ export default function Profile() {
                 lifestyle: form.lifestyle,
                 locationCity: form.locationCity,
                 locationCountry: form.locationCountry,
+                dateOfBirth: form.dateOfBirth || null,
+                gender: form.gender || null,
                 interests: form.interests.split(',').map((s) => s.trim()).filter(Boolean),
                 educations: educations
                     .filter((ed) => ed.institution.trim())
@@ -135,11 +140,13 @@ export default function Profile() {
                         endYear: ed.endYear ? parseInt(ed.endYear, 10) : null,
                     })),
             }
+
             await api.put('/api/profile', payload)
 
             const answerPayload = Object.entries(answers)
                 .filter(([_, value]) => value !== '' && value !== null)
                 .map(([questionId, value]) => ({ questionId: Number(questionId), answerValue: value }))
+            
             if (answerPayload.length > 0) {
                 await api.post('/api/questions/answers', answerPayload)
             }
@@ -172,8 +179,8 @@ export default function Profile() {
                     {user?.profileCompleted && <span className="badge badge-yes">Completed</span>}
                 </div>
 
-                {message && <div className="success">{message}</div>}
-                {error && <div className="error">{error}</div>}
+                {message && <div className="className='success'">{message}</div>}
+                {error && <div className="className='error'">{error}</div>}
 
                 <form onSubmit={handleSubmit}>
                     {/* Photo */}
@@ -191,20 +198,41 @@ export default function Profile() {
                         </div>
                     </div>
 
-                    {/* About Me */}
+                    {/* Personal Info */}
+                    <div className="card">
+                        <h2>Personal Information</h2>
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Date of Birth</label>
+                                <input type="date" name="dateOfBirth" value={form.dateOfBirth} onChange={handleChange} />
+                            </div>
+                            <div className="form-group">
+                                <label>Gender</label>
+                                <select name="gender" value={form.gender} onChange={handleChange}>
+                                    <option value="">-- Select --</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
+                                    <option value="Prefer not to say">Prefer not to say</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* About */}
                     <div className="card">
                         <h2>About Me</h2>
                         <div className="form-group">
                             <label>About me</label>
-                            <textarea name="aboutMe" value={form.aboutMe} onChange={handleFormChange} placeholder="Tell us about yourself..." />
+                            <textarea name="aboutMe" value={form.aboutMe} onChange={handleChange} placeholder="Tell us about yourself..." />
                         </div>
                         <div className="form-group">
                             <label>Occupation</label>
-                            <input name="occupation" value={form.occupation} onChange={handleFormChange} placeholder="e.g. Software Engineer" />
+                            <input type="text" name="occupation" value={form.occupation} onChange={handleChange} placeholder="e.g. Software Engineer" />
                         </div>
                         <div className="form-group">
                             <label>Lifestyle</label>
-                            <textarea name="lifestyle" value={form.lifestyle} onChange={handleFormChange} placeholder="Your lifestyle, hobbies, daily routine..." />
+                            <textarea name="lifestyle" value={form.lifestyle} onChange={handleChange} placeholder="Your lifestyle, hobbies, daily routine..." />
                         </div>
                     </div>
 
@@ -213,7 +241,7 @@ export default function Profile() {
                         <h2>Interests</h2>
                         <div className="form-group">
                             <label>Interests (comma separated)</label>
-                            <input name="interests" value={form.interests} onChange={handleFormChange} placeholder="Travel, Music, Sports" />
+                            <input type="text" name="interests" value={form.interests} onChange={handleChange} placeholder="Travel, Music, Sports" />
                         </div>
                         <div>
                             {form.interests.split(',').map((i) => i.trim()).filter(Boolean).map((i, idx) => (
@@ -228,11 +256,11 @@ export default function Profile() {
                         <div className="form-row">
                             <div className="form-group">
                                 <label>City</label>
-                                <input name="locationCity" value={form.locationCity} onChange={handleFormChange} />
+                                <input type="text" name="locationCity" value={form.locationCity} onChange={handleChange} />
                             </div>
                             <div className="form-group">
                                 <label>Country</label>
-                                <input name="locationCountry" value={form.locationCountry} onChange={handleFormChange} />
+                                <input type="text" name="locationCountry" value={form.locationCountry} onChange={handleChange} />
                             </div>
                         </div>
                     </div>
@@ -241,23 +269,27 @@ export default function Profile() {
                     <div className="card">
                         <div className="flex-between">
                             <h2>Education</h2>
-                            <button type="button" className="btn btn-sm btn-secondary" onClick={addEducation}>+ Add</button>
+                            <button type="button" className="btn btn-sm btn-secondary" onClick={addEducation}>
+                                + Add
+                            </button>
                         </div>
                         {educations.map((ed, index) => (
                             <div key={index} style={{ borderTop: index > 0 ? '1px solid #e5e7eb' : 'none', paddingTop: index > 0 ? 16 : 0, marginTop: index > 0 ? 16 : 0 }}>
-                                <div className="form-group">
-                                    <label>Institution</label>
-                                    <input value={ed.institution} onChange={(e) => handleEducationChange(index, 'institution', e.target.value)} />
-                                </div>
-                                <div className="form-group">
-                                    <label>Degree</label>
-                                    <input value={ed.degree} onChange={(e) => handleEducationChange(index, 'degree', e.target.value)} />
-                                </div>
-                                <div className="form-group">
-                                    <label>Field of study</label>
-                                    <input value={ed.fieldOfStudy} onChange={(e) => handleEducationChange(index, 'fieldOfStudy', e.target.value)} />
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Institution</label>
+                                        <input type="text" value={ed.institution} onChange={(e) => handleEducationChange(index, 'institution', e.target.value)} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Degree</label>
+                                        <input type="text" value={ed.degree} onChange={(e) => handleEducationChange(index, 'degree', e.target.value)} />
+                                    </div>
                                 </div>
                                 <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Field of study</label>
+                                        <input type="text" value={ed.fieldOfStudy} onChange={(e) => handleEducationChange(index, 'fieldOfStudy', e.target.value)} />
+                                    </div>
                                     <div className="form-group">
                                         <label>Start year</label>
                                         <input type="number" value={ed.startYear} onChange={(e) => handleEducationChange(index, 'startYear', e.target.value)} />
@@ -268,7 +300,9 @@ export default function Profile() {
                                     </div>
                                 </div>
                                 {educations.length > 1 && (
-                                    <button type="button" className="btn btn-sm btn-danger" onClick={() => removeEducation(index)}>Remove</button>
+                                    <button type="button" className="btn btn-sm btn-danger" onClick={() => removeEducation(index)}>
+                                        Remove
+                                    </button>
                                 )}
                             </div>
                         ))}
@@ -278,21 +312,23 @@ export default function Profile() {
                     {questions.length > 0 && (
                         <div className="card">
                             <h2>Additional Questions</h2>
-                            <p style={{ color: '#6b7280', marginBottom: 16 }}>Questions set by the administrator.</p>
+                            <p style={{ color: '#6b7280', marginBottom: 16 }}>
+                                Questions set by the administrator.
+                            </p>
                             {questions.map((q) => (
                                 <div className="form-group" key={q.id}>
                                     <label>
                                         {q.questionText}
                                         {q.required && <span style={{ color: '#dc2626' }}> *</span>}
-                                        {q.category && <span className="chip" style={{ marginLeft: 8 }}>{q.category}</span>}
+                                        <span className="chip" style={{ marginLeft: 8 }}>{q.category}</span>
                                     </label>
-                                    {renderQuestionInput(q, answers[q.id], handleAnswerChange, toggleMultichoice)}
+                                    {renderQuestionInput(q, answers[q.id], handleAnswerChange, toggleMultiChoice)}
                                 </div>
                             ))}
                         </div>
                     )}
 
-                    <button className="btn" type="submit" disabled={saving}>
+                    <button type="submit" className="btn" disabled={saving}>
                         {saving ? 'Saving...' : 'Save Profile'}
                     </button>
                 </form>
@@ -321,23 +357,21 @@ function renderQuestionInput(q, value, onChange, toggleMulti) {
         case 'MULTI_CHOICE': {
             const selected = (value || '').split(',').map((s) => s.trim()).filter(Boolean)
             return (
-                <div className="flex-between">
+                <div>
                     {q.options.map((opt) => (
-                        <div className="form-group" key={opt}>
-                            <label className="checkbox">
-                                <input
-                                    type="checkbox"
-                                    checked={selected.includes(opt)}
-                                    onChange={() => toggleMulti(q.id, opt)}
-                                />
-                                {opt}
-                            </label>
-                        </div>
+                        <label className="checkbox" key={opt}>
+                            <input
+                                type="checkbox"
+                                checked={selected.includes(opt)}
+                                onChange={() => toggleMulti(q.id, opt)}
+                            />
+                            {opt}
+                        </label>
                     ))}
                 </div>
             )
         }
         default:
-            return <input value={value || ''} onChange={(e) => onChange(q.id, e.target.value)} />
+            return <input type="text" value={value || ''} onChange={(e) => onChange(q.id, e.target.value)} />
     }
 }

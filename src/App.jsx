@@ -5,58 +5,67 @@ import SignIn from './pages/SignIn'
 import SignUp from './pages/SignUp'
 import Home from './pages/Home'
 import Profile from './pages/Profile'
+import Notifications from './pages/Notifications'
+import Subscriptions from './pages/Subscriptions'
+import Settings from './pages/Settings'
 import AdminDashboard from './pages/AdminDashboard'
 import AdminQuestions from './pages/AdminQuestions'
 
 export default function App() {
-    const { loading } = useAuth()
+  const { loading } = useAuth()
 
-    if (loading) {
-        return <div className="center">Loading...</div>
-    }
+  if (loading) {
+    return <div className="center">Loading...</div>
+  }
 
-    return (
-        <Routes>
-            <Route path="/signin" element={<SignIn />} />
-            <Route path="/signup" element={<SignUp />} />
-
-            <Route
-                path="/"
-                element={
-                    <ProtectedRoute>
-                        <Home />
-                    </ProtectedRoute>
-                }
-            />
-
-            <Route
-                path="/profile"
-                element={
-                    <ProtectedRoute>
-                        <Profile />
-                    </ProtectedRoute>
-                }
-            />
-
-            <Route
-                path="/admin"
-                element={
-                    <ProtectedRoute adminOnly>
-                        <AdminDashboard />
-                    </ProtectedRoute>
-                }
-            />
-
-            <Route
-                path="/admin/questions"
-                element={
-                    <ProtectedRoute adminOnly>
-                        <AdminQuestions />
-                    </ProtectedRoute>
-                }
-            />
-
-            <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-    )
+  return (
+    <Routes>
+      <Route path="/signin" element={<SignIn />} />
+      <Route path="/signup" element={<SignUp />} />
+      
+      <Route path="/" element={
+        <ProtectedRoute>
+          <Home />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/profile" element={
+        <ProtectedRoute>
+          <Profile />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/notifications" element={
+        <ProtectedRoute>
+          <Notifications />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/subscriptions" element={
+        <ProtectedRoute>
+          <Subscriptions />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/settings" element={
+        <ProtectedRoute>
+          <Settings />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/admin" element={
+        <ProtectedRoute adminOnly>
+          <AdminDashboard />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/admin/questions" element={
+        <ProtectedRoute adminOnly>
+          <AdminQuestions />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
 }

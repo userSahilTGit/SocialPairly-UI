@@ -48,18 +48,18 @@ export default function AdminDashboard() {
 
                 {/* Stat cards */}
                 <div className="grid grid-4" style={{ marginBottom: 24 }}>
-                    <StatCard value={stats?.totalUsers} label="Total Users" />
-                    <StatCard value={stats?.completedProfiles} label="Completed Profiles" />
-                    <StatCard value={stats?.incompleteProfiles} label="Incomplete Profiles" />
-                    <StatCard value={stats?.newUsersLast7Days} label="New (7 days)" />
+                    <StatCard value={stats.totalUsers} label="Total Users" />
+                    <StatCard value={stats.completedProfiles} label="Completed Profiles" />
+                    <StatCard value={stats.incompleteProfiles} label="Incomplete Profiles" />
+                    <StatCard value={stats.newUsersLast7Days} label="New (7 days)" />
                 </div>
 
                 {/* Charts */}
                 <div className="grid grid-2">
                     <div className="card">
-                        <h3>Registrations (Last 7 days)</h3>
+                        <h3>Registrations (last 7 days)</h3>
                         <ResponsiveContainer width="100%" height={260}>
-                            <BarChart data={stats?.registrationsByDay}>
+                            <BarChart data={stats.registrationsByDay}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="label" fontSize={12} />
                                 <YAxis allowDecimals={false} fontSize={12} />
@@ -73,8 +73,8 @@ export default function AdminDashboard() {
                         <h3>Profile Completion</h3>
                         <ResponsiveContainer width="100%" height={260}>
                             <PieChart>
-                                <Pie data={stats?.profileCompletion} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={90} label>
-                                    {stats?.profileCompletion.map((entry, i) => (
+                                <Pie data={stats.profileCompletion} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={90} label>
+                                    {stats.profileCompletion.map((entry, i) => (
                                         <Cell key={i} fill={COLORS[i % COLORS.length]} />
                                     ))}
                                 </Pie>
@@ -88,8 +88,8 @@ export default function AdminDashboard() {
                         <h3>Users by Role</h3>
                         <ResponsiveContainer width="100%" height={260}>
                             <PieChart>
-                                <Pie data={stats?.usersByRole} dataKey="count" nameKey="label" cx="50%" cy="50%" innerRadius={50} outerRadius={90} label>
-                                    {stats?.usersByRole.map((entry, i) => (
+                                <Pie data={stats.usersByRole} dataKey="count" nameKey="label" cx="50%" cy="50%" innerRadius={50} outerRadius={90} label>
+                                    {stats.usersByRole.map((entry, i) => (
                                         <Cell key={i} fill={COLORS[(i + 2) % COLORS.length]} />
                                     ))}
                                 </Pie>
@@ -103,17 +103,17 @@ export default function AdminDashboard() {
                         <h3>Overview</h3>
                         <table>
                             <tbody>
-                                <tr><td>Total questions</td><td><strong>{stats?.totalQuestions}</strong></td></tr>
-                                <tr><td>Total admins</td><td><strong>{stats?.totalAdmins}</strong></td></tr>
-                                <tr><td>Completed profiles</td><td><strong>{stats?.completedProfiles}</strong></td></tr>
-                                <tr><td>Incomplete profiles</td><td><strong>{stats?.incompleteProfiles}</strong></td></tr>
+                                <tr><td>Total questions</td><td><strong>{stats.totalQuestions}</strong></td></tr>
+                                <tr><td>Total admins</td><td><strong>{stats.totalAdmins}</strong></td></tr>
+                                <tr><td>Completed profiles</td><td><strong>{stats.completedProfiles}</strong></td></tr>
+                                <tr><td>Incomplete profiles</td><td><strong>{stats.incompleteProfiles}</strong></td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
 
                 {/* Answer distribution */}
-                {stats?.answerDistribution && Object.keys(stats.answerDistribution).length > 0 && (
+                {stats.answerDistribution && Object.keys(stats.answerDistribution).length > 0 && (
                     <>
                         <h2 style={{ margin: '24px 0 16px' }}>Question Answer Distribution</h2>
                         <div className="grid grid-2">
@@ -148,6 +148,7 @@ export default function AdminDashboard() {
                                     <th>Phone</th>
                                     <th>Role</th>
                                     <th>Profile</th>
+                                    <th>Subscription</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -166,6 +167,9 @@ export default function AdminDashboard() {
                                             <span className={`badge ${u.profileCompleted ? 'badge-yes' : 'badge-no'}`}>
                                                 {u.profileCompleted ? 'Complete' : 'Incomplete'}
                                             </span>
+                                        </td>
+                                        <td style={{ color: '#6b7280' }}>
+                                            {u.subscriptionDetails || '-'}
                                         </td>
                                     </tr>
                                 ))}
