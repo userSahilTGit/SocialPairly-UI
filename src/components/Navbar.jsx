@@ -64,7 +64,7 @@ export default function Navbar() {
     return (
         <>
             <nav className="navbar">
-                <NavLink to="/" className="brand">Learning Project</NavLink>
+                <NavLink to="/" className="brand">SocialPairly</NavLink>
                 <div className="nav-links">
                     <NavLink to="/">Home</NavLink>
                     <NavLink to="/notifications">Notification</NavLink>

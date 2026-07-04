@@ -39,7 +39,7 @@ export default function Home() {
                 <div className="card home-greeting-card">
                     <h2>{getGreeting()}, {user?.firstName} {user?.lastName} 👋</h2>
                     <p style={{ color: '#6b7280', marginTop: 6 }}>
-                        Welcome to Learning Project - your space to build your profile, explore features, and stay connected.
+                        Welcome to SocialPairly - your space to build your profile, explore features, and stay connected.
                     </p>
                     {(user?.email || user?.phoneNumber) && (
                         <p style={{ color: '#9ca3af', fontSize: 13, marginTop: 4 }}>
