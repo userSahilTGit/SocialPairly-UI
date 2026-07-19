@@ -4,7 +4,7 @@ import Navbar from '../components/Navbar'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:9000'
+const API_URL = import.meta.env.VITE_API_URL
 
 const emptyEducation = { institution: '', degree: '', fieldOfStudy: '', startYear: '', endYear: '' }
 
@@ -416,8 +416,8 @@ export default function Profile() {
                                 ) : (
                                     educations.map((ed, index) => (
                                         <div key={index} className="profile-info-section">
-                                            <strong>{ed.institution || 'Unknown institution'}</strong>
-                                            <span>{ed.degree || 'No degree provided'} • {ed.fieldOfStudy || 'No field'} • {ed.startYear || ''}{ed.endYear ? ` - ${ed.endYear}` : ''}</span>
+                                            <strong>{ed.institution+ ' ' || 'Unknown institution'}</strong>
+                                            <span>{ed.degreex || 'No degree provided'} • {ed.fieldOfStudy || 'No field'} • {ed.startYear || ''}{ed.endYear ? ` - ${ed.endYear}` : ''}</span>
                                         </div>
                                     ))
                                 )}
