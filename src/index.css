@@ -499,6 +499,61 @@ label.checkbox input {
     flex: 1;
 }
 
+/* Profile view */
+.profile-view-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 20px;
+}
+
+.profile-summary-card, .profile-info-card {
+    padding: 24px;
+}
+
+.profile-summary-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.profile-info-section {
+    margin-bottom: 16px;
+}
+
+.profile-display-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.profile-display-row:last-child {
+    border-bottom: none;
+}
+
+.profile-display-label {
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.profile-display-value {
+    text-align: right;
+    max-width: 60%;
+}
+
+.muted {
+    color: var(--muted);
+}
+
+@media (max-width: 900px) {
+    .profile-view-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Progress bar */
 .progress-bar {
     height: 10px;
