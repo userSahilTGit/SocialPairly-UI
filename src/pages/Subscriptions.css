@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   /* Color Palette - Brand / Rose */
   --color-brand-50: #fff1f2;
   --color-brand-100: #ffe4e6;
@@ -204,6 +204,7 @@ body {
 .plan-card {
   position: relative;
   padding: 1.75rem 1.75rem 1.25rem;
+  height: 100%;
 }
 
 .plan-card:hover {
@@ -230,6 +231,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  height: 100%;
+  flex: 1;
 }
 
 .plan-title {
@@ -303,6 +306,7 @@ body {
   text-transform: uppercase;
   cursor: pointer;
   transition: all var(--transition-fast);
+  margin-top: auto;
 }
 
 .plan-button:hover {
@@ -350,8 +354,10 @@ body {
   list-style: none;
   padding: 0;
   margin: 0.5rem 0 0;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0.65rem;
+  flex: 1;
 }
 
 .plan-features li {
@@ -443,7 +449,7 @@ hr {
   background-color: rgba(255, 255, 255, 0.95);
   border-top: 1px solid var(--color-slate-200);
   backdrop-filter: blur(12px);
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1.5rem;
   box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.08);
 }
 
@@ -460,6 +466,7 @@ hr {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
+    gap: 2rem;
   }
 }
 
@@ -467,43 +474,50 @@ hr {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  flex: 1;
 }
 
 @media (min-width: 640px) {
   .selected-plan-summary {
     flex-direction: row;
     align-items: center;
-    gap: 1.5rem;
+    gap: 2rem;
   }
 }
 
 .summary-label {
-  display: block;
+  display: inline-block;
   color: var(--color-slate-500);
   font-size: 0.75rem;
+  margin-right: 0.35rem;
 }
 
 .summary-title {
-  display: block;
-  font-size: 1rem;
-  font-weight: 700;
+  display: inline-block;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--color-slate-900);
+  margin-right: 0.35rem;
+  white-space: nowrap;
 }
 
 .summary-duration {
   display: inline-block;
   color: var(--color-slate-500);
-  font-size: 0.85rem;
+  font-size: 0.875rem;
+  white-space: nowrap;
 }
 
 .summary-price {
   font-size: 1.75rem;
   font-weight: 800;
   color: var(--color-slate-900);
+  white-space: nowrap;
 }
 
 .btn-checkout {
   width: 100%;
-  padding: 0.95rem 1rem;
+  padding: 0.95rem 1.75rem;
   border-radius: 0.75rem;
   background: linear-gradient(135deg, var(--color-brand-600), var(--color-brand-500), var(--color-amber-500));
   color: #ffffff;
@@ -519,6 +533,16 @@ hr {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .btn-checkout {
+    width: auto;
+    min-width: 240px;
+    max-width: 320px;
+    flex-shrink: 0;
+  }
 }
 
 .btn-checkout:hover {

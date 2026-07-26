@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Navbar from '../components/Navbar'
 import api from '../api/axios'
 import './Subscriptions.css'
@@ -85,7 +85,7 @@ export default function Subscriptions() {
       if (t.includes('spotlight') || t.includes('top')) return 'fa-solid fa-fire'
       if (t.includes('read') || t.includes('receipts')) return 'fa-solid fa-check-double'
       if (t.includes('vip') || t.includes('crown')) return 'fa-solid fa-crown'
-      return 'fa-solid fa-circle'
+      return 'fa-solid fa-coins'
     }
 
     return (
