@@ -416,8 +416,8 @@ export default function Profile() {
                                 ) : (
                                     educations.map((ed, index) => (
                                         <div key={index} className="profile-info-section">
-                                            <strong>{ed.institution || 'Unknown institution'}</strong>
-                                            <span>{ed.degree || 'No degree provided'} • {ed.fieldOfStudy || 'No field'} • {ed.startYear || ''}{ed.endYear ? ` - ${ed.endYear}` : ''}</span>
+                                            <strong>{ed.institution+ ' ' || 'Unknown institution'}</strong>
+                                            <span>{ed.degreex || 'No degree provided'} • {ed.fieldOfStudy || 'No field'} • {ed.startYear || ''}{ed.endYear ? ` - ${ed.endYear}` : ''}</span>
                                         </div>
                                     ))
                                 )}
