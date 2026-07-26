@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
+import { GoogleLogin } from '@react-oauth/google'
 
 export default function SignIn() {
-  const { login } = useAuth()
+  const { login, persist } = useAuth() 
   const navigate = useNavigate()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -12,7 +13,7 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false)
 
   const [forgotOpen, setForgotOpen] = useState(false)
-  const [forgotStep, setForgotStep] = useState('identifier') // 'identifier' | 'otp' | 'reset'
+  const [forgotStep, setForgotStep] = useState('identifier') 
   const [forgotIdentifier, setForgotIdentifier] = useState('')
   const [otp, setOtp] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -30,6 +31,24 @@ export default function SignIn() {
       navigate(user.role === 'ADMIN' ? '/admin' : '/')
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Check your credentials.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setError('')
+    setLoading(true)
+    try {
+      const response = await api.post('/auth/google', {
+        idToken: credentialResponse.credential
+      })
+      
+      const data = response.data
+      persist(data)
+      navigate(data.user?.role === 'ADMIN' ? '/admin' : '/')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Google Sign-In failed.')
     } finally {
       setLoading(false)
     }
@@ -55,7 +74,7 @@ export default function SignIn() {
     setForgotMessage('')
     setForgotLoading(true)
     try {
-      const data = await api.post('/api/auth/forgot-password/send-otp', {
+      const data = await api.post('/auth/forgot-password/send-otp', {
         identifier: forgotIdentifier
       })
       setForgotMessage(data.message)
@@ -72,7 +91,7 @@ export default function SignIn() {
     setForgotMessage('')
     setForgotLoading(true)
     try {
-      const data = await api.post('/api/auth/forgot-password/verify-otp', {
+      const data = await api.post('/auth/forgot-password/verify-otp', {
         identifier: forgotIdentifier,
         otp
       })
@@ -94,7 +113,7 @@ export default function SignIn() {
     }
     setForgotLoading(true)
     try {
-      const data = await api.post('/api/auth/forgot-password/reset', {
+      const data = await api.post('/auth/forgot-password/reset', {
         identifier: forgotIdentifier,
         otp,
         newPassword,
@@ -114,7 +133,7 @@ export default function SignIn() {
   return (
     <div className="auth-wrapper">
       <div className="auth-card">
-        <h1 className="Welcome back"></h1>
+        <h1>Welcome Back</h1>
         <p className="subtitle">Sign in with your email or phone number</p>
 
         {error && <div className="error">{error}</div>}
@@ -144,6 +163,22 @@ export default function SignIn() {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
+
+        <div style={{ 
+          marginTop: '20px', 
+          marginBottom: '10px',
+          display: 'flex', 
+          justifyContent: 'center',
+          width: '100%'
+        }}>
+          <GoogleLogin 
+            onSuccess={handleGoogleSuccess} 
+            onError={() => setError('Google authentication failed')} 
+            theme="outline"        
+            size="large"           
+            width="368px"          
+          />
+        </div>
 
         <p className="switch-text">
           <button type="button" className="link-btn" onClick={openForgot}>
