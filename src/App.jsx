@@ -10,6 +10,7 @@ import Subscriptions from './pages/Subscriptions'
 import Settings from './pages/Settings'
 import AdminDashboard from './pages/AdminDashboard'
 import AdminQuestions from './pages/AdminQuestions'
+import AdminPlans from './pages/AdminPlans'
 
 export default function App() {
   const { loading } = useAuth()
@@ -62,6 +63,12 @@ export default function App() {
       <Route path="/admin/questions" element={
         <ProtectedRoute adminOnly>
           <AdminQuestions />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/admin/plans" element={
+        <ProtectedRoute adminOnly>
+          <AdminPlans />
         </ProtectedRoute>
       } />
       

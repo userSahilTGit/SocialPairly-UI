@@ -73,6 +73,7 @@ export default function Navbar() {
                         <>
                             <NavLink to="/admin">Dashboard</NavLink>
                             <NavLink to="/admin/questions">Questions</NavLink>
+                            <NavLink to="/admin/plans">Plans</NavLink>
                         </>
                     )}
 
