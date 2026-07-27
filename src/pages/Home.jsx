@@ -19,8 +19,8 @@ export default function Home() {
     useEffect(() => {
         const load = async () => {
             try {
-                const response = await api.get('/api/profile/completion')
-                setCompletion(response.data)
+                const data = await api.get('/profile/completion')
+                setCompletion(data)
             } catch {
                 // ignore
             } finally {

@@ -21,7 +21,7 @@ export default function AdminQuestions() {
 
     const load = async () => {
         try {
-            const { data } = await api.get('/api/admin/questions')
+            const { data } = await api.get('/admin/questions')
             setQuestions(data)
         } catch (e) {
             setError('Failed to load questions')
@@ -62,10 +62,10 @@ export default function AdminQuestions() {
                 options: isChoice ? form.options.filter((o) => o.trim()) : [],
             }
             if (editingId) {
-                await api.put(`/api/admin/questions/${editingId}`, payload)
+                await api.put(`/admin/questions/${editingId}`, payload)
                 setMessage('Question updated')
             } else {
-                await api.post('/api/admin/questions', payload)
+                await api.post('/admin/questions', payload)
                 setMessage('Question created')
             }
             resetForm()
@@ -91,7 +91,7 @@ export default function AdminQuestions() {
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this question? User answers for it will also be removed.')) return
         try {
-            await api.delete(`/api/admin/questions/${id}`)
+            await api.delete(`/admin/questions/${id}`)
             setMessage('Question deleted')
             load()
         } catch (err) {

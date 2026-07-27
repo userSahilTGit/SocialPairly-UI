@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { GoogleOAuthProvider } from '@react-oauth/google'
 import { useAuth } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import SignIn from './pages/SignIn'
@@ -20,7 +21,8 @@ export default function App() {
   }
 
   return (
-    <Routes>
+    <GoogleOAuthProvider clientId="1043168194153-i82qfvqg1jsk804qaa7ipkkov67b8pt4.apps.googleusercontent.com">
+     <Routes>
       <Route path="/signin" element={<SignIn />} />
       <Route path="/signup" element={<SignUp />} />
       
@@ -73,6 +75,7 @@ export default function App() {
       } />
       
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+     </Routes>
+    </GoogleOAuthProvider>
   )
 }

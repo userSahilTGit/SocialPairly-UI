@@ -49,7 +49,7 @@ export default function Navbar() {
         setDeleteError('')
         setDeleteLoading(true)
         try {
-            await api.delete('/api/users/me', {
+            await api.delete('/users/me', {
                 data: { identifier: deleteIdentifier, password: deletePassword },
             })
             logout()

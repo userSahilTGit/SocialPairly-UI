@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import api from '../api/axios'
+import { GoogleLogin } from '@react-oauth/google'
 
 export default function SignUp() {
-    const { register } = useAuth()
+    const { register, persist } = useAuth()
     const navigate = useNavigate()
     const [form, setForm] = useState({
         firstName: '',
@@ -29,6 +31,24 @@ export default function SignUp() {
             navigate('/')
         } catch (err) {
             setError(err.response?.data?.message || 'Registration failed.')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleGoogleSuccess = async (credentialResponse) => {
+        setError('')
+        setLoading(true)
+        try {
+            const response = await api.post('/auth/google', {
+                idToken: credentialResponse.credential
+            })
+            
+            const data = response.data
+            persist(data)
+            navigate('/')
+        } catch (err) {
+            setError(err.response?.data?.message || 'Google registration failed.')
         } finally {
             setLoading(false)
         }
@@ -96,13 +116,13 @@ export default function SignUp() {
 
                     <div className="form-group">
                         <label>Password</label>
-                        <input
-                            type="password"
-                            name="password"
-                            value={form.password}
-                            onChange={handleChange}
+                        <input 
+                            type="password" 
+                            name="password" 
+                            value={form.password} 
+                            onChange={handleChange} 
                             placeholder="At least 6 characters"
-                            required
+                            required 
                         />
                     </div>
 
@@ -110,6 +130,22 @@ export default function SignUp() {
                         {loading ? 'Creating account...' : 'Sign Up'}
                     </button>
                 </form>
+
+                <div style={{ 
+                  marginTop: '20px', 
+                  marginBottom: '10px',
+                  display: 'flex', 
+                  justifyContent: 'center',
+                  width: '100%'
+                }}>
+                    <GoogleLogin 
+                        onSuccess={handleGoogleSuccess} 
+                        onError={() => setError('Google authentication failed')} 
+                        theme="outline"        
+                        size="large"           
+                        width="368px"          
+                    />
+                </div>
 
                 <p className="switch-text">
                     Already have an account? <Link to="/signin">Sign in</Link>

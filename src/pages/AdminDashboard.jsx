@@ -18,8 +18,8 @@ export default function AdminDashboard() {
         const load = async () => {
             try {
                 const [statsRes, usersRes] = await Promise.all([
-                    api.get('/api/admin/stats'),
-                    api.get('/api/admin/users'),
+                    api.get('/admin/stats'),
+                    api.get('/admin/users'),
                 ])
                 setStats(statsRes.data)
                 setUsers(usersRes.data)
