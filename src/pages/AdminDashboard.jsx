@@ -44,7 +44,12 @@ export default function AdminDashboard() {
         <>
             <Navbar />
             <div className="container">
-                <h1 style={{ marginBottom: 20 }}>Admin Dashboard</h1>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                    <h1 style={{ margin: 0 }}>Admin Dashboard</h1>
+                    <a href="/admin/plans" className="btn btn-primary" style={{ textDecoration: 'none', padding: '10px 18px', borderRadius: 8 }}>
+                        Manage Subscription Plans
+                    </a>
+                </div>
 
                 {/* Stat cards */}
                 <div className="grid grid-4" style={{ marginBottom: 24 }}>
