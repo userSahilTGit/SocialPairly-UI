@@ -16,7 +16,7 @@ export default function Subscriptions() {
   useEffect(() => {
     const fetchPlans = async () => {
       try {
-        const { data } = await api.get('/api/plans')
+        const { data } = await api.get('/plans')
         setPlans(data)
         if (data.length > 0) {
           setActivePlanId(data[0].id)

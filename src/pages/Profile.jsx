@@ -4,7 +4,7 @@ import Navbar from '../components/Navbar'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:9000'
 
 const emptyEducation = { institution: '', degree: '', fieldOfStudy: '', startYear: '', endYear: '' }
 
@@ -35,8 +35,8 @@ export default function Profile() {
     const loadProfile = async () => {
         try {
             const [profileRes, questionsRes] = await Promise.all([
-                api.get('/api/profile'),
-                api.get('/api/questions'),
+                api.get('/profile'),
+                api.get('/questions'),
             ])
 
             const p = profileRes.data.profile
@@ -118,7 +118,7 @@ export default function Profile() {
         const data = new FormData()
         data.append('file', file)
         try {
-            const res = await api.post('/api/profile/photo', data, {
+            const res = await api.post('/profile/photo', data, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             })
             setPhotoUrl(res.data.url)
@@ -165,14 +165,14 @@ export default function Profile() {
                     })),
             }
 
-            await api.put('/api/profile', payload)
+            await api.put('/profile', payload)
 
             const answerPayload = Object.entries(answers)
                 .filter(([_, value]) => value !== '' && value !== null)
                 .map(([questionId, value]) => ({ questionId: Number(questionId), answerValue: value }))
             
             if (answerPayload.length > 0) {
-                await api.post('/api/questions/answers', answerPayload)
+                await api.post('/questions/answers', answerPayload)
             }
 
             await refreshUser()

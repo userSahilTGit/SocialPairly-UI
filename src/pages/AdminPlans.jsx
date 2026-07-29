@@ -39,7 +39,7 @@ export default function AdminPlans() {
     const fetchPlans = async () => {
         try {
             setLoading(true)
-            const { data } = await api.get('/api/plans/admin/all')
+            const { data } = await api.get('/plans/admin/all')
             setPlans(data || [])
             setError('')
         } catch (err) {
@@ -131,11 +131,11 @@ export default function AdminPlans() {
 
             if (editingPlan) {
                 // Update existing plan
-                await api.put(`/api/plans/admin/${editingPlan.id}`, payload)
+                await api.put(`/plans/admin/${editingPlan.id}`, payload)
                 setSuccess(`Plan "${payload.planName}" updated successfully!`)
             } else {
                 // Create new plan
-                await api.post('/api/plans/admin', payload)
+                await api.post('/plans/admin', payload)
                 setSuccess(`Plan "${payload.planName}" created successfully!`)
             }
 
@@ -152,7 +152,7 @@ export default function AdminPlans() {
         try {
             setError('')
             setSuccess('')
-            await api.delete(`/api/plans/admin/${deletingPlan.id}`)
+            await api.delete(`/plans/admin/${deletingPlan.id}`)
             setSuccess(`Plan "${deletingPlan.planName}" deleted successfully!`)
             setIsDeleteModalOpen(false)
             setDeletingPlan(null)

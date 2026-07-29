@@ -1,19 +1,23 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import { GoogleLogin } from '@react-oauth/google'
 
 export default function SignIn() {
-  const { login, persist } = useAuth() 
+  const { login, persist } = useAuth()
   const navigate = useNavigate()
+
+  // Sign-in state
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Modal state
   const [forgotOpen, setForgotOpen] = useState(false)
-  const [forgotStep, setForgotStep] = useState('identifier') 
+  const [forgotStep, setForgotStep] = useState('identifier') // 'identifier' | 'otp' | 'reset'
   const [forgotIdentifier, setForgotIdentifier] = useState('')
   const [otp, setOtp] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -43,7 +47,6 @@ export default function SignIn() {
       const response = await api.post('/auth/google', {
         idToken: credentialResponse.credential
       })
-      
       const data = response.data
       persist(data)
       navigate(data.user?.role === 'ADMIN' ? '/admin' : '/')
@@ -54,57 +57,63 @@ export default function SignIn() {
     }
   }
 
-  const openForgot = () => {
-    setForgotOpen(true)
-    setForgotStep('identifier')
+  const handleOpenForgot = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setForgotError('')
+    setForgotMessage('')
     setForgotIdentifier('')
     setOtp('')
     setNewPassword('')
     setConfirmPassword('')
-    setForgotError('')
-    setForgotMessage('')
+    setForgotStep('identifier')
+    setForgotOpen(true)
   }
 
-  const closeForgot = () => {
+  const handleCloseForgot = (e) => {
+    if (e) e.preventDefault()
     setForgotOpen(false)
   }
 
-  const handleSendOtp = async () => {
+  const handleSendOtp = async (e) => {
+    e.preventDefault()
     setForgotError('')
     setForgotMessage('')
     setForgotLoading(true)
     try {
-      const data = await api.post('/auth/forgot-password/send-otp', {
+      const res = await api.post('/auth/forgot-password/send-otp', {
         identifier: forgotIdentifier
       })
-      setForgotMessage(data.message)
+      setForgotMessage(res.data?.message || 'OTP sent successfully')
       setForgotStep('otp')
     } catch (err) {
-      setForgotError(err.response?.data?.message || 'Failed to send OTP')
+      setForgotError(err.response?.data?.error || err.response?.data?.message || 'Failed to send OTP')
     } finally {
       setForgotLoading(false)
     }
   }
 
-  const handleVerifyOtp = async () => {
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault()
     setForgotError('')
     setForgotMessage('')
     setForgotLoading(true)
     try {
-      const data = await api.post('/auth/forgot-password/verify-otp', {
+      const res = await api.post('/auth/forgot-password/verify-otp', {
         identifier: forgotIdentifier,
         otp
       })
-      setForgotMessage(data.message)
+      setForgotMessage(res.data?.message || 'OTP verified successfully')
       setForgotStep('reset')
     } catch (err) {
-      setForgotError(err.response?.data?.message || 'Invalid OTP')
+      setForgotError(err.response?.data?.error || err.response?.data?.message || 'Invalid OTP')
     } finally {
       setForgotLoading(false)
     }
   }
 
-  const handleResetPassword = async () => {
+  const handleResetPassword = async (e) => {
+    e.preventDefault()
     setForgotError('')
     setForgotMessage('')
     if (newPassword !== confirmPassword) {
@@ -113,18 +122,18 @@ export default function SignIn() {
     }
     setForgotLoading(true)
     try {
-      const data = await api.post('/auth/forgot-password/reset', {
+      const res = await api.post('/auth/forgot-password/reset', {
         identifier: forgotIdentifier,
         otp,
         newPassword,
         confirmPassword
       })
-      setForgotMessage(data.message)
+      setForgotMessage(res.data?.message || 'Password reset successfully')
       setTimeout(() => {
-        closeForgot()
+        setForgotOpen(false)
       }, 1500)
     } catch (err) {
-      setForgotError(err.response?.data?.message || 'Failed to reset password')
+      setForgotError(err.response?.data?.error || err.response?.data?.message || 'Failed to reset password')
     } finally {
       setForgotLoading(false)
     }
@@ -164,43 +173,74 @@ export default function SignIn() {
           </button>
         </form>
 
-        <div style={{ 
-          marginTop: '20px', 
-          marginBottom: '10px',
-          display: 'flex', 
-          justifyContent: 'center',
-          width: '100%'
-        }}>
-          <GoogleLogin 
-            onSuccess={handleGoogleSuccess} 
-            onError={() => setError('Google authentication failed')} 
-            theme="outline"        
-            size="large"           
-            width="368px"          
+        <div style={{ marginTop: '20px', marginBottom: '15px', display: 'flex', justifyContent: 'center' }}>
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => setError('Google authentication failed')}
+            theme="outline"
+            size="large"
+            width="368px"
           />
         </div>
 
-        <p className="switch-text">
-          <button type="button" className="link-btn" onClick={openForgot}>
-            Forgot password
+        {/* Centered Forgot Password Button */}
+        <p className="switch-text" style={{ marginTop: '16px' }}>
+          <button
+            type="button"
+            className="link-btn"
+            onClick={handleOpenForgot}
+          >
+            Forgot password?
           </button>
         </p>
 
-        <p className="switch-text">
+        {/* Centered Sign up Link */}
+        <p className="switch-text" style={{ marginTop: '10px' }}>
           New here? <Link to="/signup">Create an account</Link>
         </p>
       </div>
 
-      {forgotOpen && (
-        <div className="modal-overlay" onClick={closeForgot}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Reset Password</h2>
+      {/* POPUP MODAL */}
+      {forgotOpen && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 999999,
+            padding: '20px'
+          }}
+          onClick={handleCloseForgot}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              color: '#1f2937',
+              padding: '28px',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '420px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+              position: 'relative',
+              zIndex: 1000000
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ marginBottom: '16px', fontSize: '20px', fontWeight: 'bold' }}>
+              Reset Password
+            </h2>
 
             {forgotError && <div className="error">{forgotError}</div>}
             {forgotMessage && <div className="success">{forgotMessage}</div>}
 
             {forgotStep === 'identifier' && (
-              <>
+              <form onSubmit={handleSendOtp}>
                 <div className="form-group">
                   <label>Email or Phone number</label>
                   <input
@@ -208,21 +248,21 @@ export default function SignIn() {
                     value={forgotIdentifier}
                     onChange={(e) => setForgotIdentifier(e.target.value)}
                     placeholder="you@example.com or 9876543210"
+                    required
                   />
                 </div>
                 <button
-                  type="button"
+                  type="submit"
                   className="btn btn-block"
                   disabled={forgotLoading || !forgotIdentifier.trim()}
-                  onClick={handleSendOtp}
                 >
                   {forgotLoading ? 'Sending...' : 'Send OTP'}
                 </button>
-              </>
+              </form>
             )}
 
             {forgotStep === 'otp' && (
-              <>
+              <form onSubmit={handleVerifyOtp}>
                 <div className="form-group">
                   <label>Enter 4-digit OTP</label>
                   <input
@@ -231,13 +271,13 @@ export default function SignIn() {
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
                     placeholder="0000"
                     maxLength={4}
+                    required
                   />
                 </div>
                 <button
-                  type="button"
+                  type="submit"
                   className="btn btn-block"
                   disabled={forgotLoading || otp.length !== 4}
-                  onClick={handleVerifyOtp}
                 >
                   {forgotLoading ? 'Verifying...' : 'Verify'}
                 </button>
@@ -250,11 +290,11 @@ export default function SignIn() {
                 >
                   Resend OTP
                 </button>
-              </>
+              </form>
             )}
 
             {forgotStep === 'reset' && (
-              <>
+              <form onSubmit={handleResetPassword}>
                 <div className="form-group">
                   <label>New Password</label>
                   <input
@@ -262,6 +302,7 @@ export default function SignIn() {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="********"
+                    required
                   />
                 </div>
                 <div className="form-group">
@@ -271,29 +312,30 @@ export default function SignIn() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="********"
+                    required
                   />
                 </div>
                 <button
-                  type="button"
+                  type="submit"
                   className="btn btn-block"
                   disabled={forgotLoading || !newPassword || !confirmPassword}
-                  onClick={handleResetPassword}
                 >
                   {forgotLoading ? 'Resetting...' : 'Reset'}
                 </button>
-              </>
+              </form>
             )}
 
             <button
               type="button"
               className="btn btn-secondary btn-block"
               style={{ marginTop: 12 }}
-              onClick={closeForgot}
+              onClick={handleCloseForgot}
             >
               Cancel
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
