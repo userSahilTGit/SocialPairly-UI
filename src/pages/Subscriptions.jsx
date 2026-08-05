@@ -1,17 +1,90 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Navbar from '../components/Navbar'
+import PaymentReceiptPreview from '../components/PaymentReceiptPreview'
 import api from '../api/axios'
+import { downloadReceiptPdf } from '../utils/downloadReceiptPdf'
 import './Subscriptions.css'
 
 export default function Subscriptions() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [activePlanId, setActivePlanId] = useState(null)
   const [activePlan, setActivePlan] = useState(null)
   const [planFilter, setPlanFilter] = useState('ALL')
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [showToast, setShowToast] = useState(false)
   const [error, setError] = useState(null)
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [currentSubscription, setCurrentSubscription] = useState(null)
+  const [paymentBanner, setPaymentBanner] = useState(null)
+  const [receiptModal, setReceiptModal] = useState({ open: false, data: null })
+  const [pendingSubscription, setPendingSubscription] = useState(null)
+  const [showSubscriptionBanner, setShowSubscriptionBanner] = useState(true)
+  const [downloadingReceipt, setDownloadingReceipt] = useState(false)
+  const receiptPreviewRef = useRef(null)
+
+  const paymentResult = searchParams.get('payment')
+  const sessionId = searchParams.get('session_id')
+
+  const fetchCurrentSubscription = useCallback(async () => {
+    try {
+      const { data } = await api.get('/subscriptions/current')
+      if (data && data.active === false) {
+        return null
+      }
+      return data
+    } catch (err) {
+      console.error('Failed to load current subscription', err)
+      return null
+    }
+  }, [])
+
+  const fetchLatestPaymentStatus = useCallback(async () => {
+    try {
+      const { data } = await api.get('/payment/latest-status')
+      if (data?.status === 'failed') {
+        setPaymentBanner({
+          type: 'error',
+          title: 'Payment Failed',
+          message: 'Your payment could not be processed. Please try again with a different payment method.',
+        })
+      }
+      return data
+    } catch (err) {
+      console.error('Failed to load payment status', err)
+      return null
+    }
+  }, [])
+
+  const closeReceiptModal = () => {
+    setReceiptModal({ open: false, data: null })
+    if (pendingSubscription) {
+      setCurrentSubscription(pendingSubscription)
+      setPendingSubscription(null)
+    }
+    setShowSubscriptionBanner(true)
+  }
+
+  const downloadReceipt = async () => {
+    if (!receiptPreviewRef.current || !receiptModal.data) return
+
+    setDownloadingReceipt(true)
+    try {
+      const receiptNumber = receiptModal.data.receiptNumber || 'payment'
+      const safeName = receiptNumber.replace(/[^a-zA-Z0-9-_]/g, '-')
+      await downloadReceiptPdf(receiptPreviewRef.current, `receipt-${safeName}.pdf`)
+    } catch (err) {
+      console.error('Failed to download receipt PDF', err)
+      setPaymentBanner({
+        type: 'error',
+        title: 'Download Failed',
+        message: 'Unable to generate the receipt PDF. Please try again.',
+      })
+    } finally {
+      setDownloadingReceipt(false)
+    }
+  }
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -31,7 +104,83 @@ export default function Subscriptions() {
     }
 
     fetchPlans()
-  }, [])
+
+    if (paymentResult !== 'success') {
+      fetchCurrentSubscription().then((subscription) => {
+        if (subscription) {
+          setCurrentSubscription(subscription)
+          setShowSubscriptionBanner(true)
+        }
+      })
+    }
+  }, [fetchCurrentSubscription, paymentResult])
+
+  useEffect(() => {
+    if (paymentResult !== 'success' || !sessionId) return
+
+    const confirmPaymentSession = async () => {
+      setPaymentBanner(null)
+      setShowSubscriptionBanner(false)
+
+      try {
+        const { data } = await api.post('/payment/confirm-session', { sessionId })
+
+        if (data?.subscription) {
+          setPendingSubscription(data.subscription)
+          if (data.receipt) {
+            setReceiptModal({ open: true, data: data.receipt })
+          } else {
+            setCurrentSubscription(data.subscription)
+            setShowSubscriptionBanner(true)
+          }
+        } else {
+          setPaymentBanner({
+            type: 'info',
+            title: 'Payment Received',
+            message: 'Your payment is being processed. Your subscription will appear shortly.',
+          })
+        }
+      } catch (err) {
+        console.error('Failed to confirm checkout session', err)
+        setPaymentBanner({
+          type: 'error',
+          title: 'Payment Confirmation Failed',
+          message: err.response?.data?.message || err.message || 'Unable to confirm your payment. Please contact support.',
+        })
+      }
+
+      searchParams.delete('payment')
+      searchParams.delete('session_id')
+      setSearchParams(searchParams, { replace: true })
+    }
+
+    confirmPaymentSession()
+  }, [paymentResult, sessionId, searchParams, setSearchParams])
+
+  useEffect(() => {
+    if (paymentResult) return
+    fetchLatestPaymentStatus()
+  }, [paymentResult, fetchLatestPaymentStatus])
+
+  useEffect(() => {
+    if (paymentResult === 'cancelled') {
+      setPaymentBanner({
+        type: 'warning',
+        title: 'Payment Cancelled',
+        message: 'You cancelled the checkout. No charges were made.',
+      })
+      searchParams.delete('payment')
+      setSearchParams(searchParams, { replace: true })
+    } else if (paymentResult === 'failed') {
+      setPaymentBanner({
+        type: 'error',
+        title: 'Payment Failed',
+        message: 'Your payment could not be completed. Please try again.',
+      })
+      searchParams.delete('payment')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [paymentResult, searchParams, setSearchParams])
 
   const filteredPlans = useMemo(() => {
     if (planFilter === 'ALL') return plans
@@ -70,7 +219,6 @@ export default function Subscriptions() {
 
   const renderFeatureList = (description) => {
     if (!description) return null
-    // split common separators into feature lines
     const items = description.split(/\r?\n|\||;|•|\u2022/).map((s) => s.trim()).filter(Boolean)
 
     const getIconClass = (text) => {
@@ -111,10 +259,42 @@ export default function Subscriptions() {
   const openCheckoutModal = () => setIsModalOpen(true)
   const closeCheckoutModal = () => setIsModalOpen(false)
 
-  const completePurchase = () => {
-    setIsModalOpen(false)
-    setShowToast(true)
-    window.setTimeout(() => setShowToast(false), 3500)
+  const startStripeCheckout = async () => {
+    if (!activePlan) return
+
+    setCheckoutLoading(true)
+    setPaymentBanner(null)
+
+    try {
+      const amountInCents = Math.round(Number(activePlan.amount) * 100)
+      const { data } = await api.post('/payment/checkout', {
+        amount: amountInCents,
+        quantity: 1,
+        currency: 'USD',
+        name: activePlan.planName,
+        planId: activePlan.id,
+      })
+
+      if (data?.sessionUrl) {
+        window.location.href = data.sessionUrl
+        return
+      }
+
+      setPaymentBanner({
+        type: 'error',
+        title: 'Checkout Error',
+        message: data?.message || 'Unable to start checkout. Please try again.',
+      })
+    } catch (err) {
+      console.error('Checkout failed', err)
+      setPaymentBanner({
+        type: 'error',
+        title: 'Checkout Error',
+        message: err.response?.data?.message || err.message || 'Unable to start checkout.',
+      })
+    } finally {
+      setCheckoutLoading(false)
+    }
   }
 
   if (loading) {
@@ -133,6 +313,36 @@ export default function Subscriptions() {
       <Navbar />
       <div className="subscriptions-page">
         <main className="main-content">
+          {paymentBanner && (
+            <div className={`payment-banner payment-banner-${paymentBanner.type}`} role="alert">
+              <i className={`fa-solid ${paymentBanner.type === 'error' ? 'fa-circle-xmark' : paymentBanner.type === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-info'}`} />
+              <div>
+                <strong>{paymentBanner.title}</strong>
+                <p>{paymentBanner.message}</p>
+              </div>
+            </div>
+          )}
+
+          {showSubscriptionBanner && currentSubscription && (
+            <section className="current-subscription-banner">
+              <div className="current-subscription-icon">
+                <i className="fa-solid fa-crown" />
+              </div>
+              <div className="current-subscription-details">
+                <span className="current-subscription-label">Your Current Plan</span>
+                <h2>{currentSubscription.planName}</h2>
+                <p>
+                  Active until {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString(undefined, {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                  {' '}({formatDuration(currentSubscription.durationDays)})
+                </p>
+              </div>
+            </section>
+          )}
+
           <section className="pricing-header">
             <div className="pricing-badge">
               <i className="fa-solid fa-bolt"></i>
@@ -162,16 +372,20 @@ export default function Subscriptions() {
             )}
             {filteredPlans.map((plan) => {
               const selected = plan.id === activePlanId
+              const isCurrentPlan = showSubscriptionBanner && currentSubscription?.planId === plan.id
               const monthlyEquivalent = plan.durationDays ? (Number(plan.amount) / (Number(plan.durationDays) / 30)) : null
               const showPopular = Number(plan.durationDays || 0) >= 80 && Number(plan.durationDays || 0) <= 100
 
               return (
                 <article
                   key={plan.id}
-                  className={`plan-card ${selected ? 'glass-card-selected' : ''}`}
+                  className={`plan-card ${selected ? 'glass-card-selected' : ''} ${isCurrentPlan ? 'plan-card-current' : ''}`}
                   onClick={() => handleSelectPlan(plan)}
                 >
-                  {showPopular && (
+                  {isCurrentPlan && (
+                    <div className="ribbon ribbon-current">CURRENT PLAN</div>
+                  )}
+                  {!isCurrentPlan && showPopular && (
                     <div className="ribbon">MOST POPULAR • SAVE 20%</div>
                   )}
                   <div className="plan-card-inner">
@@ -205,7 +419,7 @@ export default function Subscriptions() {
                         handleSelectPlan(plan)
                       }}
                     >
-                      {selected ? 'Selected Plan' : 'Select Pass'}
+                      {isCurrentPlan ? 'Current Plan' : selected ? 'Selected Plan' : 'Select Pass'}
                     </button>
                   </div>
                 </article>
@@ -257,7 +471,7 @@ export default function Subscriptions() {
 
         <div className={`modal-overlay ${isModalOpen ? 'active' : ''}`}>
           <div className="modal-container">
-            <button type="button" className="modal-close" onClick={closeCheckoutModal}>
+            <button type="button" className="modal-close" onClick={closeCheckoutModal} disabled={checkoutLoading}>
               <i className="fa-solid fa-xmark"></i>
             </button>
             <div className="modal-header">
@@ -281,25 +495,41 @@ export default function Subscriptions() {
                 <strong>{formatPrice(activePlan?.amount)}</strong>
               </div>
             </div>
-            <div className="modal-actions">
-              <button type="button" className="modal-button modal-button-secondary" onClick={completePurchase}>
-                <i className="fa-brands fa-apple"></i>
-                Pay with Apple Pay
-              </button>
-              <button type="button" className="modal-button modal-button-primary" onClick={completePurchase}>
-                <i className="fa-solid fa-credit-card"></i>
-                Pay with Credit / Debit Card
+            <div className="modal-actions modal-actions-single">
+              <button type="button" className="modal-button modal-button-primary" onClick={startStripeCheckout} disabled={checkoutLoading}>
+                {checkoutLoading ? 'Redirecting...' : 'Confirm'}
+                {!checkoutLoading && <i className="fa-solid fa-arrow-right"></i>}
               </button>
             </div>
-            <p className="modal-disclaimer">By clicking pay, your account will be instantly upgraded. Subscriptions auto-renew depending on your chosen plan cycle. You can cancel anytime from your settings.</p>
+            <p className="modal-disclaimer">By confirming, your account will be instantly upgraded. Subscriptions auto-renew depending on your chosen plan cycle. You can cancel anytime from your settings.</p>
           </div>
         </div>
 
-        <div className={`toast-notification ${showToast ? 'show' : ''}`}>
-          <i className="fa-solid fa-circle-check"></i>
-          <div>
-            <h5>Subscription Activated!</h5>
-            <p>Your account has been successfully upgraded.</p>
+        <div className={`modal-overlay receipt-modal-overlay ${receiptModal.open ? 'active' : ''}`}>
+          <div className="receipt-modal-container">
+            <div className="receipt-modal-header">
+              <h3>Payment Receipt</h3>
+              <button type="button" className="modal-close" onClick={closeReceiptModal} aria-label="Close receipt">
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <p className="receipt-modal-subtitle">Your payment was successful. Review your receipt below.</p>
+            <div className="receipt-frame-wrapper">
+              {receiptModal.data ? (
+                <PaymentReceiptPreview ref={receiptPreviewRef} receipt={receiptModal.data} />
+              ) : (
+                <div className="receipt-frame-fallback">Receipt is not available.</div>
+              )}
+            </div>
+            <div className="receipt-modal-actions">
+              <button type="button" className="modal-button modal-button-secondary" onClick={downloadReceipt} disabled={!receiptModal.data || downloadingReceipt}>
+                <i className="fa-solid fa-download"></i>
+                {downloadingReceipt ? 'Generating PDF...' : 'Download Receipt'}
+              </button>
+              <button type="button" className="modal-button modal-button-primary" onClick={closeReceiptModal}>
+                Close & View My Plan
+              </button>
+            </div>
           </div>
         </div>
       </div>

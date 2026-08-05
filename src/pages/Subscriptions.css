@@ -668,6 +668,10 @@ hr {
   margin-bottom: 1rem;
 }
 
+.modal-actions-single {
+  grid-template-columns: 1fr;
+}
+
 .modal-button {
   width: 100%;
   padding: 0.95rem 1rem;
@@ -754,4 +758,164 @@ button:focus-visible,
 a:focus-visible {
   outline: 2px solid var(--color-brand-500);
   outline-offset: 2px;
+}
+
+.current-subscription-banner {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin: 0 auto 2rem;
+  max-width: 960px;
+  padding: 1.25rem 1.5rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, var(--color-brand-50), #fff);
+  border: 1px solid var(--color-brand-200);
+  box-shadow: var(--shadow-md);
+}
+
+.current-subscription-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-brand-500);
+  color: #fff;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.current-subscription-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-brand-600);
+  margin-bottom: 0.25rem;
+}
+
+.current-subscription-details h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  color: var(--color-slate-900);
+}
+
+.current-subscription-details p {
+  margin: 0;
+  color: var(--color-slate-600);
+  font-size: 0.95rem;
+}
+
+.payment-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  margin: 0 auto 1.5rem;
+  max-width: 960px;
+  padding: 1rem 1.25rem;
+  border-radius: 0.875rem;
+  border: 1px solid transparent;
+}
+
+.payment-banner i {
+  font-size: 1.25rem;
+  margin-top: 0.15rem;
+}
+
+.payment-banner strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.payment-banner p {
+  margin: 0;
+  font-size: 0.925rem;
+}
+
+.payment-banner-error {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.payment-banner-warning {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.payment-banner-info {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.plan-card-current {
+  border-color: var(--color-emerald-500);
+}
+
+.ribbon-current {
+  background: var(--color-emerald-500);
+}
+
+.receipt-modal-overlay .receipt-modal-container {
+  width: min(720px, 94vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem 1.5rem;
+  box-shadow: var(--shadow-lg);
+}
+
+.receipt-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.receipt-modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--color-slate-900);
+}
+
+.receipt-modal-subtitle {
+  margin: 0.5rem 0 1rem;
+  color: var(--color-slate-600);
+  font-size: 0.925rem;
+}
+
+.receipt-frame-wrapper {
+  flex: 1;
+  min-height: 420px;
+  max-height: 55vh;
+  border: 1px solid var(--color-slate-200);
+  border-radius: 0.75rem;
+  overflow: auto;
+  background: #ffffff;
+}
+
+.receipt-frame-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 420px;
+  color: var(--color-slate-500);
+}
+
+.receipt-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.receipt-modal-actions .modal-button {
+  flex: 1;
+  min-width: 180px;
 }

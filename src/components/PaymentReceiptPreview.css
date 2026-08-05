@@ -1,0 +1,129 @@
+.payment-receipt-preview {
+  background: #ffffff;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #1a1f36;
+}
+
+.receipt-preview-banner {
+  position: relative;
+  height: 72px;
+  overflow: hidden;
+  background: #f6f9fc;
+}
+
+.receipt-preview-banner-dark {
+  position: absolute;
+  inset: 0;
+  background: #525f7f;
+  clip-path: polygon(0 0, 100% 0, 72% 100%, 0 100%);
+}
+
+.receipt-preview-banner-light {
+  position: absolute;
+  inset: 0;
+  background: #e6ebf1;
+  clip-path: polygon(68% 0, 100% 0, 100% 100%, 52% 100%);
+}
+
+.receipt-preview-body {
+  padding: 1.75rem 1.5rem 1.5rem;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+.receipt-preview-title {
+  margin: 0 0 0.35rem;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.35rem;
+  font-weight: 400;
+  text-align: center;
+  color: #1a1f36;
+}
+
+.receipt-preview-number {
+  margin: 0 0 1.5rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: #697386;
+}
+
+.receipt-preview-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.receipt-preview-meta-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #8792a2;
+  margin-bottom: 0.35rem;
+}
+
+.receipt-preview-meta strong {
+  font-size: 0.95rem;
+  color: #1a1f36;
+  font-weight: 600;
+}
+
+.receipt-preview-summary-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #8792a2;
+  margin-bottom: 0.5rem;
+}
+
+.receipt-preview-summary-box {
+  background: #f6f9fc;
+  border-radius: 0.5rem;
+  padding: 1rem 1.1rem;
+}
+
+.receipt-preview-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9rem;
+  color: #4f566b;
+}
+
+.receipt-preview-summary-box hr {
+  border: none;
+  border-top: 1px solid #e3e8ee;
+  margin: 0.85rem 0;
+}
+
+.receipt-preview-total {
+  font-weight: 700;
+  color: #1a1f36;
+}
+
+.receipt-preview-contact {
+  margin: 1.5rem 0 0.75rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #697386;
+}
+
+.receipt-preview-contact a {
+  color: #625afa;
+  text-decoration: none;
+}
+
+.receipt-preview-footer-note {
+  margin: 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #8792a2;
+}
+
+.receipt-preview-footer-note a {
+  color: #625afa;
+  text-decoration: none;
+}
