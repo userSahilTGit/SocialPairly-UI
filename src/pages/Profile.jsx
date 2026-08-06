@@ -1,20 +1,27 @@
-import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useEffect, useState, useCallback } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
+import MediaModal from '../components/MediaModal' // 1. Imported MediaModal
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:9000'
+import { getMediaUrl } from '../utils/mediaUrl'
+import { Play, Camera, Film } from 'lucide-react'
 
 const emptyEducation = { institution: '', degree: '', fieldOfStudy: '', startYear: '', endYear: '' }
 
 export default function Profile() {
     const { user, loading: authLoading, refreshUser } = useAuth()
+    const navigate = useNavigate()
+    const location = useLocation()
     const [loading, setLoading] = useState(true)
+    const [profileMedia, setProfileMedia] = useState([])
+    const [mediaLoading, setMediaLoading] = useState(false)
     const [saving, setSaving] = useState(false)
     const [message, setMessage] = useState('')
     const [error, setError] = useState('')
+
     const [photoUrl, setPhotoUrl] = useState('')
+    const [activeMedia, setActiveMedia] = useState(null) // 👈 Lightbox state
 
     const [form, setForm] = useState({
         aboutMe: '',
@@ -30,7 +37,22 @@ export default function Profile() {
 
     const [educations, setEducations] = useState([emptyEducation])
     const [questions, setQuestions] = useState([])
-    const [answers, setAnswers] = useState({}) // questionId -> value
+    const [answers, setAnswers] = useState({})
+
+    // Separate media fetch so it doesn't block profile loading
+    const fetchUserMedia = useCallback(async () => {
+        setMediaLoading(true);
+        try {
+            const mediaRes = await api.get('/media/my-uploads');
+            setProfileMedia((mediaRes.data || []).sort((a, b) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999)));
+        } catch (err) {
+            console.error('Failed to load media for profile gallery', err);
+            // Don't set error — this is non-critical for profile display
+            setProfileMedia([]);
+        } finally {
+            setMediaLoading(false);
+        }
+    }, []);
 
     const loadProfile = async () => {
         try {
@@ -80,7 +102,13 @@ export default function Profile() {
         }
     }
 
-    const location = useLocation()
+    // On mount and whenever navigating to this page, load profile + media
+    useEffect(() => {
+        if (!authLoading) {
+            loadProfile()
+            fetchUserMedia()
+        }
+    }, [authLoading, location.key]) // location.key changes on every navigation
 
     const handleEditToggle = () => {
         setMessage('')
@@ -94,12 +122,6 @@ export default function Profile() {
         setError('')
         loadProfile()
     }
-
-    useEffect(() => {
-        if (!authLoading) {
-            loadProfile()
-        }
-    }, [authLoading, location.key])
 
     const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
 
@@ -203,6 +225,8 @@ export default function Profile() {
         </div>
     )
 
+    const filteredMedia = profileMedia.filter(m => m.status === 'APPROVED');
+
     return (
         <>
             <Navbar />
@@ -226,7 +250,7 @@ export default function Profile() {
                             <h2>Profile Photo</h2>
                             <div className="flex">
                                 {photoUrl ? (
-                                    <img className="avatar" src={`${API_URL}${photoUrl}`} alt="Profile" />
+                                    <img className="avatar" src={getMediaUrl(photoUrl)} alt="Profile" />
                                 ) : (
                                     <div className="avatar-placeholder">
                                         {user?.firstName?.[0]?.toUpperCase()}
@@ -374,7 +398,7 @@ export default function Profile() {
                                         <p className="muted">{user?.email}</p>
                                     </div>
                                     {photoUrl ? (
-                                        <img className="avatar" src={`${API_URL}${photoUrl}`} alt="Profile" />
+                                        <img className="avatar" src={getMediaUrl(photoUrl)} alt="Profile" />
                                     ) : (
                                         <div className="avatar-placeholder">
                                             {user?.firstName?.[0]?.toUpperCase()}
@@ -423,6 +447,71 @@ export default function Profile() {
                                 )}
                             </div>
 
+                            {/* Photos & Videos Gallery */}
+                            <div className="card">
+                                <div className="flex-between">
+                                    <h2>Photos & Videos</h2>
+                                    <button className="btn btn-secondary btn-sm" onClick={() => navigate('/profile/media')} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        <Camera size={14} /> Manage
+                                    </button>
+                                </div>
+                                {mediaLoading ? (
+                                    <div className="center" style={{ padding: '10px 0' }}>
+                                        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Loading media...</p>
+                                    </div>
+                                ) : filteredMedia.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--muted)' }}>
+                                        <Film size={36} style={{ opacity: 0.3, marginBottom: 8 }} />
+                                        <p style={{ fontSize: 14, marginBottom: 8 }}>No photos or videos uploaded yet</p>
+                                        <button className="btn btn-sm" onClick={() => navigate('/profile/media')}>
+                                            Upload Media
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
+                                            {filteredMedia.map((m) => (
+                                                <div
+                                                    key={m.id}
+                                                    style={{
+                                                        aspectRatio: '4/5', borderRadius: 10, overflow: 'hidden',
+                                                        border: '2px solid var(--border)', position: 'relative', background: '#000',
+                                                        cursor: 'pointer',
+                                                    }}
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setActiveMedia(m);
+                                                    }}
+                                                    title={m.caption || 'View media'}
+                                                >
+                                                    {m.mediaType === 'PHOTO' ? (
+                                                        <img src={getMediaUrl(m)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    ) : (
+                                                        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                                                            <video src={getMediaUrl(m)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)' }}>
+                                                                <Play size={20} color="#fff" fill="#fff" />
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {m.caption && (
+                                                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.7))', padding: '16px 6px 4px' }}>
+                                                            <p style={{ color: '#fff', fontSize: 10, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                {m.caption}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, textAlign: 'center' }}>
+                                            {filteredMedia.length} media item(s) · <a href="/profile/media" style={{ color: 'var(--primary)' }}>Manage media</a>
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+
                             {questions.length > 0 && (
                                 <div className="card profile-info-card">
                                     <h2>Additional Questions</h2>
@@ -437,6 +526,14 @@ export default function Profile() {
                         </div>
                     </>
                 )}
+                
+                {/* Media Lightbox Modal */}
+                <MediaModal
+                  activeMedia={activeMedia}
+                  mediaList={filteredMedia}
+                  onClose={() => setActiveMedia(null)}
+                  onNavigate={setActiveMedia}
+                />
             </div>
         </>
     )

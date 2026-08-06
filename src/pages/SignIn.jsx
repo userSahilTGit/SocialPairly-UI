@@ -5,15 +5,18 @@ import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import { GoogleLogin } from '@react-oauth/google'
 
+
 export default function SignIn() {
   const { login, persist } = useAuth()
   const navigate = useNavigate()
+
 
   // Sign-in state
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
 
   // Modal state
   const [forgotOpen, setForgotOpen] = useState(false)
@@ -25,6 +28,7 @@ export default function SignIn() {
   const [forgotError, setForgotError] = useState('')
   const [forgotMessage, setForgotMessage] = useState('')
   const [forgotLoading, setForgotLoading] = useState(false)
+
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -39,6 +43,7 @@ export default function SignIn() {
       setLoading(false)
     }
   }
+
 
   const handleGoogleSuccess = async (credentialResponse) => {
     setError('')
@@ -57,6 +62,7 @@ export default function SignIn() {
     }
   }
 
+
   const handleOpenForgot = (e) => {
     e.preventDefault()
     e.stopPropagation()
@@ -70,10 +76,12 @@ export default function SignIn() {
     setForgotOpen(true)
   }
 
+
   const handleCloseForgot = (e) => {
     if (e) e.preventDefault()
     setForgotOpen(false)
   }
+
 
   const handleSendOtp = async (e) => {
     e.preventDefault()
@@ -139,13 +147,16 @@ export default function SignIn() {
     }
   }
 
+
   return (
     <div className="auth-wrapper">
       <div className="auth-card">
         <h1>Welcome Back</h1>
         <p className="subtitle">Sign in with your email or phone number</p>
 
+
         {error && <div className="error">{error}</div>}
+
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
@@ -239,6 +250,7 @@ export default function SignIn() {
             {forgotError && <div className="error">{forgotError}</div>}
             {forgotMessage && <div className="success">{forgotMessage}</div>}
 
+
             {forgotStep === 'identifier' && (
               <form onSubmit={handleSendOtp}>
                 <div className="form-group">
@@ -260,6 +272,7 @@ export default function SignIn() {
                 </button>
               </form>
             )}
+
 
             {forgotStep === 'otp' && (
               <form onSubmit={handleVerifyOtp}>
@@ -293,6 +306,7 @@ export default function SignIn() {
               </form>
             )}
 
+
             {forgotStep === 'reset' && (
               <form onSubmit={handleResetPassword}>
                 <div className="form-group">
@@ -324,6 +338,7 @@ export default function SignIn() {
                 </button>
               </form>
             )}
+
 
             <button
               type="button"
