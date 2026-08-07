@@ -12,6 +12,7 @@ import Settings from './pages/Settings'
 import AdminDashboard from './pages/AdminDashboard'
 import AdminQuestions from './pages/AdminQuestions'
 import AdminPlans from './pages/AdminPlans'
+import AdminFinance from './pages/AdminFinance'
 
 export default function App() {
   const { loading } = useAuth()
@@ -71,6 +72,12 @@ export default function App() {
       <Route path="/admin/plans" element={
         <ProtectedRoute adminOnly>
           <AdminPlans />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/finance" element={
+        <ProtectedRoute adminOnly>
+          <AdminFinance />
         </ProtectedRoute>
       } />
       

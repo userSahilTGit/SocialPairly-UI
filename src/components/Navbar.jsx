@@ -66,14 +66,19 @@ export default function Navbar() {
             <nav className="navbar">
                 <NavLink to="/" className="brand">SocialPairly</NavLink>
                 <div className="nav-links">
-                    <NavLink to="/">Home</NavLink>
+                    {user?.role !== 'ADMIN' && (
+                        <NavLink to="/">Home</NavLink>
+                    )}
                     <NavLink to="/notifications">Notification</NavLink>
-                    <NavLink to="/subscriptions">Subscription</NavLink>
+                    {user?.role !== 'ADMIN' && (
+                        <NavLink to="/subscriptions">Subscription</NavLink>
+                    )}
                     {user?.role === 'ADMIN' && (
                         <>
                             <NavLink to="/admin">Dashboard</NavLink>
                             <NavLink to="/admin/questions">Questions</NavLink>
-                            <NavLink to="/admin/plans">Plans</NavLink>
+                            <NavLink to="/admin/plans">Plan & Subscriptions</NavLink>
+                            <NavLink to="/admin/finance">Finance</NavLink>
                         </>
                     )}
 

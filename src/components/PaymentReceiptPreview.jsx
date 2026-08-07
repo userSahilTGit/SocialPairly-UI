@@ -1,4 +1,5 @@
 import { forwardRef } from 'react'
+import logo from '../assets/logo.png'
 import './PaymentReceiptPreview.css'
 
 function formatCurrency(amount, currency = 'USD') {
@@ -25,6 +26,29 @@ function formatPaidAt(paidAt) {
   })
 }
 
+function formatPaymentMethod(paymentMethod) {
+  if (!paymentMethod) return '—'
+  const parts = paymentMethod.split(' - ')
+  if (parts.length === 2) {
+    return (
+      <>
+        <strong>{parts[0]}</strong>
+        {' - '}
+        {parts[1]}
+      </>
+    )
+  }
+  return paymentMethod
+}
+
+function ReceiptLogo() {
+  return (
+    <div className="receipt-preview-logo" aria-hidden>
+      <img src={logo} alt="" className="receipt-preview-logo-img" />
+    </div>
+  )
+}
+
 const PaymentReceiptPreview = forwardRef(function PaymentReceiptPreview({ receipt }, ref) {
   if (!receipt) return null
 
@@ -39,6 +63,8 @@ const PaymentReceiptPreview = forwardRef(function PaymentReceiptPreview({ receip
         <span className="receipt-preview-banner-light" />
       </div>
 
+      <ReceiptLogo />
+
       <div className="receipt-preview-body">
         <h2 className="receipt-preview-title">Receipt from {merchantLabel}</h2>
         <p className="receipt-preview-number">{receiptLabel}</p>
@@ -51,6 +77,12 @@ const PaymentReceiptPreview = forwardRef(function PaymentReceiptPreview({ receip
           <div>
             <span className="receipt-preview-meta-label">DATE PAID</span>
             <strong>{formatPaidAt(receipt.paidAt)}</strong>
+          </div>
+          <div>
+            <span className="receipt-preview-meta-label">PAYMENT METHOD</span>
+            <strong className="receipt-preview-payment-method">
+              {formatPaymentMethod(receipt.paymentMethod)}
+            </strong>
           </div>
         </div>
 
@@ -69,19 +101,32 @@ const PaymentReceiptPreview = forwardRef(function PaymentReceiptPreview({ receip
           </div>
         </div>
 
+        <hr className="receipt-preview-divider" />
+
         <p className="receipt-preview-contact">
           If you have any questions, contact us at{' '}
           <a href={`mailto:${supportEmail}`}>{supportEmail}</a>.
         </p>
 
         {receipt.receiptUrl && (
-          <p className="receipt-preview-footer-note">
-            View the original Stripe receipt at{' '}
-            <a href={receipt.receiptUrl} target="_blank" rel="noopener noreferrer">
-              Stripe
-            </a>.
-          </p>
+          <>
+            <hr className="receipt-preview-divider" />
+            <p className="receipt-preview-footer-note">
+              View the original Stripe receipt at{' '}
+              <a href={receipt.receiptUrl} target="_blank" rel="noopener noreferrer">
+                Stripe
+              </a>.
+            </p>
+          </>
         )}
+
+        <hr className="receipt-preview-divider" />
+
+        <p className="receipt-preview-disclaimer">
+          You&apos;re receiving this receipt because you made a purchase at {merchantLabel}, which
+          partners with <a href="https://stripe.com" target="_blank" rel="noopener noreferrer">Stripe</a> to
+          provide invoicing and payment processing.
+        </p>
       </div>
     </div>
   )

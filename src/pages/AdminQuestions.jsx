@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Navbar from '../components/Navbar'
 import api from '../api/axios'
+import './AdminQuestions.css'
 
 const QUESTION_TYPES = ['TEXT', 'NUMBER', 'DATE', 'SINGLE_CHOICE', 'MULTI_CHOICE']
 const emptyForm = {
@@ -102,110 +103,116 @@ export default function AdminQuestions() {
     return (
         <>
             <Navbar />
-            <div className="container">
-                <h1 style={{ marginBottom: 20 }}>Manage Questions</h1>
+            <div className="admin-questions-page">
+                <div className="admin-questions-container">
+                    <div className="admin-questions-header">
+                        <div className="breadcrumb-tag">Profile Configuration</div>
+                        <h1>Manage Questions</h1>
+                        <p>Create and edit onboarding questions, options, and visibility settings for user profiles.</p>
+                    </div>
 
-                {message && <div className="className=success">{message}</div>}
-                {error && <div className="className=error">{error}</div>}
+                    {message && <div className="alert alert-success">{message}</div>}
+                    {error && <div className="alert alert-error">{error}</div>}
 
-                <div className="card">
-                    <h2>{editingId ? 'Edit Question' : 'Add New Question'}</h2>
-                    <form onSubmit={handleSubmit}>
-                        <div className="form-group">
-                            <label>Question Text</label>
-                            <input name="questionText" value={form.questionText} onChange={handleChange} required />
-                        </div>
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label>Type</label>
-                                <select name="type" value={form.type} onChange={handleChange}>
-                                    {QUESTION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                                </select>
+                    <div className="questions-card">
+                        <h2>{editingId ? 'Edit Question' : 'Add New Question'}</h2>
+                        <form onSubmit={handleSubmit}>
+                            <div className="questions-form-group">
+                                <label>Question Text</label>
+                                <input name="questionText" value={form.questionText} onChange={handleChange} required />
                             </div>
-                            <div className="form-group">
-                                <label>Category</label>
-                                <input name="category" value={form.category} onChange={handleChange} placeholder="e.g. Lifestyle" />
+                            <div className="questions-form-row">
+                                <div className="questions-form-group">
+                                    <label>Type</label>
+                                    <select name="type" value={form.type} onChange={handleChange}>
+                                        {QUESTION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+                                <div className="questions-form-group">
+                                    <label>Category</label>
+                                    <input name="category" value={form.category} onChange={handleChange} placeholder="e.g. Lifestyle" />
+                                </div>
                             </div>
-                        </div>
 
-                        {isChoice && (
-                            <div className="form-group">
-                                <label>Options</label>
-                                {form.options.map((opt, index) => (
-                                    <div className="option-row" key={index}>
-                                        <input value={opt} onChange={(e) => handleOptionChange(index, e.target.value)} placeholder={`Option ${index + 1}`} />
-                                        {form.options.length > 1 && (
-                                            <button type="button" className="btn btn-sm btn-danger" onClick={() => removeOption(index)}>Delete</button>
-                                        )}
-                                    </div>
-                                ))}
-                                <button type="button" className="btn btn-sm btn-secondary" onClick={addOption}>+ Add option</button>
-                            </div>
-                        )}
-
-                        <div className="flex" style={{ marginBottom: 16 }}>
-                            <label className="checkbox">
-                                <input type="checkbox" name="required" checked={form.required} onChange={handleChange} />
-                                Required
-                            </label>
-                            <label className="checkbox">
-                                <input type="checkbox" name="active" checked={form.active} onChange={handleChange} />
-                                Active
-                            </label>
-                        </div>
-
-                        <div className="flex">
-                            <button className="btn" type="submit">
-                                {editingId ? 'Update' : 'Create'}
-                            </button>
-                            {editingId && (
-                                <button className="btn btn-secondary" type="button" onClick={resetForm}>
-                                    Cancel
-                                </button>
+                            {isChoice && (
+                                <div className="questions-form-group">
+                                    <label>Options</label>
+                                    {form.options.map((opt, index) => (
+                                        <div className="questions-option-row" key={index}>
+                                            <input value={opt} onChange={(e) => handleOptionChange(index, e.target.value)} placeholder={`Option ${index + 1}`} />
+                                            {form.options.length > 1 && (
+                                                <button type="button" className="btn-questions-sm btn-questions-sm-danger" onClick={() => removeOption(index)}>Delete</button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <button type="button" className="btn-questions-sm btn-questions-sm-secondary" onClick={addOption}>+ Add option</button>
+                                </div>
                             )}
-                        </div>
-                    </form>
-                </div>
 
-                <div className="card">
-                    <h2>Existing Questions ({questions.length})</h2>
-                    {questions.length === 0 ? (
-                        <p style={{ color: '#6b7280' }}>No questions yet.</p>
-                    ) : (
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Question</th>
-                                    <th>Type</th>
-                                    <th>Category</th>
-                                    <th>Required</th>
-                                    <th>Active</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {questions.map((q) => (
-                                    <tr key={q.id}>
-                                        <td>{q.questionText}</td>
-                                        <td>{q.type}</td>
-                                        <td>{q.category || '-'}</td>
-                                        <td>{q.required ? 'Yes' : 'No'}</td>
-                                        <td>
-                                            <span className={`badge ${q.active ? 'badge-yes' : 'badge-no'}`}>
-                                                {q.active ? 'Active' : 'Inactive'}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div className="flex" style={{ gap: 8 }}>
-                                                <button className="btn btn-sm btn-secondary" onClick={() => handleEdit(q)}>Edit</button>
-                                                <button className="btn btn-sm btn-danger" onClick={() => handleDelete(q.id)}>Delete</button>
-                                            </div>
-                                        </td>
+                            <div className="questions-checkboxes">
+                                <label className="questions-checkbox-label">
+                                    <input type="checkbox" name="required" checked={form.required} onChange={handleChange} />
+                                    Required
+                                </label>
+                                <label className="questions-checkbox-label">
+                                    <input type="checkbox" name="active" checked={form.active} onChange={handleChange} />
+                                    Active
+                                </label>
+                            </div>
+
+                            <div className="questions-form-actions">
+                                <button className="btn-questions-primary" type="submit">
+                                    {editingId ? 'Update' : 'Create'}
+                                </button>
+                                {editingId && (
+                                    <button className="btn-questions-secondary" type="button" onClick={resetForm}>
+                                        Cancel
+                                    </button>
+                                )}
+                            </div>
+                        </form>
+                    </div>
+
+                    <div className="questions-card">
+                        <h2>Existing Questions ({questions.length})</h2>
+                        {questions.length === 0 ? (
+                            <p className="questions-empty">No questions yet.</p>
+                        ) : (
+                            <table className="questions-table">
+                                <thead>
+                                    <tr>
+                                        <th>Question</th>
+                                        <th>Type</th>
+                                        <th>Category</th>
+                                        <th>Required</th>
+                                        <th>Active</th>
+                                        <th>Actions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
+                                </thead>
+                                <tbody>
+                                    {questions.map((q) => (
+                                        <tr key={q.id}>
+                                            <td>{q.questionText}</td>
+                                            <td>{q.type}</td>
+                                            <td>{q.category || '-'}</td>
+                                            <td>{q.required ? 'Yes' : 'No'}</td>
+                                            <td>
+                                                <span className={`questions-badge ${q.active ? 'badge-active' : 'badge-inactive'}`}>
+                                                    {q.active ? 'Active' : 'Inactive'}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div className="questions-actions">
+                                                    <button className="btn-questions-sm btn-questions-sm-secondary" onClick={() => handleEdit(q)}>Edit</button>
+                                                    <button className="btn-questions-sm btn-questions-sm-danger" onClick={() => handleDelete(q.id)}>Delete</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
                 </div>
             </div>
         </>

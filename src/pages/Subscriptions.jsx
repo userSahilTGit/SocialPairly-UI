@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import PaymentReceiptPreview from '../components/PaymentReceiptPreview'
+import RefundTracker from '../components/RefundTracker'
+import { DiscontinueModal, ScheduleSlotModal, BankDetailsModal } from '../components/RefundModals'
 import api from '../api/axios'
 import { downloadReceiptPdf } from '../utils/downloadReceiptPdf'
 import './Subscriptions.css'
@@ -22,10 +24,31 @@ export default function Subscriptions() {
   const [pendingSubscription, setPendingSubscription] = useState(null)
   const [showSubscriptionBanner, setShowSubscriptionBanner] = useState(true)
   const [downloadingReceipt, setDownloadingReceipt] = useState(false)
+  const [currentRefund, setCurrentRefund] = useState(null)
+  const [discontinueModalOpen, setDiscontinueModalOpen] = useState(false)
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
+  const [bankModalOpen, setBankModalOpen] = useState(false)
+  const [refundLoading, setRefundLoading] = useState(false)
   const receiptPreviewRef = useRef(null)
+  const confirmSessionHandledRef = useRef(false)
 
   const paymentResult = searchParams.get('payment')
   const sessionId = searchParams.get('session_id')
+
+  const fetchCurrentRefund = useCallback(async () => {
+    try {
+      const { data } = await api.get('/refunds/current')
+      if (data && data.active === false) {
+        setCurrentRefund(null)
+        return null
+      }
+      setCurrentRefund(data)
+      return data
+    } catch (err) {
+      console.error('Failed to load refund status', err)
+      return null
+    }
+  }, [])
 
   const fetchCurrentSubscription = useCallback(async () => {
     try {
@@ -112,11 +135,36 @@ export default function Subscriptions() {
           setShowSubscriptionBanner(true)
         }
       })
+      fetchCurrentRefund()
     }
-  }, [fetchCurrentSubscription, paymentResult])
+  }, [fetchCurrentSubscription, fetchCurrentRefund, paymentResult])
+
+  useEffect(() => {
+    const isTerminal = currentRefund && (currentRefund.status === 'Completed' || currentRefund.status === 'Rejected')
+    if (!currentRefund || isTerminal) return undefined
+
+    const interval = setInterval(() => {
+      fetchCurrentRefund()
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [currentRefund, fetchCurrentRefund])
+
+  useEffect(() => {
+    if (currentRefund?.status === 'Completed') {
+      fetchCurrentSubscription().then((subscription) => {
+        if (subscription && subscription.active === false) {
+          setCurrentSubscription(null)
+          setShowSubscriptionBanner(false)
+        }
+      })
+    }
+  }, [currentRefund?.status, fetchCurrentSubscription])
 
   useEffect(() => {
     if (paymentResult !== 'success' || !sessionId) return
+    if (confirmSessionHandledRef.current) return
+    confirmSessionHandledRef.current = true
 
     const confirmPaymentSession = async () => {
       setPaymentBanner(null)
@@ -147,15 +195,18 @@ export default function Subscriptions() {
           title: 'Payment Confirmation Failed',
           message: err.response?.data?.message || err.message || 'Unable to confirm your payment. Please contact support.',
         })
+      } finally {
+        setSearchParams((params) => {
+          const next = new URLSearchParams(params)
+          next.delete('payment')
+          next.delete('session_id')
+          return next
+        }, { replace: true })
       }
-
-      searchParams.delete('payment')
-      searchParams.delete('session_id')
-      setSearchParams(searchParams, { replace: true })
     }
 
     confirmPaymentSession()
-  }, [paymentResult, sessionId, searchParams, setSearchParams])
+  }, [paymentResult, sessionId, setSearchParams])
 
   useEffect(() => {
     if (paymentResult) return
@@ -256,9 +307,6 @@ export default function Subscriptions() {
     return 'Plan'
   }
 
-  const openCheckoutModal = () => setIsModalOpen(true)
-  const closeCheckoutModal = () => setIsModalOpen(false)
-
   const startStripeCheckout = async () => {
     if (!activePlan) return
 
@@ -297,6 +345,66 @@ export default function Subscriptions() {
     }
   }
 
+  const openCheckoutModal = () => setIsModalOpen(true)
+  const closeCheckoutModal = () => setIsModalOpen(false)
+
+  const hasActiveRefund = currentRefund && currentRefund.status !== 'Completed' && currentRefund.status !== 'Rejected'
+  const showRefundTracker = currentRefund && currentRefund.refundId
+
+  const handleDiscontinueSubmit = async (reason) => {
+    setRefundLoading(true)
+    try {
+      const { data } = await api.post('/refunds', { reason })
+      setCurrentRefund(data)
+      setDiscontinueModalOpen(false)
+    } catch (err) {
+      setPaymentBanner({
+        type: 'error',
+        title: 'Request Failed',
+        message: err.response?.data?.message || 'Unable to submit refund request.',
+      })
+    } finally {
+      setRefundLoading(false)
+    }
+  }
+
+  const handleScheduleSubmit = async (slotValue) => {
+    if (!currentRefund?.refundId) return
+    setRefundLoading(true)
+    try {
+      const slot = new Date(slotValue).toISOString()
+      const { data } = await api.post(`/refunds/${currentRefund.refundId}/slot`, { slot })
+      setCurrentRefund(data)
+      setScheduleModalOpen(false)
+    } catch (err) {
+      setPaymentBanner({
+        type: 'error',
+        title: 'Schedule Failed',
+        message: err.response?.data?.message || 'Unable to confirm time slot.',
+      })
+    } finally {
+      setRefundLoading(false)
+    }
+  }
+
+  const handleBankDetailsSubmit = async (form) => {
+    if (!currentRefund?.refundId) return
+    setRefundLoading(true)
+    try {
+      const { data } = await api.post(`/refunds/${currentRefund.refundId}/bank-details`, form)
+      setCurrentRefund(data)
+      setBankModalOpen(false)
+    } catch (err) {
+      setPaymentBanner({
+        type: 'error',
+        title: 'Submission Failed',
+        message: err.response?.data?.message || 'Unable to submit bank details.',
+      })
+    } finally {
+      setRefundLoading(false)
+    }
+  }
+
   if (loading) {
     return (
       <>
@@ -323,26 +431,6 @@ export default function Subscriptions() {
             </div>
           )}
 
-          {showSubscriptionBanner && currentSubscription && (
-            <section className="current-subscription-banner">
-              <div className="current-subscription-icon">
-                <i className="fa-solid fa-crown" />
-              </div>
-              <div className="current-subscription-details">
-                <span className="current-subscription-label">Your Current Plan</span>
-                <h2>{currentSubscription.planName}</h2>
-                <p>
-                  Active until {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString(undefined, {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                  {' '}({formatDuration(currentSubscription.durationDays)})
-                </p>
-              </div>
-            </section>
-          )}
-
           <section className="pricing-header">
             <div className="pricing-badge">
               <i className="fa-solid fa-bolt"></i>
@@ -350,6 +438,48 @@ export default function Subscriptions() {
             </div>
             <h1>Match Faster, Connect Deeper</h1>
             <p>Choose a membership plan to unlock tokens, media sharing, and high-visibility profile boosts designed to get you noticed.</p>
+
+            {showSubscriptionBanner && currentSubscription && (
+              <section className="current-subscription-banner">
+                <div className="current-subscription-icon">
+                  <i className="fa-solid fa-crown" />
+                </div>
+                <div className="current-subscription-details">
+                  <span className="current-subscription-label">Your Active Membership</span>
+                  <h2>{currentSubscription.planName}</h2>
+                  <p>
+                    Active until {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString(undefined, {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                    {' '}({formatDuration(currentSubscription.durationDays)})
+                  </p>
+                </div>
+                <div className="current-subscription-actions">
+                  <button
+                    type="button"
+                    className="btn-subscription-discontinue"
+                    onClick={() => setDiscontinueModalOpen(true)}
+                    disabled={hasActiveRefund}
+                  >
+                    Discontinue Plan
+                  </button>
+                  <button type="button" className="btn-subscription-upgrade">
+                    Upgrade
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {showRefundTracker && (
+              <RefundTracker
+                refund={currentRefund}
+                onScheduleSlot={() => setScheduleModalOpen(true)}
+                onProvideBankDetails={() => setBankModalOpen(true)}
+              />
+            )}
+
             <div className="pricing-tabs">
               {['ALL', 'WEEKLY', 'MONTHLY', 'LONGTERM'].map((tab) => (
                 <button
@@ -532,6 +662,28 @@ export default function Subscriptions() {
             </div>
           </div>
         </div>
+
+        <DiscontinueModal
+          open={discontinueModalOpen}
+          onClose={() => setDiscontinueModalOpen(false)}
+          onSubmit={handleDiscontinueSubmit}
+          amount={currentSubscription?.amount || currentRefund?.amount}
+          loading={refundLoading}
+        />
+
+        <ScheduleSlotModal
+          open={scheduleModalOpen}
+          onClose={() => setScheduleModalOpen(false)}
+          onSubmit={handleScheduleSubmit}
+          loading={refundLoading}
+        />
+
+        <BankDetailsModal
+          open={bankModalOpen}
+          onClose={() => setBankModalOpen(false)}
+          onSubmit={handleBankDetailsSubmit}
+          loading={refundLoading}
+        />
       </div>
     </>
   )
