@@ -945,6 +945,15 @@ a:focus-visible {
   border-color: var(--color-emerald-500);
 }
 
+.plan-card-disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.plan-card-disabled .plan-button:disabled {
+  cursor: not-allowed;
+}
+
 .ribbon-current {
   background: var(--color-emerald-500);
 }

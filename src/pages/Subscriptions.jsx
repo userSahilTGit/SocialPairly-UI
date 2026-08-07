@@ -140,6 +140,15 @@ export default function Subscriptions() {
   }, [fetchCurrentSubscription, fetchCurrentRefund, paymentResult])
 
   useEffect(() => {
+    if (!currentSubscription?.planId || plans.length === 0) return
+    const currentPlan = plans.find((plan) => plan.id === currentSubscription.planId)
+    if (currentPlan) {
+      setActivePlanId(currentPlan.id)
+      setActivePlan(currentPlan)
+    }
+  }, [currentSubscription, plans])
+
+  useEffect(() => {
     const isTerminal = currentRefund && (currentRefund.status === 'Completed' || currentRefund.status === 'Rejected')
     if (!currentRefund || isTerminal) return undefined
 
@@ -254,6 +263,7 @@ export default function Subscriptions() {
   }, [plans, planFilter])
 
   const handleSelectPlan = (plan) => {
+    if (hasActiveSubscription) return
     setActivePlanId(plan.id)
     setActivePlan(plan)
   }
@@ -310,6 +320,15 @@ export default function Subscriptions() {
   const startStripeCheckout = async () => {
     if (!activePlan) return
 
+    if (hasActiveSubscription) {
+      setPaymentBanner({
+        type: 'warning',
+        title: 'Active Subscription',
+        message: 'You already have an active membership. Please discontinue your current plan or wait until it expires before purchasing another.',
+      })
+      return
+    }
+
     setCheckoutLoading(true)
     setPaymentBanner(null)
 
@@ -345,10 +364,21 @@ export default function Subscriptions() {
     }
   }
 
-  const openCheckoutModal = () => setIsModalOpen(true)
+  const openCheckoutModal = () => {
+    if (hasActiveSubscription) {
+      setPaymentBanner({
+        type: 'warning',
+        title: 'Active Subscription',
+        message: 'You already have an active membership. Please discontinue your current plan or wait until it expires before purchasing another.',
+      })
+      return
+    }
+    setIsModalOpen(true)
+  }
   const closeCheckoutModal = () => setIsModalOpen(false)
 
   const hasActiveRefund = currentRefund && currentRefund.status !== 'Completed' && currentRefund.status !== 'Rejected'
+  const hasActiveSubscription = !!currentSubscription
   const showRefundTracker = currentRefund && currentRefund.refundId
 
   const handleDiscontinueSubmit = async (reason) => {
@@ -465,7 +495,7 @@ export default function Subscriptions() {
                   >
                     Discontinue Plan
                   </button>
-                  <button type="button" className="btn-subscription-upgrade">
+                  <button type="button" className="btn-subscription-upgrade" disabled title="Upgrade is unavailable while your current plan is active">
                     Upgrade
                   </button>
                 </div>
@@ -509,7 +539,7 @@ export default function Subscriptions() {
               return (
                 <article
                   key={plan.id}
-                  className={`plan-card ${selected ? 'glass-card-selected' : ''} ${isCurrentPlan ? 'plan-card-current' : ''}`}
+                  className={`plan-card ${selected ? 'glass-card-selected' : ''} ${isCurrentPlan ? 'plan-card-current' : ''} ${hasActiveSubscription && !isCurrentPlan ? 'plan-card-disabled' : ''}`}
                   onClick={() => handleSelectPlan(plan)}
                 >
                   {isCurrentPlan && (
@@ -544,12 +574,13 @@ export default function Subscriptions() {
                     <button
                       type="button"
                       className={`plan-button ${selected ? 'selected' : ''}`}
+                      disabled={hasActiveSubscription && !isCurrentPlan}
                       onClick={(e) => {
                         e.stopPropagation()
                         handleSelectPlan(plan)
                       }}
                     >
-                      {isCurrentPlan ? 'Current Plan' : selected ? 'Selected Plan' : 'Select Pass'}
+                      {isCurrentPlan ? 'Current Plan' : hasActiveSubscription ? 'Unavailable' : selected ? 'Selected Plan' : 'Select Pass'}
                     </button>
                   </div>
                 </article>
@@ -592,8 +623,8 @@ export default function Subscriptions() {
               </div>
               <div className="summary-price">{formatPrice(activePlan?.amount)}</div>
             </div>
-            <button type="button" className="btn-checkout" onClick={openCheckoutModal} disabled={!activePlan}>
-              <span>Continue to Checkout</span>
+            <button type="button" className="btn-checkout" onClick={openCheckoutModal} disabled={!activePlan || hasActiveSubscription}>
+              <span>{hasActiveSubscription ? 'Plan Already Active' : 'Continue to Checkout'}</span>
               <i className="fa-solid fa-arrow-right"></i>
             </button>
           </div>
