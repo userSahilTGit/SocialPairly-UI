@@ -1,3 +1,31 @@
+@import "tailwindcss";
+
+@theme {
+  --color-spViolet: #6b21a8;
+  --color-spIndigo: #3730a3;
+  --color-spCoral: #fb7185;
+  --color-spRose: #f43f5e;
+  --color-spLavender: #f3e8ff;
+  --color-spNavy: #0f172a;
+
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+}
+
+@layer base {
+  body {
+    @apply bg-spLavender text-spNavy font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-white/70 backdrop-blur-md border border-white/40 shadow-glass rounded-2xl;
+  }
+}
+
 :root {
   --primary: #4f46e5;
   --primary-dark: #4338ca;
@@ -612,4 +640,422 @@ label.checkbox input {
 
 .link-btn:hover {
     color: var(--primary-dark);
+}
+
+/* ============================================
+   Profile Preview Card & Segment Bar Navigation
+   ============================================ */
+.profile-preview-card {
+  max-width: 220px;
+  margin: 0 auto;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border: 3px solid #fff;
+  background: #fff;
+}
+
+/* Strict aspect ratio + object-fit: cover to prevent distortion */
+.preview-image-container,
+.media-slot-thumb {
+  width: 100%;
+  aspect-ratio: 4 / 5; /* Standard high-conversion dating profile ratio */
+  overflow: hidden;
+  border-radius: 12px;
+  background-color: #1a1a24;
+  position: relative;
+}
+
+.preview-image,
+.media-slot-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Prevents image stretching/squeezing */
+  object-position: center;
+}
+
+.preview-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  padding: 40px 12px 14px;
+}
+
+.preview-video-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  padding: 6px;
+}
+
+.placeholder-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--muted);
+}
+
+/* Segment Indicator Bars - clickable */
+.segment-bar-container {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  background: #fff;
+}
+
+.segment-bar {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  background: var(--border);
+  transition: background 0.2s ease, height 0.2s ease;
+}
+
+.segment-bar.active {
+  background: var(--primary);
+  height: 4px;
+}
+
+.segment-bar:hover:not(.active) {
+  background: #c7d2fe;
+}
+
+/* Action buttons */
+.preview-actions {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px 10px;
+  background: #fff;
+}
+
+.preview-actions .btn {
+  flex: 1;
+  font-size: 11px;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+}
+
+.btn-outline:hover {
+  background: #eef2ff;
+}
+
+.btn-outline:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Lightbox modal for expanded preview */
+.modal-lightbox {
+  position: relative;
+  background: #0f172a;
+  border-radius: 16px;
+  overflow: hidden;
+  max-width: 90vw;
+  max-height: 90vh;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.lightbox-image {
+  display: block;
+  max-width: 90vw;
+  max-height: 80vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  margin: 0 auto;
+}
+
+.lightbox-caption {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+  color: #fff;
+  padding: 30px 16px 12px;
+  font-size: 13px;
+  font-style: italic;
+  text-align: center;
+}
+
+.close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.2s;
+}
+
+.close-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+/* ============================================
+   Modern Biometric Scanner (Fintech/Cyber Glassmorphism)
+   ============================================ */
+.biometric-scanner-frame {
+  position: relative;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid rgba(99, 102, 241, 0.4);
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.2);
+  margin: 0 auto;
+}
+
+/* Pulsing Laser Ring */
+.biometric-scanner-frame::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom, transparent, rgba(99, 102, 241, 0.4), transparent);
+  animation: laserScan 2.5s infinite ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes laserScan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(200%); }
+}
+
+/* Glowing Target Circle */
+.face-guide-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 220px;
+  height: 280px;
+  border: 2px dashed #818cf8;
+  border-radius: 50%;
+  box-shadow: 0 0 15px rgba(129, 140, 248, 0.5);
+  pointer-events: none;
+}
+
+/* Scanner corner brackets for fintech look */
+.scanner-corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #818cf8;
+  pointer-events: none;
+}
+
+.scanner-corner.tl { top: 8px; left: 8px; border-right: none; border-bottom: none; border-radius: 4px 0 0 0; }
+.scanner-corner.tr { top: 8px; right: 8px; border-left: none; border-bottom: none; border-radius: 0 4px 0 0; }
+.scanner-corner.bl { bottom: 8px; left: 8px; border-right: none; border-top: none; border-radius: 0 0 0 4px; }
+.scanner-corner.br { bottom: 8px; right: 8px; border-left: none; border-top: none; border-radius: 0 0 4px 0; }
+
+/* Biometric status chip */
+.biometric-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #6366f1;
+}
+
+.biometric-status.scanning {
+  animation: pulseGlow 1.5s infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.6); }
+}
+
+/* Glassmorphism panel for verification */
+.biometric-panel {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+/* Dark fintech verification modal background */
+.biometric-modal {
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+  color: #fff;
+  border-radius: 20px;
+  padding: 28px;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+/* ============================================
+   Centered Fixed Overlay
+   (used by VideoPromptModal and other modals)
+   ============================================ */
+.modern-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  
+  /* Flexbox Centering */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* Smooth backdrop blur + dark tint */
+  background-color: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  
+  /* Ensure it sits on top of all page elements */
+  z-index: 9999;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+/* Ensure the modal card auto-centers safely */
+.prompt-modal-card,
+.modern-prompt-card,
+.modern-editor-card {
+  margin: auto;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* ============================================
+   Vibrant Blue Prompt Modal Styles
+   (used by the video prompt selector)
+   ============================================ */
+.prompt-modal-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 24px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+.prompt-modal-header h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a; /* High contrast dark header */
+  margin-bottom: 4px;
+}
+
+.prompt-modal-header p {
+  font-size: 0.875rem;
+  color: #475569;
+  margin-bottom: 20px;
+}
+
+.prompt-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Base Option Button with Bold Visible Text */
+.prompt-option-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 12px;
+  font-size: 0.925rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Visible "None" Button - Slate Blue Style */
+.prompt-option-btn.none-btn {
+  background: #334155;
+  color: #ffffff;
+  border: 1px solid #475569;
+}
+
+.prompt-option-btn.none-btn:hover {
+  background: #1e293b;
+}
+
+/* Deep Blue / Indigo Prompt Buttons */
+.prompt-option-btn.video-prompt-btn {
+  background: #4f46e5; /* Bold solid indigo-blue */
+  color: #ffffff;      /* High contrast white text */
+  border: 1px solid #4338ca;
+}
+
+.prompt-option-btn.video-prompt-btn:hover {
+  background: #3730a3;
+  transform: translateY(-1px);
+}
+
+.prompt-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 8px 0;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.prompt-divider::before,
+.prompt-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.prompt-divider span {
+  padding: 0 8px;
+}
+
+.prompt-cancel-btn {
+  margin-top: 16px;
+  width: 100%;
+  padding: 10px;
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.prompt-cancel-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
 }
