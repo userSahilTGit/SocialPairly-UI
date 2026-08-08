@@ -1,0 +1,171 @@
+/* Shared confirm/delete modal styles (used by Navbar, AdminPlans, etc.) */
+
+.plan-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999 !important;
+    padding: 20px;
+    animation: confirmModalFadeIn 0.2s ease-out;
+}
+
+@keyframes confirmModalFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes confirmModalSlideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.delete-confirm-card {
+    background: #ffffff;
+    border-radius: 20px;
+    width: 100%;
+    max-width: 420px;
+    padding: 32px 28px;
+    text-align: center;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    animation: confirmModalSlideUp 0.25s ease-out;
+}
+
+.delete-confirm-card-form {
+    text-align: left;
+}
+
+.delete-confirm-card-form .delete-title,
+.delete-confirm-card-form .delete-description,
+.delete-confirm-card-form .delete-icon-circle {
+    text-align: center;
+}
+
+.delete-icon-circle {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #fee2e2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px auto;
+}
+
+.warning-symbol {
+    font-size: 26px;
+}
+
+.delete-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 10px 0;
+}
+
+.delete-description {
+    font-size: 14px;
+    color: #64748b;
+    line-height: 1.5;
+    margin: 0 0 24px 0;
+}
+
+.delete-modal-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 16px;
+}
+
+.delete-form-field {
+    margin-bottom: 24px;
+}
+
+.delete-form-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 6px;
+}
+
+.delete-form-field input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 13px;
+    color: #0f172a;
+    background: #ffffff;
+    font-family: inherit;
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.delete-form-field input:focus {
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+
+.delete-buttons-row {
+    display: flex;
+    gap: 12px;
+}
+
+.btn-delete-cancel {
+    flex: 1;
+    padding: 11px 18px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 13px;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-delete-cancel:hover:not(:disabled) {
+    background: #f8fafc;
+}
+
+.btn-delete-cancel:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-delete-confirm {
+    flex: 1;
+    padding: 11px 18px;
+    background: #e11d48;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 13px;
+    color: #ffffff;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(225, 29, 72, 0.3);
+    transition: all 0.2s ease;
+}
+
+.btn-delete-confirm:hover:not(:disabled) {
+    background: #be123c;
+    transform: translateY(-1px);
+}
+
+.btn-delete-confirm:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
