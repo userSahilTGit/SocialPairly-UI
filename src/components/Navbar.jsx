@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
@@ -8,7 +9,6 @@ export default function Navbar() {
     const navigate = useNavigate()
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const [deleteModalOpen, setDeleteModalOpen] = useState(false)
-    const [deleteIdentifier, setDeleteIdentifier] = useState('')
     const [deletePassword, setDeletePassword] = useState('')
     const [deleteError, setDeleteError] = useState('')
     const [deleteLoading, setDeleteLoading] = useState(false)
@@ -32,7 +32,6 @@ export default function Navbar() {
 
     const openDeleteModal = () => {
         setDropdownOpen(false)
-        setDeleteIdentifier('')
         setDeletePassword('')
         setDeleteError('')
         setDeleteModalOpen(true)
@@ -40,18 +39,23 @@ export default function Navbar() {
 
     const closeDeleteModal = () => {
         setDeleteModalOpen(false)
-        setDeleteIdentifier('')
         setDeletePassword('')
         setDeleteError('')
     }
 
     const handleDeleteAccount = async () => {
+        if (!deletePassword.trim()) {
+            setDeleteError('Password is required')
+            return
+        }
+
         setDeleteError('')
         setDeleteLoading(true)
         try {
             await api.delete('/users/me', {
-                data: { identifier: deleteIdentifier, password: deletePassword },
+                data: { password: deletePassword },
             })
+            closeDeleteModal()
             logout()
             navigate('/signin')
         } catch (err) {
@@ -112,7 +116,15 @@ export default function Navbar() {
                                 <button type="button" onClick={handleLogout}>
                                     Logout
                                 </button>
-                                <button type="button" className="dropdown-danger" onClick={openDeleteModal}>
+                                <button
+                                    type="button"
+                                    className="dropdown-danger"
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        openDeleteModal()
+                                    }}
+                                >
                                     Delete Account
                                 </button>
                             </div>
@@ -121,42 +133,55 @@ export default function Navbar() {
                 </div>
             </nav>
 
-            {deleteModalOpen && (
-                <div className="modal-overlay" onClick={closeDeleteModal}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <h2>Delete Account</h2>
-                        <p style={{ color: '#6b7280', marginBottom: 16, fontSize: 14 }}>
-                            This action is permanent. Enter your credentials to confirm.
-                        </p>
-                        {deleteError && <div className="error">{deleteError}</div>}
-                        <div className="form-group">
-                            <label>Email or Phone number</label>
-                            <input
-                                type="text"
-                                value={deleteIdentifier}
-                                onChange={(e) => setDeleteIdentifier(e.target.value)}
-                                placeholder="you@example.com or 9876543210"
-                            />
+            {deleteModalOpen && createPortal(
+                <div className="plan-modal-overlay" onClick={!deleteLoading ? closeDeleteModal : undefined}>
+                    <div className="delete-confirm-card delete-confirm-card-form" onClick={(e) => e.stopPropagation()}>
+                        <div className="delete-icon-circle">
+                            <span className="warning-symbol">⚠️</span>
                         </div>
-                        <div className="form-group">
-                            <label>Password</label>
+                        <h2 className="delete-title">Delete Account?</h2>
+                        <p className="delete-description">
+                            This action is permanent and cannot be undone. Enter your password to confirm account deletion.
+                        </p>
+                        {deleteError && <div className="delete-modal-error">{deleteError}</div>}
+                        <div className="delete-form-field">
+                            <label htmlFor="delete-account-password">Password</label>
                             <input
+                                id="delete-account-password"
                                 type="password"
                                 value={deletePassword}
                                 onChange={(e) => setDeletePassword(e.target.value)}
-                                placeholder="••••••••"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !deleteLoading) {
+                                        handleDeleteAccount()
+                                    }
+                                }}
+                                placeholder="Enter your password"
+                                autoFocus
+                                disabled={deleteLoading}
                             />
                         </div>
-                        <div className="modal-actions">
-                            <button type="button" className="btn btn-danger" disabled={deleteLoading} onClick={handleDeleteAccount}>
-                                {deleteLoading ? 'Deleting...' : 'Are you Sure'}
+                        <div className="delete-buttons-row">
+                            <button
+                                type="button"
+                                className="btn-delete-cancel"
+                                onClick={closeDeleteModal}
+                                disabled={deleteLoading}
+                            >
+                                Cancel
                             </button>
-                            <button type="button" className="btn btn-secondary" onClick={closeDeleteModal}>
-                                Go Back
+                            <button
+                                type="button"
+                                className="btn-delete-confirm"
+                                disabled={deleteLoading}
+                                onClick={handleDeleteAccount}
+                            >
+                                {deleteLoading ? 'DELETING...' : 'YES, DELETE'}
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </>
     )
