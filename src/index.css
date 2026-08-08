@@ -67,7 +67,7 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #312e81 0%, #6366f1 35%, #8b5cf6 65%, #ec4899 100%);
   padding: 20px;
 }
 
@@ -353,6 +353,16 @@ th {
 .badge-no {
   background: #fee2e2;
   color: #b91c1c;
+}
+
+.badge-subscribed {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.badge-unsubscribed {
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 /* Profile photo */

@@ -1,17 +1,113 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Navbar from '../components/Navbar'
+import PaymentReceiptPreview from '../components/PaymentReceiptPreview'
+import RefundTracker from '../components/RefundTracker'
+import { DiscontinueModal, ScheduleSlotModal, BankDetailsModal } from '../components/RefundModals'
 import api from '../api/axios'
+import { downloadReceiptPdf } from '../utils/downloadReceiptPdf'
 import './Subscriptions.css'
 
 export default function Subscriptions() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [activePlanId, setActivePlanId] = useState(null)
   const [activePlan, setActivePlan] = useState(null)
   const [planFilter, setPlanFilter] = useState('ALL')
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [showToast, setShowToast] = useState(false)
   const [error, setError] = useState(null)
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [currentSubscription, setCurrentSubscription] = useState(null)
+  const [paymentBanner, setPaymentBanner] = useState(null)
+  const [receiptModal, setReceiptModal] = useState({ open: false, data: null })
+  const [pendingSubscription, setPendingSubscription] = useState(null)
+  const [showSubscriptionBanner, setShowSubscriptionBanner] = useState(true)
+  const [downloadingReceipt, setDownloadingReceipt] = useState(false)
+  const [currentRefund, setCurrentRefund] = useState(null)
+  const [discontinueModalOpen, setDiscontinueModalOpen] = useState(false)
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
+  const [bankModalOpen, setBankModalOpen] = useState(false)
+  const [refundLoading, setRefundLoading] = useState(false)
+  const receiptPreviewRef = useRef(null)
+  const confirmSessionHandledRef = useRef(false)
+
+  const paymentResult = searchParams.get('payment')
+  const sessionId = searchParams.get('session_id')
+
+  const fetchCurrentRefund = useCallback(async () => {
+    try {
+      const { data } = await api.get('/refunds/current')
+      if (data && data.active === false) {
+        setCurrentRefund(null)
+        return null
+      }
+      setCurrentRefund(data)
+      return data
+    } catch (err) {
+      console.error('Failed to load refund status', err)
+      return null
+    }
+  }, [])
+
+  const fetchCurrentSubscription = useCallback(async () => {
+    try {
+      const { data } = await api.get('/subscriptions/current')
+      if (data && data.active === false) {
+        return null
+      }
+      return data
+    } catch (err) {
+      console.error('Failed to load current subscription', err)
+      return null
+    }
+  }, [])
+
+  const fetchLatestPaymentStatus = useCallback(async () => {
+    try {
+      const { data } = await api.get('/payment/latest-status')
+      if (data?.status === 'failed') {
+        setPaymentBanner({
+          type: 'error',
+          title: 'Payment Failed',
+          message: 'Your payment could not be processed. Please try again with a different payment method.',
+        })
+      }
+      return data
+    } catch (err) {
+      console.error('Failed to load payment status', err)
+      return null
+    }
+  }, [])
+
+  const closeReceiptModal = () => {
+    setReceiptModal({ open: false, data: null })
+    if (pendingSubscription) {
+      setCurrentSubscription(pendingSubscription)
+      setPendingSubscription(null)
+    }
+    setShowSubscriptionBanner(true)
+  }
+
+  const downloadReceipt = async () => {
+    if (!receiptPreviewRef.current || !receiptModal.data) return
+
+    setDownloadingReceipt(true)
+    try {
+      const receiptNumber = receiptModal.data.receiptNumber || 'payment'
+      const safeName = receiptNumber.replace(/[^a-zA-Z0-9-_]/g, '-')
+      await downloadReceiptPdf(receiptPreviewRef.current, `receipt-${safeName}.pdf`)
+    } catch (err) {
+      console.error('Failed to download receipt PDF', err)
+      setPaymentBanner({
+        type: 'error',
+        title: 'Download Failed',
+        message: 'Unable to generate the receipt PDF. Please try again.',
+      })
+    } finally {
+      setDownloadingReceipt(false)
+    }
+  }
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -31,7 +127,120 @@ export default function Subscriptions() {
     }
 
     fetchPlans()
-  }, [])
+
+    if (paymentResult !== 'success') {
+      fetchCurrentSubscription().then((subscription) => {
+        if (subscription) {
+          setCurrentSubscription(subscription)
+          setShowSubscriptionBanner(true)
+        }
+      })
+      fetchCurrentRefund()
+    }
+  }, [fetchCurrentSubscription, fetchCurrentRefund, paymentResult])
+
+  useEffect(() => {
+    if (!currentSubscription?.planId || plans.length === 0) return
+    const currentPlan = plans.find((plan) => plan.id === currentSubscription.planId)
+    if (currentPlan) {
+      setActivePlanId(currentPlan.id)
+      setActivePlan(currentPlan)
+    }
+  }, [currentSubscription, plans])
+
+  useEffect(() => {
+    const isTerminal = currentRefund && (currentRefund.status === 'Completed' || currentRefund.status === 'Rejected')
+    if (!currentRefund || isTerminal) return undefined
+
+    const interval = setInterval(() => {
+      fetchCurrentRefund()
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [currentRefund, fetchCurrentRefund])
+
+  useEffect(() => {
+    if (currentRefund?.status === 'Completed') {
+      fetchCurrentSubscription().then((subscription) => {
+        if (subscription && subscription.active === false) {
+          setCurrentSubscription(null)
+          setShowSubscriptionBanner(false)
+        }
+      })
+    }
+  }, [currentRefund?.status, fetchCurrentSubscription])
+
+  useEffect(() => {
+    if (paymentResult !== 'success' || !sessionId) return
+    if (confirmSessionHandledRef.current) return
+    confirmSessionHandledRef.current = true
+
+    const confirmPaymentSession = async () => {
+      setPaymentBanner(null)
+      setShowSubscriptionBanner(false)
+
+      try {
+        const { data } = await api.post('/payment/confirm-session', { sessionId })
+
+        if (data?.subscription) {
+          setPendingSubscription(data.subscription)
+          if (data.receipt) {
+            setReceiptModal({ open: true, data: data.receipt })
+          } else {
+            setCurrentSubscription(data.subscription)
+            setShowSubscriptionBanner(true)
+          }
+        } else {
+          setPaymentBanner({
+            type: 'info',
+            title: 'Payment Received',
+            message: 'Your payment is being processed. Your subscription will appear shortly.',
+          })
+        }
+      } catch (err) {
+        console.error('Failed to confirm checkout session', err)
+        setPaymentBanner({
+          type: 'error',
+          title: 'Payment Confirmation Failed',
+          message: err.response?.data?.message || err.message || 'Unable to confirm your payment. Please contact support.',
+        })
+      } finally {
+        setSearchParams((params) => {
+          const next = new URLSearchParams(params)
+          next.delete('payment')
+          next.delete('session_id')
+          return next
+        }, { replace: true })
+      }
+    }
+
+    confirmPaymentSession()
+  }, [paymentResult, sessionId, setSearchParams])
+
+  useEffect(() => {
+    if (paymentResult) return
+    fetchLatestPaymentStatus()
+  }, [paymentResult, fetchLatestPaymentStatus])
+
+  useEffect(() => {
+    if (paymentResult === 'cancelled') {
+      setPaymentBanner({
+        type: 'warning',
+        title: 'Payment Cancelled',
+        message: 'You cancelled the checkout. No charges were made.',
+      })
+      searchParams.delete('payment')
+      setSearchParams(searchParams, { replace: true })
+    } else if (paymentResult === 'failed') {
+      setPaymentBanner({
+        type: 'error',
+        title: 'Payment Failed',
+        message: 'Your payment could not be completed. Please try again.',
+      })
+      searchParams.delete('payment')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [paymentResult, searchParams, setSearchParams])
 
   const filteredPlans = useMemo(() => {
     if (planFilter === 'ALL') return plans
@@ -54,6 +263,7 @@ export default function Subscriptions() {
   }, [plans, planFilter])
 
   const handleSelectPlan = (plan) => {
+    if (hasActiveSubscription) return
     setActivePlanId(plan.id)
     setActivePlan(plan)
   }
@@ -70,7 +280,6 @@ export default function Subscriptions() {
 
   const renderFeatureList = (description) => {
     if (!description) return null
-    // split common separators into feature lines
     const items = description.split(/\r?\n|\||;|•|\u2022/).map((s) => s.trim()).filter(Boolean)
 
     const getIconClass = (text) => {
@@ -108,13 +317,122 @@ export default function Subscriptions() {
     return 'Plan'
   }
 
-  const openCheckoutModal = () => setIsModalOpen(true)
+  const startStripeCheckout = async () => {
+    if (!activePlan) return
+
+    if (hasActiveSubscription) {
+      setPaymentBanner({
+        type: 'warning',
+        title: 'Active Subscription',
+        message: 'You already have an active membership. Please discontinue your current plan or wait until it expires before purchasing another.',
+      })
+      return
+    }
+
+    setCheckoutLoading(true)
+    setPaymentBanner(null)
+
+    try {
+      const amountInCents = Math.round(Number(activePlan.amount) * 100)
+      const { data } = await api.post('/payment/checkout', {
+        amount: amountInCents,
+        quantity: 1,
+        currency: 'USD',
+        name: activePlan.planName,
+        planId: activePlan.id,
+      })
+
+      if (data?.sessionUrl) {
+        window.location.href = data.sessionUrl
+        return
+      }
+
+      setPaymentBanner({
+        type: 'error',
+        title: 'Checkout Error',
+        message: data?.message || 'Unable to start checkout. Please try again.',
+      })
+    } catch (err) {
+      console.error('Checkout failed', err)
+      setPaymentBanner({
+        type: 'error',
+        title: 'Checkout Error',
+        message: err.response?.data?.message || err.message || 'Unable to start checkout.',
+      })
+    } finally {
+      setCheckoutLoading(false)
+    }
+  }
+
+  const openCheckoutModal = () => {
+    if (hasActiveSubscription) {
+      setPaymentBanner({
+        type: 'warning',
+        title: 'Active Subscription',
+        message: 'You already have an active membership. Please discontinue your current plan or wait until it expires before purchasing another.',
+      })
+      return
+    }
+    setIsModalOpen(true)
+  }
   const closeCheckoutModal = () => setIsModalOpen(false)
 
-  const completePurchase = () => {
-    setIsModalOpen(false)
-    setShowToast(true)
-    window.setTimeout(() => setShowToast(false), 3500)
+  const hasActiveRefund = currentRefund && currentRefund.status !== 'Completed' && currentRefund.status !== 'Rejected'
+  const hasActiveSubscription = !!currentSubscription
+  const showRefundTracker = currentRefund && currentRefund.refundId
+
+  const handleDiscontinueSubmit = async (reason) => {
+    setRefundLoading(true)
+    try {
+      const { data } = await api.post('/refunds', { reason })
+      setCurrentRefund(data)
+      setDiscontinueModalOpen(false)
+    } catch (err) {
+      setPaymentBanner({
+        type: 'error',
+        title: 'Request Failed',
+        message: err.response?.data?.message || 'Unable to submit refund request.',
+      })
+    } finally {
+      setRefundLoading(false)
+    }
+  }
+
+  const handleScheduleSubmit = async (slotValue) => {
+    if (!currentRefund?.refundId) return
+    setRefundLoading(true)
+    try {
+      const slot = new Date(slotValue).toISOString()
+      const { data } = await api.post(`/refunds/${currentRefund.refundId}/slot`, { slot })
+      setCurrentRefund(data)
+      setScheduleModalOpen(false)
+    } catch (err) {
+      setPaymentBanner({
+        type: 'error',
+        title: 'Schedule Failed',
+        message: err.response?.data?.message || 'Unable to confirm time slot.',
+      })
+    } finally {
+      setRefundLoading(false)
+    }
+  }
+
+  const handleBankDetailsSubmit = async (form) => {
+    if (!currentRefund?.refundId) return
+    setRefundLoading(true)
+    try {
+      const { data } = await api.post(`/refunds/${currentRefund.refundId}/bank-details`, form)
+      setCurrentRefund(data)
+      setBankModalOpen(false)
+    } catch (err) {
+      setPaymentBanner({
+        type: 'error',
+        title: 'Submission Failed',
+        message: err.response?.data?.message || 'Unable to submit bank details.',
+      })
+    } finally {
+      setRefundLoading(false)
+    }
   }
 
   if (loading) {
@@ -133,6 +451,16 @@ export default function Subscriptions() {
       <Navbar />
       <div className="subscriptions-page">
         <main className="main-content">
+          {paymentBanner && (
+            <div className={`payment-banner payment-banner-${paymentBanner.type}`} role="alert">
+              <i className={`fa-solid ${paymentBanner.type === 'error' ? 'fa-circle-xmark' : paymentBanner.type === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-info'}`} />
+              <div>
+                <strong>{paymentBanner.title}</strong>
+                <p>{paymentBanner.message}</p>
+              </div>
+            </div>
+          )}
+
           <section className="pricing-header">
             <div className="pricing-badge">
               <i className="fa-solid fa-bolt"></i>
@@ -140,6 +468,48 @@ export default function Subscriptions() {
             </div>
             <h1>Match Faster, Connect Deeper</h1>
             <p>Choose a membership plan to unlock tokens, media sharing, and high-visibility profile boosts designed to get you noticed.</p>
+
+            {showSubscriptionBanner && currentSubscription && (
+              <section className="current-subscription-banner">
+                <div className="current-subscription-icon">
+                  <i className="fa-solid fa-crown" />
+                </div>
+                <div className="current-subscription-details">
+                  <span className="current-subscription-label">Your Active Membership</span>
+                  <h2>{currentSubscription.planName}</h2>
+                  <p>
+                    Active until {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString(undefined, {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                    {' '}({formatDuration(currentSubscription.durationDays)})
+                  </p>
+                </div>
+                <div className="current-subscription-actions">
+                  <button
+                    type="button"
+                    className="btn-subscription-discontinue"
+                    onClick={() => setDiscontinueModalOpen(true)}
+                    disabled={hasActiveRefund}
+                  >
+                    Discontinue Plan
+                  </button>
+                  <button type="button" className="btn-subscription-upgrade" disabled title="Upgrade is unavailable while your current plan is active">
+                    Upgrade
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {showRefundTracker && (
+              <RefundTracker
+                refund={currentRefund}
+                onScheduleSlot={() => setScheduleModalOpen(true)}
+                onProvideBankDetails={() => setBankModalOpen(true)}
+              />
+            )}
+
             <div className="pricing-tabs">
               {['ALL', 'WEEKLY', 'MONTHLY', 'LONGTERM'].map((tab) => (
                 <button
@@ -162,16 +532,20 @@ export default function Subscriptions() {
             )}
             {filteredPlans.map((plan) => {
               const selected = plan.id === activePlanId
+              const isCurrentPlan = showSubscriptionBanner && currentSubscription?.planId === plan.id
               const monthlyEquivalent = plan.durationDays ? (Number(plan.amount) / (Number(plan.durationDays) / 30)) : null
               const showPopular = Number(plan.durationDays || 0) >= 80 && Number(plan.durationDays || 0) <= 100
 
               return (
                 <article
                   key={plan.id}
-                  className={`plan-card ${selected ? 'glass-card-selected' : ''}`}
+                  className={`plan-card ${selected ? 'glass-card-selected' : ''} ${isCurrentPlan ? 'plan-card-current' : ''} ${hasActiveSubscription && !isCurrentPlan ? 'plan-card-disabled' : ''}`}
                   onClick={() => handleSelectPlan(plan)}
                 >
-                  {showPopular && (
+                  {isCurrentPlan && (
+                    <div className="ribbon ribbon-current">CURRENT PLAN</div>
+                  )}
+                  {!isCurrentPlan && showPopular && (
                     <div className="ribbon">MOST POPULAR • SAVE 20%</div>
                   )}
                   <div className="plan-card-inner">
@@ -200,12 +574,13 @@ export default function Subscriptions() {
                     <button
                       type="button"
                       className={`plan-button ${selected ? 'selected' : ''}`}
+                      disabled={hasActiveSubscription && !isCurrentPlan}
                       onClick={(e) => {
                         e.stopPropagation()
                         handleSelectPlan(plan)
                       }}
                     >
-                      {selected ? 'Selected Plan' : 'Select Pass'}
+                      {isCurrentPlan ? 'Current Plan' : hasActiveSubscription ? 'Unavailable' : selected ? 'Selected Plan' : 'Select Pass'}
                     </button>
                   </div>
                 </article>
@@ -248,8 +623,8 @@ export default function Subscriptions() {
               </div>
               <div className="summary-price">{formatPrice(activePlan?.amount)}</div>
             </div>
-            <button type="button" className="btn-checkout" onClick={openCheckoutModal} disabled={!activePlan}>
-              <span>Continue to Checkout</span>
+            <button type="button" className="btn-checkout" onClick={openCheckoutModal} disabled={!activePlan || hasActiveSubscription}>
+              <span>{hasActiveSubscription ? 'Plan Already Active' : 'Continue to Checkout'}</span>
               <i className="fa-solid fa-arrow-right"></i>
             </button>
           </div>
@@ -257,7 +632,7 @@ export default function Subscriptions() {
 
         <div className={`modal-overlay ${isModalOpen ? 'active' : ''}`}>
           <div className="modal-container">
-            <button type="button" className="modal-close" onClick={closeCheckoutModal}>
+            <button type="button" className="modal-close" onClick={closeCheckoutModal} disabled={checkoutLoading}>
               <i className="fa-solid fa-xmark"></i>
             </button>
             <div className="modal-header">
@@ -281,27 +656,65 @@ export default function Subscriptions() {
                 <strong>{formatPrice(activePlan?.amount)}</strong>
               </div>
             </div>
-            <div className="modal-actions">
-              <button type="button" className="modal-button modal-button-secondary" onClick={completePurchase}>
-                <i className="fa-brands fa-apple"></i>
-                Pay with Apple Pay
-              </button>
-              <button type="button" className="modal-button modal-button-primary" onClick={completePurchase}>
-                <i className="fa-solid fa-credit-card"></i>
-                Pay with Credit / Debit Card
+            <div className="modal-actions modal-actions-single">
+              <button type="button" className="modal-button modal-button-primary" onClick={startStripeCheckout} disabled={checkoutLoading}>
+                {checkoutLoading ? 'Redirecting...' : 'Confirm'}
+                {!checkoutLoading && <i className="fa-solid fa-arrow-right"></i>}
               </button>
             </div>
-            <p className="modal-disclaimer">By clicking pay, your account will be instantly upgraded. Subscriptions auto-renew depending on your chosen plan cycle. You can cancel anytime from your settings.</p>
+            <p className="modal-disclaimer">By confirming, your account will be instantly upgraded. Subscriptions auto-renew depending on your chosen plan cycle. You can cancel anytime from your settings.</p>
           </div>
         </div>
 
-        <div className={`toast-notification ${showToast ? 'show' : ''}`}>
-          <i className="fa-solid fa-circle-check"></i>
-          <div>
-            <h5>Subscription Activated!</h5>
-            <p>Your account has been successfully upgraded.</p>
+        <div className={`modal-overlay receipt-modal-overlay ${receiptModal.open ? 'active' : ''}`}>
+          <div className="receipt-modal-container">
+            <div className="receipt-modal-header">
+              <h3>Payment Receipt</h3>
+              <button type="button" className="modal-close" onClick={closeReceiptModal} aria-label="Close receipt">
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <p className="receipt-modal-subtitle">Your payment was successful. Review your receipt below.</p>
+            <div className="receipt-frame-wrapper">
+              {receiptModal.data ? (
+                <PaymentReceiptPreview ref={receiptPreviewRef} receipt={receiptModal.data} />
+              ) : (
+                <div className="receipt-frame-fallback">Receipt is not available.</div>
+              )}
+            </div>
+            <div className="receipt-modal-actions">
+              <button type="button" className="modal-button modal-button-secondary" onClick={downloadReceipt} disabled={!receiptModal.data || downloadingReceipt}>
+                <i className="fa-solid fa-download"></i>
+                {downloadingReceipt ? 'Generating PDF...' : 'Download Receipt'}
+              </button>
+              <button type="button" className="modal-button modal-button-primary" onClick={closeReceiptModal}>
+                Close & View My Plan
+              </button>
+            </div>
           </div>
         </div>
+
+        <DiscontinueModal
+          open={discontinueModalOpen}
+          onClose={() => setDiscontinueModalOpen(false)}
+          onSubmit={handleDiscontinueSubmit}
+          amount={currentSubscription?.amount || currentRefund?.amount}
+          loading={refundLoading}
+        />
+
+        <ScheduleSlotModal
+          open={scheduleModalOpen}
+          onClose={() => setScheduleModalOpen(false)}
+          onSubmit={handleScheduleSubmit}
+          loading={refundLoading}
+        />
+
+        <BankDetailsModal
+          open={bankModalOpen}
+          onClose={() => setBankModalOpen(false)}
+          onSubmit={handleBankDetailsSubmit}
+          loading={refundLoading}
+        />
       </div>
     </>
   )

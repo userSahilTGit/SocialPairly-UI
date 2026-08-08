@@ -14,6 +14,7 @@ import AdminQuestions from './pages/AdminQuestions'
 import ProfileMediaPage from './pages/ProfileMediaPage'
 import AdminMediaModeration from './pages/AdminMediaModeration'
 import AdminPlans from './pages/AdminPlans'
+import AdminFinance from './pages/AdminFinance'
 
 export default function App() {
   const { loading } = useAuth()
@@ -89,6 +90,18 @@ export default function App() {
             </ProtectedRoute>
           } 
         />
+
+      <Route path="/admin/finance" element={
+        <ProtectedRoute adminOnly>
+          <AdminFinance />
+        </ProtectedRoute>
+      } />
+
+        <Route path="/admin/plans" element={
+          <ProtectedRoute adminOnly>
+            <AdminPlans />
+          </ProtectedRoute>
+        } />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

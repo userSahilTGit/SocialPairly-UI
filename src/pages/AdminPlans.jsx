@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Navbar from '../components/Navbar'
 import api from '../api/axios'
 import './AdminPlans.css'
@@ -16,6 +16,12 @@ export default function AdminPlans() {
     const [filterType, setFilterType] = useState('All Types')
     const [searchQuery, setSearchQuery] = useState('')
     const [viewMode, setViewMode] = useState('grid') // 'grid' or 'table'
+    const [subscribedUsers, setSubscribedUsers] = useState([])
+    const [subscriptionsLoading, setSubscriptionsLoading] = useState(true)
+    const [subscriptionsError, setSubscriptionsError] = useState('')
+    const [isRemoveSubscriptionModalOpen, setIsRemoveSubscriptionModalOpen] = useState(false)
+    const [removingSubscription, setRemovingSubscription] = useState(null)
+    const [subscriptionActionLoading, setSubscriptionActionLoading] = useState(false)
 
     const initialFormState = {
         planName: '',
@@ -32,9 +38,24 @@ export default function AdminPlans() {
 
     const [formData, setFormData] = useState(initialFormState)
 
+    const fetchSubscribedUsers = useCallback(async () => {
+        try {
+            setSubscriptionsLoading(true)
+            setSubscriptionsError('')
+            const { data } = await api.get('/admin/subscriptions')
+            setSubscribedUsers(data || [])
+        } catch (err) {
+            setSubscriptionsError(err.response?.data?.message || 'Failed to load subscribed users')
+            console.error('Fetch subscribed users error:', err)
+        } finally {
+            setSubscriptionsLoading(false)
+        }
+    }, [])
+
     useEffect(() => {
         fetchPlans()
-    }, [])
+        fetchSubscribedUsers()
+    }, [fetchSubscribedUsers])
 
     const fetchPlans = async () => {
         try {
@@ -161,6 +182,39 @@ export default function AdminPlans() {
             console.error('Delete plan error:', err)
             setError(err.response?.data?.message || 'Failed to delete plan')
         }
+    }
+
+    const handleRemoveSubscriptionClick = (subscription) => {
+        setRemovingSubscription(subscription)
+        setSubscriptionsError('')
+        setIsRemoveSubscriptionModalOpen(true)
+    }
+
+    const handleConfirmRemoveSubscription = async () => {
+        if (!removingSubscription) return
+        try {
+            setSubscriptionActionLoading(true)
+            setSubscriptionsError('')
+            await api.delete(`/admin/subscriptions/${removingSubscription.id}`)
+            setSuccess(`Subscription for "${removingSubscription.userName}" removed successfully!`)
+            setIsRemoveSubscriptionModalOpen(false)
+            setRemovingSubscription(null)
+            fetchSubscribedUsers()
+        } catch (err) {
+            console.error('Remove subscription error:', err)
+            setSubscriptionsError(err.response?.data?.message || 'Failed to remove subscription')
+        } finally {
+            setSubscriptionActionLoading(false)
+        }
+    }
+
+    const formatSubscriptionDate = (dateValue) => {
+        if (!dateValue) return '—'
+        return new Date(dateValue).toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        })
     }
 
     const filteredPlans = plans.filter((plan) => {
@@ -430,6 +484,79 @@ export default function AdminPlans() {
                             </table>
                         </div>
                     )}
+
+                    {/* Subscribed Users Table */}
+                    <section className="subscribed-users-section">
+                        <div className="subscribed-users-header">
+                            <div className="header-content">
+                                <div className="breadcrumb-tag">User Subscriptions</div>
+                                <h2>Subscribed Users</h2>
+                                <p>View and manage active user subscriptions linked to catalog plans.</p>
+                            </div>
+                            <button
+                                type="button"
+                                className="btn-refresh-subscriptions"
+                                onClick={fetchSubscribedUsers}
+                                disabled={subscriptionsLoading}
+                                title="Refresh subscribed users"
+                            >
+                                <span className={`refresh-icon ${subscriptionsLoading ? 'spinning' : ''}`}>↻</span>
+                                {subscriptionsLoading ? 'Refreshing...' : 'Refresh'}
+                            </button>
+                        </div>
+
+                        {subscriptionsError && (
+                            <div className="alert alert-error">{subscriptionsError}</div>
+                        )}
+
+                        <div className="plans-table-wrapper subscribed-users-table-wrapper">
+                            {subscriptionsLoading && subscribedUsers.length === 0 ? (
+                                <div className="loading-state subscribed-users-loading">Loading subscribed users...</div>
+                            ) : subscribedUsers.length === 0 ? (
+                                <div className="empty-state subscribed-users-empty">
+                                    <div className="empty-icon">👥</div>
+                                    <h3>No Subscribed Users</h3>
+                                    <p>No user subscriptions found in the database.</p>
+                                </div>
+                            ) : (
+                                <table className="plans-table subscribed-users-table">
+                                    <thead>
+                                        <tr>
+                                            <th>User Name</th>
+                                            <th>Plan</th>
+                                            <th>Subscription Start</th>
+                                            <th>End Date</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {subscribedUsers.map((subscription) => (
+                                            <tr key={subscription.id}>
+                                                <td className="name-cell">
+                                                    <strong>{subscription.userName}</strong>
+                                                </td>
+                                                <td>
+                                                    <span className="badge badge-type">{subscription.planName}</span>
+                                                </td>
+                                                <td>{formatSubscriptionDate(subscription.subscriptionStartDate)}</td>
+                                                <td>{formatSubscriptionDate(subscription.subscriptionEndDate)}</td>
+                                                <td className="actions-cell">
+                                                    <button
+                                                        type="button"
+                                                        className="btn-remove-subscription"
+                                                        onClick={() => handleRemoveSubscriptionClick(subscription)}
+                                                        title="Remove subscription"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </section>
                 </div>
             </div>
 
@@ -613,6 +740,39 @@ export default function AdminPlans() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* REMOVE SUBSCRIPTION CONFIRMATION MODAL */}
+            {isRemoveSubscriptionModalOpen && (
+                <div className="plan-modal-overlay" onClick={() => !subscriptionActionLoading && setIsRemoveSubscriptionModalOpen(false)}>
+                    <div className="delete-confirm-card" onClick={(e) => e.stopPropagation()}>
+                        <div className="delete-icon-circle">
+                            <span className="warning-symbol">⚠️</span>
+                        </div>
+                        <h2 className="delete-title">Remove User Subscription?</h2>
+                        <p className="delete-description">
+                            Are you sure you want to remove the subscription for "<strong>{removingSubscription?.userName}</strong>" on plan "<strong>{removingSubscription?.planName}</strong>"? This action cannot be undone.
+                        </p>
+                        <div className="delete-buttons-row">
+                            <button
+                                type="button"
+                                className="btn-delete-cancel"
+                                onClick={() => setIsRemoveSubscriptionModalOpen(false)}
+                                disabled={subscriptionActionLoading}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="btn-delete-confirm"
+                                onClick={handleConfirmRemoveSubscription}
+                                disabled={subscriptionActionLoading}
+                            >
+                                {subscriptionActionLoading ? 'REMOVING...' : 'YES, REMOVE'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
