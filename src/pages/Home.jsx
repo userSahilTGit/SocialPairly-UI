@@ -2,7 +2,10 @@ import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import api from '../api/axios'
 import { useEffect, useState } from 'react'
-import { useAuth } from '../context/AuthContext'
+import { ShieldAlert, Sparkles } from 'lucide-react'
+import { useAuth, PHONE_VERIFY_DISMISS_KEY } from '../context/AuthContext'
+import { userNeedsPhoneVerification, hasUsablePhoneNumber } from '../utils/verification'
+import PhoneVerificationModal from '../components/PhoneVerificationModal'
 
 function getGreeting() {
     const hour = new Date().getHours()
@@ -15,6 +18,7 @@ export default function Home() {
     const { user } = useAuth()
     const [completion, setCompletion] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [phoneOpen, setPhoneOpen] = useState(false)
 
     useEffect(() => {
         const load = async () => {
@@ -31,22 +35,60 @@ export default function Home() {
     }, [])
 
     const percentage = completion?.percentage ?? 0
+    const needsPhone = userNeedsPhoneVerification(user)
 
     return (
         <>
             <Navbar />
-            <div className="container">
-                <div className="card home-greeting-card">
-                    <h2>{getGreeting()}, {user?.firstName} {user?.lastName} 👋</h2>
+            <div className="container home-page">
+                <div className="card home-greeting-card home-hero-card">
+                    <p className="home-kicker"><Sparkles size={14} /> Your Socialpairly journey</p>
+                    <h2>{getGreeting()}, {user?.displayName || user?.firstName}</h2>
                     <p style={{ color: '#6b7280', marginTop: 6 }}>
-                        Welcome to SocialPairly - your space to build your profile, explore features, and stay connected.
+                        Build your profile, meet genuinely, and stay connected through curated events.
                     </p>
                     {(user?.email || user?.phoneNumber) && (
                         <p style={{ color: '#9ca3af', fontSize: 13, marginTop: 4 }}>
-                            {user.email}{user.email && user.phoneNumber ? ' • ' : ''}{user.phoneNumber}
+                            {user.email}
+                            {user.email && hasUsablePhoneNumber(user) ? ' • ' : ''}
+                            {hasUsablePhoneNumber(user) ? user.phoneNumber : ''}
+                            {hasUsablePhoneNumber(user) && (
+                                <span className={`phone-inline-badge ${user.phoneVerified ? 'ok' : 'warn'}`}>
+                                    {user.phoneVerified ? 'Verified' : 'Unverified'}
+                                </span>
+                            )}
                         </p>
                     )}
                 </div>
+
+                {needsPhone && (
+                    <div className="card phone-home-banner">
+                        <div className="phone-home-banner-copy">
+                            <ShieldAlert size={22} />
+                            <div>
+                                <strong>{hasUsablePhoneNumber(user) ? 'Verify your mobile number' : 'Add a mobile number'}</strong>
+                                <p>
+                                    {hasUsablePhoneNumber(user)
+                                        ? 'Your number is on file but not verified yet. A quick SMS keeps your account secure.'
+                                        : 'Add and verify a mobile number for trusted matching and account recovery.'}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="phone-home-banner-actions">
+                            <button
+                                type="button"
+                                className="btn auth-primary-btn"
+                                onClick={() => {
+                                    sessionStorage.removeItem(PHONE_VERIFY_DISMISS_KEY)
+                                    setPhoneOpen(true)
+                                }}
+                            >
+                                {hasUsablePhoneNumber(user) ? 'Verify now' : 'Add number'}
+                            </button>
+                            <Link to="/profile" className="btn btn-secondary">Open profile</Link>
+                        </div>
+                    </div>
+                )}
 
                 {!loading && (
                     <div className="card profile-progress-card">
@@ -69,6 +111,12 @@ export default function Home() {
                     <p className="coming-soon-text">Coming soon....</p>
                 </div>
             </div>
+
+            <PhoneVerificationModal
+                open={phoneOpen}
+                onClose={() => setPhoneOpen(false)}
+                onVerified={() => setPhoneOpen(false)}
+            />
         </>
     )
 }

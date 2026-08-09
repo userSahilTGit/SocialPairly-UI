@@ -423,10 +423,10 @@ export default function ProfileMediaPage() {
               Are you sure you want to go back to your profile? Your unsaved changes may be lost.
             </p>
             <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowCancelModal(false)}>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowCancelModal(false)}>
                 Stay Here
               </button>
-              <button className="btn btn-danger" onClick={handleCancelExit} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button type="button" className="btn btn-danger" onClick={handleCancelExit} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <LogOut size={16} /> Go to Profile
               </button>
             </div>
@@ -448,6 +448,7 @@ export default function ProfileMediaPage() {
             {myMedia.length}/{MAX_MEDIA_SLOTS} used
           </span>
           <button
+            type="button"
             className="btn btn-secondary"
             onClick={() => setShowCancelModal(true)}
             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '8px 14px', fontSize: 13 }}
@@ -600,6 +601,7 @@ export default function ProfileMediaPage() {
 
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <button
+                  type="button"
                   className="btn btn-secondary"
                   onClick={() => setShowCancelModal(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: 4 }}
@@ -670,7 +672,7 @@ export default function ProfileMediaPage() {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn btn-secondary" onClick={() => setShowCancelModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowCancelModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <X size={16} /> Cancel
                   </button>
                   <button className="btn btn-secondary" onClick={() => setActiveStep(1)} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -821,7 +823,7 @@ export default function ProfileMediaPage() {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn btn-secondary" onClick={() => setShowCancelModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowCancelModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <X size={16} /> Cancel
                   </button>
                   <button className="btn btn-secondary" onClick={() => setActiveStep(2)} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
