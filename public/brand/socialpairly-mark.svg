@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Socialpairly">
+  <!-- Recreated from brand mark: coral + magenta couple heart / wine-glass negative space -->
+  <g fill="#F53C46">
+    <circle cx="58" cy="46" r="22"/>
+    <path d="M78 72c-30 6-52 34-54 78-2 28 14 46 40 52 18 4 34-2 46-14-8-24-12-48-8-72 2-14-2-28-24-44z"/>
+  </g>
+  <g fill="#FF57C6">
+    <circle cx="142" cy="46" r="22"/>
+    <path d="M122 72c30 6 52 34 54 78 2 28-14 46-40 52-18 4-34-2-46-14 8-24 12-48 8-72-2-14 2-28 24-44z"/>
+  </g>
+</svg>

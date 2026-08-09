@@ -6,6 +6,7 @@ import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import { getMediaUrl } from '../utils/mediaUrl'
 import { Play, Camera, Film } from 'lucide-react'
+import PhoneVerifyPanel from '../components/PhoneVerifyPanel'
 
 const emptyEducation = { institution: '', degree: '', fieldOfStudy: '', startYear: '', endYear: '' }
 
@@ -31,6 +32,8 @@ export default function Profile() {
         locationCountry: '',
         dateOfBirth: '',
         gender: '',
+        religion: '',
+        preferredReligion: '',
         interests: '',
     })
     const [isEditing, setIsEditing] = useState(false)
@@ -38,6 +41,7 @@ export default function Profile() {
     const [educations, setEducations] = useState([emptyEducation])
     const [questions, setQuestions] = useState([])
     const [answers, setAnswers] = useState({})
+    const [identity, setIdentity] = useState(null)
 
     // Separate media fetch so it doesn't block profile loading
     const fetchUserMedia = useCallback(async () => {
@@ -56,9 +60,10 @@ export default function Profile() {
 
     const loadProfile = async () => {
         try {
-            const [profileRes, questionsRes] = await Promise.all([
+            const [profileRes, questionsRes, identityRes] = await Promise.all([
                 api.get('/profile'),
                 api.get('/questions'),
+                api.get('/onboarding/identity').catch(() => ({ data: null })),
             ])
 
             const p = profileRes.data.profile
@@ -69,8 +74,10 @@ export default function Profile() {
                     lifestyle: p.lifestyle || '',
                     locationCity: p.locationCity || '',
                     locationCountry: p.locationCountry || '',
-                    dateOfBirth: p.dateOfBirth || '',
-                    gender: p.gender || '',
+                    dateOfBirth: p.dateOfBirth || identityRes.data?.dateOfBirth || '',
+                    gender: p.gender || identityRes.data?.gender || '',
+                    religion: p.religion || '',
+                    preferredReligion: p.preferredReligion || '',
                     interests: (p.interests || []).join(', '),
                 })
                 setPhotoUrl(p.profilePhotoUrl || '')
@@ -88,6 +95,8 @@ export default function Profile() {
             } else {
                 setEducations([emptyEducation])
             }
+
+            setIdentity(identityRes.data || null)
 
             setQuestions(questionsRes.data)
             const initialAnswers = {}
@@ -175,6 +184,8 @@ export default function Profile() {
                 locationCountry: form.locationCountry,
                 dateOfBirth: form.dateOfBirth || null,
                 gender: form.gender || null,
+                religion: form.religion || null,
+                preferredReligion: form.preferredReligion || null,
                 interests: form.interests.split(',').map((s) => s.trim()).filter(Boolean),
                 educations: educations
                     .filter((ed) => ed.institution.trim())
@@ -243,6 +254,13 @@ export default function Profile() {
 
                 {message && <div className="success">{message}</div>}
                 {error && <div className="error">{error}</div>}
+
+                <div className="card phone-profile-card">
+                    <div className="flex-between" style={{ marginBottom: 12 }}>
+                        <h2 style={{ margin: 0 }}>Mobile number</h2>
+                    </div>
+                    <PhoneVerifyPanel />
+                </div>
 
                 {isEditing ? (
                     <form onSubmit={handleSubmit}>
@@ -394,7 +412,7 @@ export default function Profile() {
                             <div className="card profile-summary-card">
                                 <div className="profile-summary-header">
                                     <div>
-                                        <h2>{user?.firstName} {user?.lastName}</h2>
+                                        <h2>{user?.displayName || user?.firstName}</h2>
                                         <p className="muted">{user?.email}</p>
                                     </div>
                                     {photoUrl ? (
@@ -416,9 +434,71 @@ export default function Profile() {
                             </div>
 
                             <div className="card profile-info-card">
-                                <h2>Personal Information</h2>
-                                {renderField('Date of Birth', form.dateOfBirth)}
-                                {renderField('Gender', form.gender)}
+                                <div className="flex-between" style={{ marginBottom: 12 }}>
+                                    <h2 style={{ margin: 0 }}>Identity & Background</h2>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => navigate('/onboarding/identity')}
+                                    >
+                                        Edit
+                                    </button>
+                                </div>
+                                {renderField(
+                                    'Legal name',
+                                    [identity?.namePrefix, identity?.firstName, identity?.middleName, identity?.lastName, identity?.nameSuffix]
+                                        .filter(Boolean)
+                                        .join(' ')
+                                        || [user?.firstName, user?.lastName].filter(Boolean).join(' ')
+                                )}
+                                {renderField('Preferred name', identity?.preferredName || user?.preferredName || user?.displayName)}
+                                {renderField('Date of Birth', identity?.dateOfBirth || form.dateOfBirth)}
+                                {renderField(
+                                    'Age',
+                                    identity?.age != null ? `${identity.age} years` : null
+                                )}
+                                {renderField('Pronouns', identity?.pronouns)}
+                                {renderField('Gender identity', identity?.gender || form.gender)}
+                                {renderField('Religion', form.religion)}
+                                {renderField('Preferred religion', form.preferredReligion)}
+                                <div style={{ marginTop: 12 }}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => navigate('/onboarding/faith')}
+                                    >
+                                        Edit Faith
+                                    </button>
+                                </div>
+                                {renderField(
+                                    'Gender visibility',
+                                    identity?.genderShownToMatches === 'HIDDEN'
+                                        ? 'Hidden'
+                                        : identity?.genderShownToMatches === 'PUBLIC'
+                                            ? 'Public'
+                                            : identity?.genderShownToMatches
+                                                ? 'Shown to potential matches'
+                                                : null
+                                )}
+                                {renderField('Primary email', identity?.primaryEmail || user?.email)}
+                                {renderField('Secondary email', identity?.secondaryEmail)}
+                                {renderField('Primary phone', identity?.primaryPhone || user?.phoneNumber)}
+                                {renderField('Secondary phone', identity?.secondaryPhone)}
+                                {renderField('Home phone', identity?.homePhone)}
+                                {renderField('Preferred contact', identity?.preferredContactMethod)}
+                                {renderField('Best time to contact', identity?.bestTimeToContact)}
+                                {renderField('City', identity?.locationCity || form.locationCity)}
+                                {renderField('Country', identity?.locationCountry || form.locationCountry)}
+                                {renderField(
+                                    'Marital status',
+                                    identity?.relationship?.maritalStatus
+                                        ? String(identity.relationship.maritalStatus).replace(/_/g, ' ')
+                                        : null
+                                )}
+                            </div>
+
+                            <div className="card profile-info-card">
+                                <h2>Location</h2>
                                 {renderField('City', form.locationCity)}
                                 {renderField('Country', form.locationCountry)}
                             </div>
@@ -506,7 +586,7 @@ export default function Profile() {
                                             ))}
                                         </div>
                                         <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, textAlign: 'center' }}>
-                                            {filteredMedia.length} media item(s) · <a href="/profile/media" style={{ color: 'var(--primary)' }}>Manage media</a>
+                                            {filteredMedia.length} media item(s)
                                         </p>
                                     </>
                                 )}

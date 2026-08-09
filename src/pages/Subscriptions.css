@@ -590,7 +590,7 @@ hr {
   transform: scale(0.98);
 }
 
-.modal-overlay {
+.subscriptions-page .modal-overlay {
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -605,7 +605,7 @@ hr {
   transition: opacity var(--transition-normal), visibility var(--transition-normal);
 }
 
-.modal-overlay.active {
+.subscriptions-page .modal-overlay.active {
   opacity: 1;
   visibility: visible;
 }
@@ -622,7 +622,7 @@ hr {
   transition: transform var(--transition-normal);
 }
 
-.modal-overlay.active .modal-container {
+.subscriptions-page .modal-overlay.active .modal-container {
   transform: scale(1);
 }
 

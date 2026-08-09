@@ -76,7 +76,7 @@ export function ProfilePreviewCard({ mediaList = [], user = {}, onCancel, onSave
 
       {/* Action Buttons */}
       <div className="preview-actions">
-        <button className="btn btn-secondary btn-sm" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={onCancel}>Cancel</button>
         <button className="btn btn-primary btn-sm" onClick={onSave}>Save</button>
         <button
           className="btn btn-outline btn-sm"

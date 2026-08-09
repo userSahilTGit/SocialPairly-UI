@@ -1,59 +1,133 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import api from '../api/axios'
+import { normalizeUser } from '../utils/user'
+
+/**
+ * Central toggle for phone verification enforcement.
+ * false = optional (Skip / Remind Me Later allowed) — Firebase phone auth used when verifying
+ * true  = block unverified users (enable guard in ProtectedRoute.jsx)
+ */
+export const IS_PHONE_VERIFICATION_MANDATORY = false
+
+export const PHONE_VERIFY_DISMISS_KEY = 'sp_phone_verify_remind_later'
+export const IDENTITY_CONTINUE_LATER_KEY = 'sp_identity_continue_later'
 
 const AuthContext = createContext(null)
 
+function readStoredAuth() {
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+  const rawUser = localStorage.getItem('user') || sessionStorage.getItem('user')
+  if (token && rawUser) {
+    return { token, user: normalizeUser(JSON.parse(rawUser)) }
+  }
+  return null
+}
+
 export function AuthProvider({ children }) {
-    const [user, setUser] = useState(null)
-    const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-    useEffect(() => {
-        const storedUser = localStorage.getItem('user')
-        const token = localStorage.getItem('token')
-        if (storedUser && token) {
-            setUser(JSON.parse(storedUser))
-        }
+  useEffect(() => {
+    let cancelled = false
+
+    async function bootstrapAuth() {
+      const stored = readStoredAuth()
+      if (!stored?.token) {
         setLoading(false)
-    }, [])
+        return
+      }
 
-    const persist = (data) => {
-        localStorage.setItem('token', data.token)
-        localStorage.setItem('user', JSON.stringify(data.user))
-        setUser(data.user)
-    }
+      setUser(stored.user)
 
-    const login = async (identifier, password) => {
-        const { data } = await api.post('/auth/login', { identifier, password })
-        persist(data)
-        return data.user
-    }
-
-    const register = async (form) => {
-        const { data } = await api.post('/auth/register', form)
-        persist(data)
-        return data.user
-    }
-
-    const refreshUser = async () => {
+      try {
         const { data } = await api.get('/users/me')
-        localStorage.setItem('user', JSON.stringify(data))
-        setUser(data)
-        return data
+        if (!cancelled) {
+          const rememberMe = !!localStorage.getItem('token')
+          const storage = rememberMe ? localStorage : sessionStorage
+          const normalized = normalizeUser(data)
+          storage.setItem('user', JSON.stringify(normalized))
+          setUser(normalized)
+        }
+      } catch {
+        // Keep cached user if refresh fails (offline / expired token handled by axios interceptor)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
 
-    const logout = () => {
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
-        setUser(null)
-    }
+    bootstrapAuth()
+    return () => { cancelled = true }
+  }, [])
 
-    return (
-        <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, setUser, persist }}>
-            {children}
-        </AuthContext.Provider>
-    )
+  const persist = (data, rememberMe = true) => {
+    const storage = rememberMe ? localStorage : sessionStorage
+    const other = rememberMe ? sessionStorage : localStorage
+    other.removeItem('token')
+    other.removeItem('user')
+    const normalizedUser = normalizeUser(data.user)
+    storage.setItem('token', data.token)
+    storage.setItem('user', JSON.stringify(normalizedUser))
+    setUser(normalizedUser)
+  }
+
+  const login = async (identifier, password, rememberMe = true) => {
+    sessionStorage.removeItem(PHONE_VERIFY_DISMISS_KEY)
+    sessionStorage.removeItem(IDENTITY_CONTINUE_LATER_KEY)
+    const { data } = await api.post('/auth/login', { identifier, password, rememberMe })
+    persist(data, rememberMe)
+    try {
+      const { data: me } = await api.get('/users/me')
+      persist({ token: data.token, user: me }, rememberMe)
+      return normalizeUser(me)
+    } catch {
+      return normalizeUser(data.user)
+    }
+  }
+
+  const register = async (form) => {
+    sessionStorage.removeItem(PHONE_VERIFY_DISMISS_KEY)
+    sessionStorage.removeItem(IDENTITY_CONTINUE_LATER_KEY)
+    const { data } = await api.post('/auth/register', form)
+    persist(data, true)
+    return normalizeUser(data.user)
+  }
+
+  const refreshUser = async () => {
+    const { data } = await api.get('/users/me')
+    const rememberMe = !!localStorage.getItem('token')
+    persist({ token: localStorage.getItem('token') || sessionStorage.getItem('token'), user: data }, rememberMe)
+    return normalizeUser(data)
+  }
+
+  const logout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    sessionStorage.removeItem('token')
+    sessionStorage.removeItem('user')
+    sessionStorage.removeItem(PHONE_VERIFY_DISMISS_KEY)
+    sessionStorage.removeItem(IDENTITY_CONTINUE_LATER_KEY)
+    setUser(null)
+  }
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        logout,
+        refreshUser,
+        setUser,
+        persist,
+        IS_PHONE_VERIFICATION_MANDATORY,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {
-    return useContext(AuthContext)
+  return useContext(AuthContext)
 }

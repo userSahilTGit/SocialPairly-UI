@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
+import { BrandMark } from './AuthBrandAssets'
 
 export default function Navbar() {
     const { user, logout } = useAuth()
@@ -68,7 +69,10 @@ export default function Navbar() {
     return (
         <>
             <nav className="navbar">
-                <NavLink to="/" className="brand">SocialPairly</NavLink>
+                <NavLink to="/" className="brand">
+                    <BrandMark size={36} className="nav-brand-logo" />
+                    <span className="nav-brand-name">Socialpairly</span>
+                </NavLink>
                 <div className="nav-links">
                     {user?.role !== 'ADMIN' && (
                         <NavLink to="/">Home</NavLink>
@@ -102,13 +106,16 @@ export default function Navbar() {
                             aria-label="Profile menu"
                         >
                             <span className="profile-icon">
-                                {user?.firstName?.[0]?.toUpperCase() || '?'}
+                                {(user?.displayName || user?.firstName)?.[0]?.toUpperCase() || '?'}
                             </span>
                         </button>
                         {dropdownOpen && (
                             <div className="dropdown-menu">
                                 <button type="button" onClick={() => { setDropdownOpen(false); navigate('/profile') }}>
                                     Profile
+                                </button>
+                                <button type="button" onClick={() => { setDropdownOpen(false); navigate('/onboarding/identity') }}>
+                                    Identity & Background
                                 </button>
                                 <button type="button" onClick={() => { setDropdownOpen(false); navigate('/settings') }}>
                                     Settings
