@@ -18,6 +18,8 @@ import ProfileMediaPage from './pages/ProfileMediaPage'
 import AdminMediaModeration from './pages/AdminMediaModeration'
 import AdminPlans from './pages/AdminPlans'
 import AdminFinance from './pages/AdminFinance'
+import AdminEvents from './pages/AdminEvents'
+import EventWorkspace from './pages/EventWorkspace'
 import IdentityBackgroundPage from './pages/onboarding/IdentityBackgroundPage'
 import PersonalityLifestylePage from './pages/onboarding/PersonalityLifestylePage'
 import FaithOnboardingPage from './pages/onboarding/FaithOnboardingPage'
@@ -78,6 +80,12 @@ export default function App() {
         <Route path="/" element={
           <ProtectedRoute>
             <Home />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/events/:eventId" element={
+          <ProtectedRoute>
+            <EventWorkspace />
           </ProtectedRoute>
         } />
 
@@ -144,6 +152,12 @@ export default function App() {
         <Route path="/admin/plans" element={
           <ProtectedRoute adminOnly>
             <AdminPlans />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/admin/events" element={
+          <ProtectedRoute adminOnly>
+            <AdminEvents />
           </ProtectedRoute>
         } />
 

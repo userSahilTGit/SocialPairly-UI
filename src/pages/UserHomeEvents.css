@@ -1,0 +1,414 @@
+/* User Home — aligned with admin events dashboard styling */
+
+.user-home-page {
+    min-height: 100vh;
+    background: linear-gradient(180deg, #f5f3ff 0%, #fdf2f8 45%, #f8fafc 100%);
+    padding-bottom: 60px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #1e293b;
+}
+
+.user-home-container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 24px 20px;
+}
+
+.user-home-page .home-greeting-card,
+.user-home-page .home-phone-banner,
+.user-home-page .profile-progress-card,
+.user-home-page .home-event-tile,
+.user-home-page .coming-soon-card {
+    background: #fff;
+    border: 1px solid #f1f5f9;
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+    margin-bottom: 16px;
+}
+
+/* Hero card */
+.user-home-page .home-hero-card {
+    background:
+        linear-gradient(135deg, rgba(99, 102, 241, 0.06), rgba(236, 72, 153, 0.08)),
+        #fff;
+    border: 1px solid rgba(124, 58, 237, 0.12);
+    padding: 24px 28px;
+}
+
+.user-home-page .home-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #7c3aed;
+    margin: 0 0 8px;
+}
+
+.user-home-page .home-hero-title {
+    font-size: 28px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 8px;
+    letter-spacing: -0.5px;
+}
+
+.user-home-page .home-hero-subtitle {
+    margin: 0;
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.55;
+    max-width: 560px;
+}
+
+.user-home-page .home-hero-meta {
+    margin: 8px 0 0;
+    color: #94a3b8;
+    font-size: 13px;
+}
+
+.home-hero-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.home-token-balance {
+    text-align: right;
+    flex-shrink: 0;
+    background: #faf5ff;
+    border: 1px solid #ede9fe;
+    border-radius: 14px;
+    padding: 14px 20px;
+    min-width: 140px;
+}
+
+.home-token-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    color: #94a3b8;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.home-token-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 22px;
+    font-weight: 800;
+    color: #db2777;
+}
+
+.home-user-id {
+    color: #7c3aed;
+    font-weight: 600;
+}
+
+/* Shared home buttons — match admin dashboard */
+.user-home-page .home-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 11px 22px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    border: none;
+    font-family: inherit;
+}
+
+.user-home-page .home-btn-primary {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+    color: #fff !important;
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+}
+
+.user-home-page .home-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(124, 58, 237, 0.45);
+    filter: brightness(1.03);
+}
+
+.user-home-page .home-btn-outline {
+    background: #fff;
+    color: #64748b !important;
+    border: 1px solid #e2e8f0;
+}
+
+.user-home-page .home-btn-outline:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #475569 !important;
+}
+
+/* Phone verification banner — purple theme (not legacy orange) */
+.user-home-page .home-phone-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 24px;
+    border: 1px solid #ddd6fe;
+    background: linear-gradient(120deg, #faf5ff 0%, #fff 100%);
+}
+
+.user-home-page .home-phone-banner-copy {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    flex: 1;
+    min-width: 240px;
+}
+
+.user-home-page .home-phone-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: #ede9fe;
+    color: #7c3aed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.user-home-page .home-phone-banner-copy strong {
+    display: block;
+    color: #0f172a;
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.user-home-page .home-phone-banner-copy p {
+    margin: 0;
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.5;
+    max-width: 420px;
+}
+
+.user-home-page .home-phone-banner-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Profile completion */
+.user-home-page .profile-progress-card {
+    padding: 22px 24px;
+}
+
+.user-home-page .home-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.user-home-page .home-progress-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.user-home-page .home-progress-value {
+    font-size: 14px;
+    font-weight: 800;
+    color: #7c3aed;
+}
+
+.user-home-page .home-progress-bar {
+    height: 10px;
+    background: #f1f5f9;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.user-home-page .home-progress-fill {
+    height: 100%;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+    border-radius: 999px;
+    transition: width 0.4s ease;
+}
+
+.user-home-page .home-progress-actions {
+    margin-top: 16px;
+}
+
+/* Events section */
+.home-events-section {
+    margin-top: 8px;
+}
+
+.home-events-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    padding: 0 4px;
+}
+
+.home-events-head h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.home-events-active {
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.home-event-tile {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 22px 24px !important;
+}
+
+.home-event-tile-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.home-event-badges {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.home-event-status {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 999px;
+    letter-spacing: 0.04em;
+}
+
+.home-event-status.pending {
+    background: #ede9fe;
+    color: #6d28d9;
+}
+
+.home-event-status.accepted,
+.home-event-status.checked_in {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.home-event-status.declined {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.home-event-id {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.home-event-title {
+    margin: 0 0 10px;
+    font-size: 18px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.home-event-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 13px;
+    color: #64748b;
+}
+
+.home-event-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.home-event-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 22px;
+    min-height: 46px;
+    border: none;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.35);
+    flex-shrink: 0;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+.home-event-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(124, 58, 237, 0.45);
+}
+
+.user-home-page .coming-soon-card {
+    padding: 40px 24px;
+    text-align: center;
+}
+
+.user-home-page .coming-soon-text {
+    color: #94a3b8;
+    font-size: 14px;
+    margin: 0;
+}
+
+@media (max-width: 640px) {
+    .home-event-tile {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .home-event-action {
+        width: 100%;
+    }
+
+    .home-hero-top {
+        flex-direction: column;
+    }
+
+    .home-token-balance {
+        width: 100%;
+        text-align: left;
+    }
+
+    .user-home-page .home-phone-banner-actions {
+        width: 100%;
+    }
+
+    .user-home-page .home-phone-banner-actions .home-btn {
+        flex: 1;
+        min-width: 120px;
+    }
+}

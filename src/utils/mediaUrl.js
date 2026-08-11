@@ -6,7 +6,7 @@
  * which need to be combined with the API base URL.
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:9010';
 
 /**
  * Constructs a full media URL from a media object or path

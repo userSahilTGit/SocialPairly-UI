@@ -94,6 +94,7 @@ export default function Navbar() {
                                 🛡️ Moderation Center
                             </NavLink>
                             <NavLink to="/admin/plans">Plan & Subscriptions</NavLink>
+                            <NavLink to="/admin/events">Events & Groups</NavLink>
                             <NavLink to="/admin/finance">Finance</NavLink>
                         </>
                     )}

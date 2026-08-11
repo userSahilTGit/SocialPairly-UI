@@ -5,10 +5,12 @@ import PaymentReceiptPreview from '../components/PaymentReceiptPreview'
 import RefundTracker from '../components/RefundTracker'
 import { DiscontinueModal, ScheduleSlotModal, BankDetailsModal } from '../components/RefundModals'
 import api from '../api/axios'
+import { useAuth } from '../context/AuthContext'
 import { downloadReceiptPdf } from '../utils/downloadReceiptPdf'
 import './Subscriptions.css'
 
 export default function Subscriptions() {
+  const { refreshUser } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
@@ -29,8 +31,11 @@ export default function Subscriptions() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
   const [bankModalOpen, setBankModalOpen] = useState(false)
   const [refundLoading, setRefundLoading] = useState(false)
+  const [subscriptionResolved, setSubscriptionResolved] = useState(false)
   const receiptPreviewRef = useRef(null)
   const confirmSessionHandledRef = useRef(false)
+  const refreshUserRef = useRef(refreshUser)
+  refreshUserRef.current = refreshUser
 
   const paymentResult = searchParams.get('payment')
   const sessionId = searchParams.get('session_id')
@@ -55,6 +60,13 @@ export default function Subscriptions() {
       const { data } = await api.get('/subscriptions/current')
       if (data && data.active === false) {
         return null
+      }
+      if (data && data.active !== false) {
+        try {
+          await refreshUserRef.current()
+        } catch {
+          // balance syncs on next profile refresh
+        }
       }
       return data
     } catch (err) {
@@ -110,43 +122,62 @@ export default function Subscriptions() {
   }
 
   useEffect(() => {
+    let cancelled = false
+
     const fetchPlans = async () => {
       try {
         const { data } = await api.get('/plans')
+        if (cancelled) return
         setPlans(data)
-        if (data.length > 0) {
-          setActivePlanId(data[0].id)
-          setActivePlan(data[0])
-        }
       } catch (err) {
+        if (cancelled) return
         console.error('Failed to load subscription plans', err)
         setError(err.response?.data?.message || err.message || 'Failed to load plans')
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     fetchPlans()
+    return () => { cancelled = true }
+  }, [])
 
-    if (paymentResult !== 'success') {
-      fetchCurrentSubscription().then((subscription) => {
-        if (subscription) {
-          setCurrentSubscription(subscription)
-          setShowSubscriptionBanner(true)
-        }
-      })
-      fetchCurrentRefund()
-    }
+  useEffect(() => {
+    if (paymentResult === 'success') return
+
+    let cancelled = false
+
+    fetchCurrentSubscription().then((subscription) => {
+      if (cancelled) return
+      if (subscription) {
+        setCurrentSubscription(subscription)
+        setShowSubscriptionBanner(true)
+      }
+      setSubscriptionResolved(true)
+    }).catch(() => {
+      if (!cancelled) setSubscriptionResolved(true)
+    })
+    fetchCurrentRefund()
+
+    return () => { cancelled = true }
   }, [fetchCurrentSubscription, fetchCurrentRefund, paymentResult])
 
   useEffect(() => {
-    if (!currentSubscription?.planId || plans.length === 0) return
-    const currentPlan = plans.find((plan) => plan.id === currentSubscription.planId)
-    if (currentPlan) {
-      setActivePlanId(currentPlan.id)
-      setActivePlan(currentPlan)
+    if (plans.length === 0) return
+    if (paymentResult !== 'success' && !subscriptionResolved) return
+
+    if (currentSubscription?.planId) {
+      const currentPlan = plans.find((plan) => plan.id === currentSubscription.planId)
+      if (currentPlan) {
+        setActivePlanId((prev) => (prev === currentPlan.id ? prev : currentPlan.id))
+        setActivePlan((prev) => (prev?.id === currentPlan.id ? prev : currentPlan))
+      }
+      return
     }
-  }, [currentSubscription, plans])
+
+    setActivePlanId((prev) => prev ?? plans[0]?.id ?? null)
+    setActivePlan((prev) => prev ?? plans[0] ?? null)
+  }, [plans, currentSubscription?.planId, subscriptionResolved, paymentResult])
 
   useEffect(() => {
     const isTerminal = currentRefund && (currentRefund.status === 'Completed' || currentRefund.status === 'Rejected')
@@ -184,6 +215,11 @@ export default function Subscriptions() {
 
         if (data?.subscription) {
           setPendingSubscription(data.subscription)
+          try {
+            await refreshUserRef.current()
+          } catch {
+            // token balance will sync on next /users/me refresh
+          }
           if (data.receipt) {
             setReceiptModal({ open: true, data: data.receipt })
           } else {

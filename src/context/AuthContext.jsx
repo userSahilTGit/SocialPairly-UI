@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import api from '../api/axios'
 import { normalizeUser } from '../utils/user'
 
@@ -59,7 +59,7 @@ export function AuthProvider({ children }) {
     return () => { cancelled = true }
   }, [])
 
-  const persist = (data, rememberMe = true) => {
+  const persist = useCallback((data, rememberMe = true) => {
     const storage = rememberMe ? localStorage : sessionStorage
     const other = rememberMe ? sessionStorage : localStorage
     other.removeItem('token')
@@ -68,7 +68,14 @@ export function AuthProvider({ children }) {
     storage.setItem('token', data.token)
     storage.setItem('user', JSON.stringify(normalizedUser))
     setUser(normalizedUser)
-  }
+  }, [])
+
+  const refreshUser = useCallback(async () => {
+    const { data } = await api.get('/users/me')
+    const rememberMe = !!localStorage.getItem('token')
+    persist({ token: localStorage.getItem('token') || sessionStorage.getItem('token'), user: data }, rememberMe)
+    return normalizeUser(data)
+  }, [persist])
 
   const login = async (identifier, password, rememberMe = true) => {
     sessionStorage.removeItem(PHONE_VERIFY_DISMISS_KEY)
@@ -90,13 +97,6 @@ export function AuthProvider({ children }) {
     const { data } = await api.post('/auth/register', form)
     persist(data, true)
     return normalizeUser(data.user)
-  }
-
-  const refreshUser = async () => {
-    const { data } = await api.get('/users/me')
-    const rememberMe = !!localStorage.getItem('token')
-    persist({ token: localStorage.getItem('token') || sessionStorage.getItem('token'), user: data }, rememberMe)
-    return normalizeUser(data)
   }
 
   const logout = () => {
