@@ -23,6 +23,7 @@ export function normalizeUser(raw) {
     emailVerified: emailVerified === true || emailVerified === 'true' || emailVerified === 1,
     identityPage1Complete,
     onboardingStep: raw.onboardingStep ?? raw.onboarding_step ?? null,
+    userTokens: Number(raw.userTokens ?? raw.user_tokens ?? 0),
   }
 }
 
