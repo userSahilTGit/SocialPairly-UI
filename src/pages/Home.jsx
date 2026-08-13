@@ -7,6 +7,9 @@ import { Calendar, Gem, MapPin, ShieldAlert, Sparkles, UserSearch } from 'lucide
 import { useAuth, PHONE_VERIFY_DISMISS_KEY } from '../context/AuthContext'
 import { userNeedsPhoneVerification, hasUsablePhoneNumber } from '../utils/verification'
 import PhoneVerificationModal from '../components/PhoneVerificationModal'
+import { profileScoreTone } from '../utils/profileScore'
+import { readCompletionPercentage } from '../utils/profileCompletion'
+import SiteFooter from '../components/SiteFooter'
 import './UserHomeEvents.css'
 
 function getGreeting() {
@@ -57,8 +60,8 @@ export default function Home() {
     useEffect(() => {
         const load = async () => {
             try {
-                const data = await api.get('/profile/completion')
-                setCompletion(data)
+                const res = await api.get('/profile/completion')
+                setCompletion({ percentage: readCompletionPercentage(res) })
             } catch {
                 // ignore
             } finally {
@@ -71,6 +74,7 @@ export default function Home() {
     }, [loadEvents, refreshUser])
 
     const percentage = completion?.percentage ?? 0
+    const scoreTone = profileScoreTone(percentage)
     const needsPhone = userNeedsPhoneVerification(user)
     const primaryEvent = events.find((e) => e.rsvpStatus === 'pending' || e.rsvpStatus === 'accepted') || events[0]
     const activeEvents = events.filter((e) => e.rsvpStatus !== 'declined')
@@ -173,13 +177,16 @@ export default function Home() {
                 )}
 
                 {!loading && (
-                    <div className="profile-progress-card">
+                    <div className={`profile-progress-card score-tone-${scoreTone}`}>
                         <div className="home-progress-header">
                             <span className="home-progress-label">Profile Completion</span>
-                            <span className="home-progress-value">{percentage}%</span>
+                            <span className={`home-progress-value score-tone-${scoreTone}`}>{percentage}%</span>
                         </div>
                         <div className="home-progress-bar">
-                            <div className="home-progress-fill" style={{ width: `${percentage}%` }} />
+                            <div
+                                className={`home-progress-fill score-fill score-tone-${scoreTone}`}
+                                style={{ width: `${percentage}%` }}
+                            />
                         </div>
                         {percentage < 100 && (
                             <div className="home-progress-actions">
@@ -254,6 +261,7 @@ export default function Home() {
                 onClose={() => setPhoneOpen(false)}
                 onVerified={() => setPhoneOpen(false)}
             />
+            <SiteFooter />
         </>
     )
 }

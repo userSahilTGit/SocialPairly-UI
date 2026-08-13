@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Navbar from '../components/Navbar'
+import SiteFooter from '../components/SiteFooter'
 import api from '../api/axios'
 import './AdminQuestions.css'
 
@@ -214,7 +215,8 @@ export default function AdminQuestions() {
                         )}
                     </div>
                 </div>
-            </div>
+            </div>
+        <SiteFooter />
         </>
     )
 }

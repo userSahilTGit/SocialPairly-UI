@@ -6,7 +6,7 @@
  * which need to be combined with the API base URL.
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:9010';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 /**
  * Constructs a full media URL from a media object or path
@@ -22,26 +22,35 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:9010';
  * getMediaUrl('/api/media/123/stream')
  * // Returns: 'http://localhost:8080/api/media/123/stream'
  */
+/** Disk-era avatars (`/uploads/...`) often 404; prefer BLOB stream URLs. */
+export const isLegacyDiskPhoto = (path) => {
+  if (!path || typeof path !== 'string') return false
+  return path.includes('/uploads/')
+}
+
+const resolveMediaPath = (path) => {
+  if (!path) return '';
+  if (
+    path.startsWith('blob:')
+    || path.startsWith('data:')
+    || path.startsWith('http://')
+    || path.startsWith('https://')
+  ) {
+    return path;
+  }
+  // Same-origin /api paths go through the Vite proxy (and work with auth later)
+  if (path.startsWith('/api/')) return path;
+  return `${API_URL}${path}`;
+};
+
 export const getMediaUrl = (media) => {
   if (!media) return '';
-  
-  // If it's already a full URL (starts with http:// or https://), return as-is
+
   if (typeof media === 'string') {
-    return media.startsWith('http') ? media : `${API_URL}${media}`;
+    return resolveMediaPath(media);
   }
-  
-  // If it's an object, extract the mediaUrl property
-  const mediaPath = media.mediaUrl || media.url || '';
-  
-  if (!mediaPath) return '';
-  
-  // If already a full URL, return as-is
-  if (mediaPath.startsWith('http')) {
-    return mediaPath;
-  }
-  
-  // Otherwise, prepend the API base URL
-  return `${API_URL}${mediaPath}`;
+
+  return resolveMediaPath(media.mediaUrl || media.url || '');
 };
 
 /**
@@ -88,6 +97,7 @@ export const revokeBlobUrl = (blobUrl) => {
 
 export default {
   getMediaUrl,
+  isLegacyDiskPhoto,
   isVideo,
   createBlobUrl,
   revokeBlobUrl

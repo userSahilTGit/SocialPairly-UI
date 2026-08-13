@@ -2,14 +2,14 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import SignIn from '../pages/SignIn'
+import SignIn from '@/pages/SignIn'
 
 const loginMock = vi.fn()
 const persistMock = vi.fn()
 const refreshUserMock = vi.fn()
 const navigateMock = vi.fn()
 
-vi.mock('../context/AuthContext', () => ({
+vi.mock('@/context/AuthContext', () => ({
   useAuth: () => ({
     login: loginMock,
     persist: persistMock,
@@ -31,15 +31,20 @@ vi.mock('@react-oauth/google', () => ({
   GoogleLogin: () => <div data-testid="google-login">Google</div>,
 }))
 
-vi.mock('../components/AuthHeroPanel', () => ({
+vi.mock('@/components/AuthHeroPanel', () => ({
   default: () => <div data-testid="auth-hero">Hero</div>,
 }))
 
-vi.mock('../components/GlassCard', () => ({
-  default: ({ children, className }) => <div className={className}>{children}</div>,
+vi.mock('@/components/AuthPageLayout', () => ({
+  default: ({ children }) => (
+    <div data-testid="auth-layout">
+      {typeof children === 'function' ? children({ openPrivacy: () => {} }) : children}
+    </div>
+  ),
 }))
 
-vi.mock('../components/AuthBrandAssets', () => ({
+vi.mock('@/components/AuthBrandAssets', () => ({
+  BrandMark: () => <span data-testid="brand-mark">Logo</span>,
   GoogleGlyph: () => <span>G</span>,
   AppleGlyph: () => <span>A</span>,
 }))
@@ -65,7 +70,7 @@ describe('SignIn', () => {
     expect(screen.getByLabelText(/remember me/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /forgot password/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /create an account/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /coming soon/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /apple/i })).toBeDisabled()
   })
 
   it('submits email login with rememberMe', async () => {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
+import SiteFooter from '../components/SiteFooter'
 import api from '../api/axios'
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -215,6 +216,7 @@ export default function AdminDashboard() {
                     </div>
                 </div>
             </div>
+        <SiteFooter />
         </>
     )
 }

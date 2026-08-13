@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import Navbar from '../components/Navbar'
+import SiteFooter from '../components/SiteFooter'
 import api from '../api/axios'
 import './AdminPlans.css'
 
@@ -806,7 +807,8 @@ export default function AdminPlans() {
                         </div>
                     </div>
                 </div>
-            )}
+            )}
+        <SiteFooter />
         </>
     )
 }

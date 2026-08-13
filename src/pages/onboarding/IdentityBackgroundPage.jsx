@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  BadgeCheck, Briefcase, Calendar, Check, Eye, Globe2, Info,
+  MapPin, PhoneCall, ShieldAlert, ShieldCheck, Sparkles, UserCheck, Users,
+  Home, Landmark, HeartHandshake, Wallet, Scale, FileCheck2, Baby,
+} from 'lucide-react'
+import * as faceapi from 'face-api.js'
 import api from '../../api/axios'
 import { useAuth, IDENTITY_CONTINUE_LATER_KEY } from '../../context/AuthContext'
+import { loadFaceApiModels, matchProfileToIDDocument } from '../../utils/faceRecognition'
+import { readCompletionPercentage } from '../../utils/profileCompletion'
 import OnboardingShell from '../../components/onboarding/OnboardingShell'
 import AccordionSection from '../../components/onboarding/AccordionSection'
 import ConsentTermsModal from '../../components/onboarding/ConsentTermsModal'
@@ -102,7 +110,12 @@ export default function IdentityBackgroundPage() {
     civilJudgment: { ...EMPTY_IDENTITY_FORM.civilJudgment },
   }))
   const [refData, setRefData] = useState(null)
-  const [openSection, setOpenSection] = useState('legal')
+  const ALL_SECTIONS = [
+    'legal', 'preferred', 'dob', 'gender', 'contact', 'address', 'previousAddresses',
+    'nationality', 'immigration', 'relationship', 'family', 'education', 'career',
+    'financial', 'safety', 'civil', 'verification', 'consent',
+  ]
+  const [openSections, setOpenSections] = useState(() => new Set(['legal']))
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -113,6 +126,9 @@ export default function IdentityBackgroundPage() {
   const [consentModalOpen, setConsentModalOpen] = useState(false)
   const [verifyBusy, setVerifyBusy] = useState(false)
   const [locationDraft, setLocationDraft] = useState('')
+  const [completionPct, setCompletionPct] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showPreview, setShowPreview] = useState(false)
 
   const age = useMemo(() => calcAge(form.dateOfBirth), [form.dateOfBirth])
   const durationLabel = useMemo(
@@ -139,9 +155,10 @@ export default function IdentityBackgroundPage() {
     setLoading(true)
     setLoadError('')
     try {
-      const [identityRes, refRes] = await Promise.all([
+      const [identityRes, refRes, completionRes] = await Promise.all([
         api.get('/onboarding/identity'),
         api.get('/onboarding/identity/reference-data'),
+        api.get('/profile/completion').catch(() => ({ data: null })),
       ])
       const data = identityRes.data
       const mapped = mapIdentityResponseToForm(data)
@@ -153,6 +170,7 @@ export default function IdentityBackgroundPage() {
       setEditMode(!!data.identityPage1Complete)
       setForm(mapped)
       setConsentChecked(!!mapped.backgroundConsent?.accepted)
+      setCompletionPct(readCompletionPercentage(completionRes))
     } catch (err) {
       setLoadError(err.response?.data?.message || 'Could not load Identity & Background. Please try again.')
     } finally {
@@ -309,7 +327,7 @@ export default function IdentityBackgroundPage() {
     if (!form.backgroundConsent?.accepted) {
       setFormError('Background screening consent is required before saving.')
       setFieldErrors({ backgroundConsent: 'Consent is required' })
-      setOpenSection('consent')
+      setOpenSections((prev) => new Set([...prev, 'consent']))
       setConsentModalOpen(true)
       return
     }
@@ -317,7 +335,7 @@ export default function IdentityBackgroundPage() {
     setFieldErrors(errors)
     if (Object.keys(errors).length) {
       setFormError('Please fix the highlighted fields before continuing.')
-      setOpenSection(openSectionForErrors(errors))
+      setOpenSections(new Set([openSectionForErrors(errors)]))
       return
     }
 
@@ -342,7 +360,7 @@ export default function IdentityBackgroundPage() {
       if (fields && typeof fields === 'object') setFieldErrors(fields)
       setFormError(msg)
       if (String(msg).toLowerCase().includes('consent')) {
-        setOpenSection('consent')
+        setOpenSections((prev) => new Set([...prev, 'consent']))
         setConsentModalOpen(true)
       }
     } finally {
@@ -404,10 +422,30 @@ export default function IdentityBackgroundPage() {
     setVerifyBusy(true)
     setFormError('')
     try {
-      const uploaded = await uploadDocument(file, docPurpose)
-      if (docPurpose === 'SELFIE' && uploaded?.id) {
+      if (docPurpose === 'SELFIE') {
+        const dlFrontId = form.verificationSummary?.dlFrontDocumentId
+        if (!dlFrontId) {
+          setFormError('Upload the front of your driver license first, then upload a selfie to match faces.')
+          return
+        }
+        await loadFaceApiModels('/models')
+        const dlRes = await api.get(`/onboarding/identity/documents/${dlFrontId}/stream`, {
+          responseType: 'blob',
+        })
+        const selfieImg = await faceapi.bufferToImage(file)
+        const dlImg = await faceapi.bufferToImage(dlRes.data)
+        const match = await matchProfileToIDDocument(selfieImg, dlImg)
+        if (!match.isMatch) {
+          setFormError(
+            `Selfie does not match the face on your driver license (confidence ${match.confidenceScore}%). Use a clear, well-lit photo of the same person.`,
+          )
+          return
+        }
+        const uploaded = await uploadDocument(file, docPurpose)
+        if (!uploaded?.id) return
         const { data } = await api.post('/onboarding/identity/verification/selfie', {
           documentId: uploaded.id,
+          faceMatchConfirmed: true,
         })
         setForm((prev) => ({
           ...prev,
@@ -416,7 +454,11 @@ export default function IdentityBackgroundPage() {
             ...data,
           },
         }))
-      } else if ((docPurpose === 'DL_FRONT' || docPurpose === 'DL_BACK') && uploaded?.id) {
+        return
+      }
+
+      const uploaded = await uploadDocument(file, docPurpose)
+      if ((docPurpose === 'DL_FRONT' || docPurpose === 'DL_BACK') && uploaded?.id) {
         setForm((prev) => ({
           ...prev,
           verificationSummary: {
@@ -428,7 +470,7 @@ export default function IdentityBackgroundPage() {
         }))
       }
     } catch (err) {
-      setFormError(err.response?.data?.message || 'Document upload failed.')
+      setFormError(err.response?.data?.message || err.message || 'Document upload failed.')
     } finally {
       setVerifyBusy(false)
     }
@@ -471,7 +513,25 @@ export default function IdentityBackgroundPage() {
     }
   }
 
-  const toggleSection = (id) => setOpenSection((prev) => (prev === id ? '' : id))
+  const toggleSection = (id) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const expandAll = () => setOpenSections(new Set(ALL_SECTIONS))
+  const collapseAll = () => setOpenSections(new Set())
+
+  const sectionVisible = (id, keywords = []) => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return true
+    return [id, ...keywords].some((k) => String(k).toLowerCase().includes(q))
+  }
+
+  const isOpen = (id) => openSections.has(id)
 
   if (loading) {
     return (
@@ -500,22 +560,56 @@ export default function IdentityBackgroundPage() {
   }
 
   const vs = form.verificationSummary
+  const displayName = form.preferredName || form.firstName || 'Member'
+  const locationSummary = [
+    form.currentResidence?.city,
+    form.currentResidence?.stateRegion,
+  ].filter(Boolean).join(', ') || 'Location not set'
+  const jumpLinks = [
+    { id: 'legal', label: 'Legal Identity', icon: 'lock' },
+    { id: 'address', label: 'Contact & Location', status: 'ok' },
+    { id: 'nationality', label: 'Languages & Citizenship', status: 'active' },
+    { id: 'career', label: 'Career & Education', status: 'muted' },
+    { id: 'verification', label: 'Identity Verification', icon: 'badge' },
+  ]
+  const searchMatchCount = ALL_SECTIONS.filter((id) => sectionVisible(id, [id])).length
 
   return (
     <OnboardingShell
       currentStepId="identity"
       saving={saving}
       editMode={editMode}
-      continueLabel={editMode ? 'Save changes' : 'Save & Continue'}
+      continueLabel={editMode ? 'Save changes' : 'Save & Continue to Step 2'}
       saveLaterLabel={editMode ? 'Cancel' : 'Save & continue later'}
       onBack={handleBack}
       onSaveLater={handleCancelOrLater}
       onContinue={() => submit('CONTINUE')}
+      completionPct={completionPct}
+      jumpLinks={jumpLinks}
+      onJump={(id) => setOpenSections((prev) => new Set([...prev, id]))}
+      onPreview={() => setShowPreview(true)}
+      searchEnabled
+      searchQuery={searchQuery}
+      onSearch={setSearchQuery}
+      searchMatchCount={searchMatchCount}
+      expandAll={expandAll}
+      collapseAll={collapseAll}
     >
       {formError && <div className="error ob-form-error" role="alert">{formError}</div>}
 
-      <AccordionSection id="legal" title="Legal identity" open={openSection === 'legal'} onToggle={toggleSection}>
-        <div className="ob-grid ob-grid-4">
+      <AccordionSection
+        id="legal"
+        title="Legal Identity"
+        icon={UserCheck}
+        iconTone="indigo"
+        subtitle="Your official full name for background screening and identity trust."
+        badge={{ label: 'Strictly Confidential', tone: 'amber' }}
+        summary={form.firstName && form.lastName ? 'Details Saved' : 'Required'}
+        tone="confidential"
+        open={isOpen('legal')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('legal', ['legal identity', 'first name', 'last name', 'prefix', 'suffix'])}
+      >        <div className="ob-grid ob-grid-4">
           <label className={fieldClass('namePrefix')}>
             <span>Prefix</span>
             <select name="namePrefix" value={form.namePrefix} onChange={onChange}>
@@ -549,10 +643,26 @@ export default function IdentityBackgroundPage() {
           </label>
         </div>
         <p className="ob-hint">Legal name is stored privately and is not shown to other members.</p>
+        <div className="ob-info-callout">
+          <Info className="w-4 h-4" style={{ flexShrink: 0, marginTop: 2 }} />
+          <span>
+            Legal names are verified against government IDs and stored securely. Other members will only see your chosen <strong>Preferred Display Name</strong>.
+          </span>
+        </div>
       </AccordionSection>
 
-      <AccordionSection id="preferred" title="Preferred name" open={openSection === 'preferred'} onToggle={toggleSection}>
-        <div className="ob-grid">
+      <AccordionSection
+        id="preferred"
+        title="Preferred Display Name & Audio"
+        icon={Sparkles}
+        iconTone="purple"
+        subtitle="How your matches will see your name on Socialpairly."
+        badge={{ label: 'Public Display', tone: 'purple' }}
+        summary={form.preferredName || form.firstName || '—'}
+        open={isOpen('preferred')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('preferred', ['preferred name', 'nickname', 'display'])}
+      >        <div className="ob-grid">
           <label className={fieldClass('preferredName')}>
             <span>Preferred name</span>
             <input name="preferredName" value={form.preferredName} onChange={onChange} placeholder="How should we greet you?" {...inputA11y('preferredName')} />
@@ -564,8 +674,17 @@ export default function IdentityBackgroundPage() {
         </p>
       </AccordionSection>
 
-      <AccordionSection id="dob" title="Date of birth" open={openSection === 'dob'} onToggle={toggleSection}>
-        <div className="ob-grid">
+      <AccordionSection
+        id="dob"
+        title="Date of Birth & Age Privacy"
+        icon={Calendar}
+        iconTone="pink"
+        subtitle="Your birthdate determines age calculation and star signs."
+        summary={age != null ? `${form.dateOfBirth || ''} (${age} yrs)` : 'Required'}
+        open={isOpen('dob')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('dob', ['date of birth', 'age', 'birthday'])}
+      >        <div className="ob-grid">
           <label className={fieldClass('dateOfBirth')}>
             <span>Date of birth *</span>
             <input type="date" name="dateOfBirth" value={form.dateOfBirth} onChange={onChange} {...inputA11y('dateOfBirth')} />
@@ -579,8 +698,17 @@ export default function IdentityBackgroundPage() {
         <p className="ob-hint">Exact date of birth is never shown on member-facing profiles—only approved age information.</p>
       </AccordionSection>
 
-      <AccordionSection id="gender" title="Pronouns & gender identity" open={openSection === 'gender'} onToggle={toggleSection}>
-        <div className="ob-grid">
+      <AccordionSection
+        id="gender"
+        title="Pronouns & Gender Identity"
+        icon={Users}
+        iconTone="blue"
+        subtitle="How you identify and prefer to be addressed."
+        summary={[form.pronouns, form.gender].filter(Boolean).join(' • ') || '—'}
+        open={isOpen('gender')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('gender', ['pronouns', 'gender identity'])}
+      >        <div className="ob-grid">
           <label className="ob-field">
             <span>Pronouns</span>
             <select name="pronouns" value={form.pronouns} onChange={onChange}>
@@ -608,8 +736,18 @@ export default function IdentityBackgroundPage() {
         </div>
       </AccordionSection>
 
-      <AccordionSection id="contact" title="Contact details" open={openSection === 'contact'} onToggle={toggleSection}>
-        <div className="ob-grid">
+      <AccordionSection
+        id="contact"
+        title="Contact Details"
+        icon={PhoneCall}
+        iconTone="teal"
+        subtitle="Used for security notifications and match request updates."
+        badge={{ label: 'Private', tone: 'slate' }}
+        summary={form.emailVerified || form.phoneVerified ? 'Verified contact' : 'Contact info'}
+        open={isOpen('contact')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('contact', ['email', 'phone', 'contact'])}
+      >        <div className="ob-grid">
           <label className="ob-field">
             <span>Primary email</span>
             <input value={form.primaryEmail} readOnly disabled />
@@ -660,8 +798,17 @@ export default function IdentityBackgroundPage() {
         <p className="ob-hint">Contact details never appear on public event or member profiles.</p>
       </AccordionSection>
 
-      <AccordionSection id="address" title="Current residence" open={openSection === 'address'} onToggle={toggleSection}>
-        <p className="ob-hint">Your exact address is never shown publicly—only city and country may appear.</p>
+      <AccordionSection
+        id="address"
+        title="Current Residence & Location"
+        icon={MapPin}
+        iconTone="orange"
+        subtitle="Where you currently live and previous hometowns."
+        summary={locationSummary}
+        open={isOpen('address')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('address', ['residence', 'location', 'city', 'address'])}
+      >        <p className="ob-hint">Your exact address is never shown publicly—only city and country may appear.</p>
         <div className="ob-grid">
           <label className={fieldClass('currentResidence.line1')}>
             <span>Address line 1 *</span>
@@ -780,8 +927,16 @@ export default function IdentityBackgroundPage() {
         </div>
       </AccordionSection>
 
-      <AccordionSection id="previousAddresses" title="Previous addresses" open={openSection === 'previousAddresses'} onToggle={toggleSection}>
-        {(form.previousAddresses || []).map((row, idx) => (
+      <AccordionSection
+        id="previousAddresses"
+        title="Previous Addresses"
+        icon={Home}
+        iconTone="slate"
+        subtitle="Earlier residences for background consistency."
+        open={isOpen('previousAddresses')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('previousAddresses', ['previous addresses', 'prior residence'])}
+      >        {(form.previousAddresses || []).map((row, idx) => (
           <div key={row.id || idx} className="ob-repeat-card">
             <div className="ob-grid">
               <label className="ob-field">
@@ -864,8 +1019,17 @@ export default function IdentityBackgroundPage() {
         </div>
       </AccordionSection>
 
-      <AccordionSection id="nationality" title="Nationality & languages" open={openSection === 'nationality'} onToggle={toggleSection}>
-        <div className="ob-grid">
+      <AccordionSection
+        id="nationality"
+        title="Nationality, Citizenship & Languages"
+        icon={Globe2}
+        iconTone="cyan"
+        subtitle="Cultural origins and languages spoken fluently."
+        summary={(form.nationality?.languages || []).map((l) => l.language).filter(Boolean).slice(0, 2).join(', ') || '—'}
+        open={isOpen('nationality')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('nationality', ['nationality', 'languages', 'citizenship', 'culture'])}
+      >        <div className="ob-grid">
           <label className="ob-field">
             <span>Country of birth</span>
             <select name="countryOfBirth" value={form.nationality.countryOfBirth} onChange={onSectionChange('nationality')}>
@@ -965,8 +1129,16 @@ export default function IdentityBackgroundPage() {
         </div>
       </AccordionSection>
 
-      <AccordionSection id="immigration" title="Immigration (optional)" open={openSection === 'immigration'} onToggle={toggleSection}>
-        <div className="ob-grid">
+      <AccordionSection
+        id="immigration"
+        title="Immigration (Optional)"
+        icon={Landmark}
+        iconTone="blue"
+        subtitle="Optional immigration and relocation preferences."
+        open={isOpen('immigration')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('immigration', ['immigration', 'visa', 'status'])}
+      >        <div className="ob-grid">
           <label className="ob-field">
             <span>Current country of residence</span>
             <select name="currentCountryOfResidence" value={form.immigration.currentCountryOfResidence} onChange={onSectionChange('immigration')}>
@@ -1012,8 +1184,17 @@ export default function IdentityBackgroundPage() {
         <p className="ob-hint">You may select Prefer not to say for any immigration field.</p>
       </AccordionSection>
 
-      <AccordionSection id="relationship" title="Relationship history" open={openSection === 'relationship'} onToggle={toggleSection}>
-        <div className="ob-grid">
+      <AccordionSection
+        id="relationship"
+        title="Relationship History"
+        icon={HeartHandshake}
+        iconTone="rose"
+        subtitle="Marital status and relationship background."
+        summary={form.relationship?.maritalStatus ? humanizeEnum(form.relationship.maritalStatus) : '—'}
+        open={isOpen('relationship')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('relationship', ['relationship', 'marital', 'divorced'])}
+      >        <div className="ob-grid">
           <EnumSelect
             label="Marital status"
             name="maritalStatus"
@@ -1071,8 +1252,16 @@ export default function IdentityBackgroundPage() {
         </div>
       </AccordionSection>
 
-      <AccordionSection id="family" title="Family" open={openSection === 'family'} onToggle={toggleSection}>
-        <p className="ob-hint">Do not enter children’s names. Age ranges only.</p>
+      <AccordionSection
+        id="family"
+        title="Family"
+        icon={Baby}
+        iconTone="pink"
+        subtitle="Family structure and children details."
+        open={isOpen('family')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('family', ['family', 'children', 'kids'])}
+      >        <p className="ob-hint">Do not enter children’s names. Age ranges only.</p>
         <div className="ob-grid">
           <EnumSelect
             label="Has children"
@@ -1145,8 +1334,16 @@ export default function IdentityBackgroundPage() {
         </div>
       </AccordionSection>
 
-      <AccordionSection id="education" title="Education" open={openSection === 'education'} onToggle={toggleSection}>
-        {(form.educations || []).map((edu, idx) => (
+      <AccordionSection
+        id="education"
+        title="Education"
+        icon={Landmark}
+        iconTone="violet"
+        subtitle="Schools, degrees, and fields of study."
+        open={isOpen('education')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('education', ['education', 'degree', 'school', 'university'])}
+      >        {(form.educations || []).map((edu, idx) => (
           <div key={edu.id || idx} className="ob-repeat-card">
             <div className="ob-grid">
               <label className="ob-field">
@@ -1231,8 +1428,17 @@ export default function IdentityBackgroundPage() {
         </div>
       </AccordionSection>
 
-      <AccordionSection id="career" title="Career" open={openSection === 'career'} onToggle={toggleSection}>
-        <div className="ob-grid">
+      <AccordionSection
+        id="career"
+        title="Education & Career Background"
+        icon={Briefcase}
+        iconTone="violet"
+        subtitle="Your profession, employer type, and career stage."
+        summary={form.career?.jobFunction || form.career?.employerName || '—'}
+        open={isOpen('career')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('career', ['career', 'job', 'occupation', 'work', 'employer'])}
+      >        <div className="ob-grid">
           <EnumSelect
             label="Employment status"
             name="employmentStatus"
@@ -1276,8 +1482,16 @@ export default function IdentityBackgroundPage() {
         </div>
       </AccordionSection>
 
-      <AccordionSection id="financial" title="Financial lifestyle" open={openSection === 'financial'} onToggle={toggleSection}>
-        <div className="ob-grid">
+      <AccordionSection
+        id="financial"
+        title="Financial Lifestyle"
+        icon={Wallet}
+        iconTone="amber"
+        subtitle="Optional financial lifestyle preferences."
+        open={isOpen('financial')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('financial', ['financial', 'income', 'money'])}
+      >        <div className="ob-grid">
           <EnumSelect label="Income range" name="incomeRange" value={form.financial.incomeRange} options={refData?.incomeRanges} onChange={onSectionChange('financial')} section="financial" />
           <EnumSelect label="Credit score range" name="creditScoreRange" value={form.financial.creditScoreRange} options={refData?.creditScoreRanges} onChange={onSectionChange('financial')} section="financial" />
           <EnumSelect label="Savings range" name="savingsRange" value={form.financial.savingsRange} options={refData?.savingsRanges} onChange={onSectionChange('financial')} section="financial" />
@@ -1302,8 +1516,16 @@ export default function IdentityBackgroundPage() {
         </div>
       </AccordionSection>
 
-      <AccordionSection id="safety" title="Safety disclosure" open={openSection === 'safety'} onToggle={toggleSection}>
-        <div className="ob-private-banner" role="note">
+      <AccordionSection
+        id="safety"
+        title="Safety Disclosure"
+        icon={ShieldAlert}
+        iconTone="rose"
+        subtitle="Safety and criminal history disclosures."
+        open={isOpen('safety')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('safety', ['safety', 'criminal', 'disclosure'])}
+      >        <div className="ob-private-banner" role="note">
           These answers are private and reviewed only by authorized staff. They are never shown on your public profile.
         </div>
         <div className="ob-grid">
@@ -1337,8 +1559,16 @@ export default function IdentityBackgroundPage() {
         </div>
       </AccordionSection>
 
-      <AccordionSection id="civil" title="Civil judgment" open={openSection === 'civil'} onToggle={toggleSection}>
-        <div className="ob-grid">
+      <AccordionSection
+        id="civil"
+        title="Civil Judgment"
+        icon={Scale}
+        iconTone="slate"
+        subtitle="Civil judgments and related disclosures."
+        open={isOpen('civil')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('civil', ['civil', 'judgment', 'court'])}
+      >        <div className="ob-grid">
           <EnumSelect
             label="Has civil judgment"
             name="hasJudgment"
@@ -1376,8 +1606,19 @@ export default function IdentityBackgroundPage() {
         </div>
       </AccordionSection>
 
-      <AccordionSection id="verification" title="Identity verification" open={openSection === 'verification'} onToggle={toggleSection}>
-        <div className="ob-chip-row" style={{ marginBottom: 12 }}>
+      <AccordionSection
+        id="verification"
+        title="Identity Verification & Background Consent"
+        icon={BadgeCheck}
+        iconTone="emerald"
+        subtitle="Government ID & safety screening badge for maximum trust."
+        badge={{ label: vs?.overallStatus === 'VERIFIED' ? 'Verified Badge Active' : 'Verification', tone: 'emerald' }}
+        summary={vs?.overallStatus ? humanizeEnum(vs.overallStatus) : 'Start verification'}
+        tone="verified"
+        open={isOpen('verification')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('verification', ['verification', 'id', 'selfie', 'document', 'ssn'])}
+      >        <div className="ob-chip-row" style={{ marginBottom: 12 }}>
           <span className="ob-status-chip">Overall: {humanizeEnum(vs?.overallStatus) || 'Not started'}</span>
           <span className="ob-status-chip">Name: {humanizeEnum(vs?.nameStatus) || '—'}</span>
           <span className="ob-status-chip">Age: {humanizeEnum(vs?.ageStatus) || '—'}</span>
@@ -1418,11 +1659,23 @@ export default function IdentityBackgroundPage() {
             <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => onDocUpload(e, 'SELFIE')} disabled={verifyBusy} />
           </label>
         </div>
-        <p className="ob-hint">SSN is stored privately and returned masked. DL images are never shown on public profiles.</p>
+        <p className="ob-hint">
+          SSN is stored privately and returned masked. DL images are never shown on public profiles.
+          Selfie is compared to the driver-license photo — upload DL front first.
+        </p>
       </AccordionSection>
 
-      <AccordionSection id="consent" title="Background screening consent" open={openSection === 'consent'} onToggle={toggleSection}>
-        <div className="ob-private-banner" role="note">
+      <AccordionSection
+        id="consent"
+        title="Background Screening Consent"
+        icon={FileCheck2}
+        iconTone="emerald"
+        subtitle="Required consent before identity details can be saved."
+        badge={{ label: form.backgroundConsent?.accepted ? 'Accepted' : 'Required', tone: form.backgroundConsent?.accepted ? 'emerald' : 'amber' }}
+        open={isOpen('consent')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('consent', ['consent', 'background', 'screening', 'terms'])}
+      >        <div className="ob-private-banner" role="note">
           You must accept the background screening terms before saving Identity &amp; Background.
           Consent document version:{' '}
           <strong>{refData?.backgroundConsentDocumentVersion || '—'}</strong>.
@@ -1460,6 +1713,61 @@ export default function IdentityBackgroundPage() {
         onAgree={acceptConsentFromModal}
         onCancel={() => setConsentModalOpen(false)}
       />
+
+      {showPreview && (
+        <div className="ob-preview-overlay" role="presentation" onClick={() => setShowPreview(false)}>
+          <div className="ob-preview-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="ob-preview-head">
+              <div className="ob-preview-head-left">
+                <div className="ob-preview-head-icon"><Eye className="w-4 h-4" /></div>
+                <div>
+                  <h3>Public Profile View Preview</h3>
+                  <p>What prospective matches see on your card</p>
+                </div>
+              </div>
+              <button type="button" className="ob-preview-close" onClick={() => setShowPreview(false)} aria-label="Close">
+                ×
+              </button>
+            </div>
+            <div className="ob-preview-body">
+              <div className="ob-preview-profile">
+                <div className="ob-preview-avatar">
+                  {(displayName?.[0] || 'S').toUpperCase()}
+                  {user?.verified && (
+                    <span className="ok"><Check className="w-3 h-3" /></span>
+                  )}
+                </div>
+                <div>
+                  <h4>
+                    {displayName}
+                    {age != null && <span>{age} yrs</span>}
+                  </h4>
+                  <p>
+                    {[form.career?.jobFunction, locationSummary !== 'Location not set' ? locationSummary : null]
+                      .filter(Boolean)
+                      .join(' • ') || 'Complete your profile to preview'}
+                  </p>
+                  <div className="ob-preview-tags">
+                    {form.pronouns && <span>{form.pronouns}</span>}
+                    {(user?.verified || vs?.overallStatus === 'VERIFIED') && (
+                      <span className="verified">Verified Identity</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="ob-preview-note">
+                <ShieldCheck className="w-4 h-4" style={{ flexShrink: 0, marginTop: 2 }} />
+                <span>
+                  Notice: Your legal full name, phone, exact birth date, and background reports are <strong>strictly hidden</strong>.
+                </span>
+              </div>
+            </div>
+            <div className="ob-preview-foot">
+              <button type="button" onClick={() => setShowPreview(false)}>Got it, Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </OnboardingShell>
   )
 }

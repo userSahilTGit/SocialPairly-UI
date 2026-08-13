@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Navbar from '../components/Navbar'
+import SiteFooter from '../components/SiteFooter'
 import AdminRefundInspectionModal from '../components/AdminRefundInspectionModal'
 import api from '../api/axios'
 import './AdminFinance.css'
@@ -498,7 +499,8 @@ export default function AdminFinance() {
                 onCloseRefund={() => handleRefundAction('close')}
                 onCompletePayout={() => handleRefundAction('complete')}
                 actionLoading={actionLoading}
-            />
+            />
+        <SiteFooter />
         </>
     )
 }
