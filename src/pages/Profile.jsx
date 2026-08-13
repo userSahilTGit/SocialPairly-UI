@@ -1,659 +1,718 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
-import MediaModal from '../components/MediaModal' // 1. Imported MediaModal
+import MediaModal from '../components/MediaModal'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
-import { getMediaUrl } from '../utils/mediaUrl'
-import { Play, Camera, Film } from 'lucide-react'
+import { getMediaUrl, isLegacyDiskPhoto, createBlobUrl, revokeBlobUrl } from '../utils/mediaUrl'
+import { profileScoreHint, profileScoreTone } from '../utils/profileScore'
+import { readCompletionPercentage } from '../utils/profileCompletion'
 import PhoneVerifyPanel from '../components/PhoneVerifyPanel'
+import SiteFooter from '../components/SiteFooter'
+import {
+  Camera, CheckCircle2, Eye, Edit3, Images, User, Briefcase, GraduationCap,
+  MessageSquareQuote, Sliders, Heart, Users, MapPin, PhoneCall, Play,
+  Plus, UploadCloud, Video, X, LayoutDashboard, UserCheck, Sparkles, Shield,
+} from 'lucide-react'
 
 const emptyEducation = { institution: '', degree: '', fieldOfStudy: '', startYear: '', endYear: '' }
 
-export default function Profile() {
-    const { user, loading: authLoading, refreshUser } = useAuth()
-    const navigate = useNavigate()
-    const location = useLocation()
-    const [loading, setLoading] = useState(true)
-    const [profileMedia, setProfileMedia] = useState([])
-    const [mediaLoading, setMediaLoading] = useState(false)
-    const [saving, setSaving] = useState(false)
-    const [message, setMessage] = useState('')
-    const [error, setError] = useState('')
-
-    const [photoUrl, setPhotoUrl] = useState('')
-    const [activeMedia, setActiveMedia] = useState(null) // 👈 Lightbox state
-
-    const [form, setForm] = useState({
-        aboutMe: '',
-        occupation: '',
-        lifestyle: '',
-        locationCity: '',
-        locationCountry: '',
-        dateOfBirth: '',
-        gender: '',
-        religion: '',
-        preferredReligion: '',
-        interests: '',
-    })
-    const [isEditing, setIsEditing] = useState(false)
-
-    const [educations, setEducations] = useState([emptyEducation])
-    const [questions, setQuestions] = useState([])
-    const [answers, setAnswers] = useState({})
-    const [identity, setIdentity] = useState(null)
-
-    // Separate media fetch so it doesn't block profile loading
-    const fetchUserMedia = useCallback(async () => {
-        setMediaLoading(true);
-        try {
-            const mediaRes = await api.get('/media/my-uploads');
-            setProfileMedia((mediaRes.data || []).sort((a, b) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999)));
-        } catch (err) {
-            console.error('Failed to load media for profile gallery', err);
-            // Don't set error — this is non-critical for profile display
-            setProfileMedia([]);
-        } finally {
-            setMediaLoading(false);
-        }
-    }, []);
-
-    const loadProfile = async () => {
-        try {
-            const [profileRes, questionsRes, identityRes] = await Promise.all([
-                api.get('/profile'),
-                api.get('/questions'),
-                api.get('/onboarding/identity').catch(() => ({ data: null })),
-            ])
-
-            const p = profileRes.data.profile
-            if (p) {
-                setForm({
-                    aboutMe: p.aboutMe || '',
-                    occupation: p.occupation || '',
-                    lifestyle: p.lifestyle || '',
-                    locationCity: p.locationCity || '',
-                    locationCountry: p.locationCountry || '',
-                    dateOfBirth: p.dateOfBirth || identityRes.data?.dateOfBirth || '',
-                    gender: p.gender || identityRes.data?.gender || '',
-                    religion: p.religion || '',
-                    preferredReligion: p.preferredReligion || '',
-                    interests: (p.interests || []).join(', '),
-                })
-                setPhotoUrl(p.profilePhotoUrl || '')
-                if (p.educations && p.educations.length > 0) {
-                    setEducations(p.educations.map((e) => ({
-                        institution: e.institution || '',
-                        degree: e.degree || '',
-                        fieldOfStudy: e.fieldOfStudy || '',
-                        startYear: e.startYear || '',
-                        endYear: e.endYear || '',
-                    })))
-                } else {
-                    setEducations([emptyEducation])
-                }
-            } else {
-                setEducations([emptyEducation])
-            }
-
-            setIdentity(identityRes.data || null)
-
-            setQuestions(questionsRes.data)
-            const initialAnswers = {}
-            questionsRes.data.forEach((q) => {
-                initialAnswers[q.id] = q.answerValue || ''
-            })
-            setAnswers(initialAnswers)
-        } catch (e) {
-            setError('Failed to load profile data')
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    // On mount and whenever navigating to this page, load profile + media
-    useEffect(() => {
-        if (!authLoading) {
-            loadProfile()
-            fetchUserMedia()
-        }
-    }, [authLoading, location.key]) // location.key changes on every navigation
-
-    const handleEditToggle = () => {
-        setMessage('')
-        setError('')
-        setIsEditing(true)
-    }
-
-    const handleCancel = () => {
-        setIsEditing(false)
-        setMessage('')
-        setError('')
-        loadProfile()
-    }
-
-    const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
-
-    const handleEducationChange = (index, field, value) => {
-        const next = [...educations]
-        next[index][field] = value
-        setEducations(next)
-    }
-
-    const addEducation = () => setEducations([...educations, { ...emptyEducation }])
-    const removeEducation = (index) => setEducations(educations.filter((_, i) => i !== index))
-
-    const handlePhotoUpload = async (e) => {
-        const file = e.target.files[0]
-        if (!file) return
-        const data = new FormData()
-        data.append('file', file)
-        try {
-            const res = await api.post('/profile/photo', data, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            })
-            setPhotoUrl(res.data.url)
-            setMessage('Photo uploaded')
-        } catch (err) {
-            setError(err.response?.data?.message || 'Photo upload failed')
-        }
-    }
-
-    const handleAnswerChange = (questionId, value) => {
-        setAnswers({ ...answers, [questionId]: value })
-    }
-
-    const toggleMultiChoice = (questionId, option) => {
-        const current = (answers[questionId] || '').split(',').map((s) => s.trim()).filter(Boolean)
-        const exists = current.includes(option)
-        const next = exists ? current.filter((o) => o !== option) : [...current, option]
-        setAnswers({ ...answers, [questionId]: next.join(', ') })
-    }
-
-    const handleSubmit = async (e) => {
-        e.preventDefault()
-        setSaving(true)
-        setMessage('')
-        setError('')
-        try {
-            const payload = {
-                aboutMe: form.aboutMe,
-                occupation: form.occupation,
-                lifestyle: form.lifestyle,
-                locationCity: form.locationCity,
-                locationCountry: form.locationCountry,
-                dateOfBirth: form.dateOfBirth || null,
-                gender: form.gender || null,
-                religion: form.religion || null,
-                preferredReligion: form.preferredReligion || null,
-                interests: form.interests.split(',').map((s) => s.trim()).filter(Boolean),
-                educations: educations
-                    .filter((ed) => ed.institution.trim())
-                    .map((ed) => ({
-                        institution: ed.institution,
-                        degree: ed.degree,
-                        fieldOfStudy: ed.fieldOfStudy,
-                        startYear: ed.startYear ? parseInt(ed.startYear, 10) : null,
-                        endYear: ed.endYear ? parseInt(ed.endYear, 10) : null,
-                    })),
-            }
-
-            await api.put('/profile', payload)
-
-            const answerPayload = Object.entries(answers)
-                .filter(([_, value]) => value !== '' && value !== null)
-                .map(([questionId, value]) => ({ questionId: Number(questionId), answerValue: value }))
-            
-            if (answerPayload.length > 0) {
-                await api.post('/questions/answers', answerPayload)
-            }
-
-            await refreshUser()
-            await loadProfile()
-            setIsEditing(false)
-            setMessage('Profile saved successfully!')
-            window.scrollTo({ top: 0, behavior: 'smooth' })
-        } catch (err) {
-            setError(err.response?.data?.message || 'Failed to save profile')
-        } finally {
-            setSaving(false)
-        }
-    }
-
-    if (loading) {
-        return (
-            <>
-                <Navbar />
-                <div className="center">Loading...</div>
-            </>
-        )
-    }
-
-    const renderField = (label, value) => (
-        <div className="profile-display-row">
-            <span className="profile-display-label">{label}</span>
-            <span className="profile-display-value">{value || <span className="muted">Not added yet</span>}</span>
-        </div>
-    )
-
-    const filteredMedia = profileMedia.filter(m => m.status === 'APPROVED');
-
-    return (
-        <>
-            <Navbar />
-            <div className="container">
-                <div className="flex-between" style={{ marginBottom: 20 }}>
-                    <div>
-                        <h1>My Profile</h1>
-                        {user?.profileCompleted && <span className="badge badge-yes">Completed</span>}
-                    </div>
-                    <button type="button" className="btn btn-secondary" onClick={isEditing ? handleCancel : handleEditToggle}>
-                        {isEditing ? 'Cancel' : 'Edit Profile'}
-                    </button>
-                </div>
-
-                {message && <div className="success">{message}</div>}
-                {error && <div className="error">{error}</div>}
-
-                <div className="card phone-profile-card">
-                    <div className="flex-between" style={{ marginBottom: 12 }}>
-                        <h2 style={{ margin: 0 }}>Mobile number</h2>
-                    </div>
-                    <PhoneVerifyPanel />
-                </div>
-
-                {isEditing ? (
-                    <form onSubmit={handleSubmit}>
-                        <div className="card">
-                            <h2>Profile Photo</h2>
-                            <div className="flex">
-                                {photoUrl ? (
-                                    <img className="avatar" src={getMediaUrl(photoUrl)} alt="Profile" />
-                                ) : (
-                                    <div className="avatar-placeholder">
-                                        {user?.firstName?.[0]?.toUpperCase()}
-                                    </div>
-                                )}
-                                <input type="file" accept="image/*" onChange={handlePhotoUpload} />
-                            </div>
-                        </div>
-
-                        <div className="card">
-                            <h2>Personal Information</h2>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Date of Birth</label>
-                                    <input type="date" name="dateOfBirth" value={form.dateOfBirth} onChange={handleChange} />
-                                </div>
-                                <div className="form-group">
-                                    <label>Gender</label>
-                                    <select name="gender" value={form.gender} onChange={handleChange}>
-                                        <option value="">-- Select --</option>
-                                        <option value="Male">Male</option>
-                                        <option value="Female">Female</option>
-                                        <option value="Other">Other</option>
-                                        <option value="Prefer not to say">Prefer not to say</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="card">
-                            <h2>About Me</h2>
-                            <div className="form-group">
-                                <label>About me</label>
-                                <textarea name="aboutMe" value={form.aboutMe} onChange={handleChange} placeholder="Tell us about yourself..." />
-                            </div>
-                            <div className="form-group">
-                                <label>Occupation</label>
-                                <input type="text" name="occupation" value={form.occupation} onChange={handleChange} placeholder="e.g. Software Engineer" />
-                            </div>
-                            <div className="form-group">
-                                <label>Lifestyle</label>
-                                <textarea name="lifestyle" value={form.lifestyle} onChange={handleChange} placeholder="Your lifestyle, hobbies, daily routine..." />
-                            </div>
-                        </div>
-
-                        <div className="card">
-                            <h2>Interests</h2>
-                            <div className="form-group">
-                                <label>Interests (comma separated)</label>
-                                <input type="text" name="interests" value={form.interests} onChange={handleChange} placeholder="Travel, Music, Sports" />
-                            </div>
-                            <div>
-                                {form.interests.split(',').map((i) => i.trim()).filter(Boolean).map((i, idx) => (
-                                    <span className="chip" key={idx}>{i}</span>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="card">
-                            <h2>Location</h2>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>City</label>
-                                    <input type="text" name="locationCity" value={form.locationCity} onChange={handleChange} />
-                                </div>
-                                <div className="form-group">
-                                    <label>Country</label>
-                                    <input type="text" name="locationCountry" value={form.locationCountry} onChange={handleChange} />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="card">
-                            <div className="flex-between">
-                                <h2>Education</h2>
-                                <button type="button" className="btn btn-sm btn-secondary" onClick={addEducation}>
-                                    + Add
-                                </button>
-                            </div>
-                            {educations.map((ed, index) => (
-                                <div key={index} style={{ borderTop: index > 0 ? '1px solid #e5e7eb' : 'none', paddingTop: index > 0 ? 16 : 0, marginTop: index > 0 ? 16 : 0 }}>
-                                    <div className="form-row">
-                                        <div className="form-group">
-                                            <label>Institution</label>
-                                            <input type="text" value={ed.institution} onChange={(e) => handleEducationChange(index, 'institution', e.target.value)} />
-                                        </div>
-                                        <div className="form-group">
-                                            <label>Degree</label>
-                                            <input type="text" value={ed.degree} onChange={(e) => handleEducationChange(index, 'degree', e.target.value)} />
-                                        </div>
-                                    </div>
-                                    <div className="form-row">
-                                        <div className="form-group">
-                                            <label>Field of study</label>
-                                            <input type="text" value={ed.fieldOfStudy} onChange={(e) => handleEducationChange(index, 'fieldOfStudy', e.target.value)} />
-                                        </div>
-                                        <div className="form-group">
-                                            <label>Start year</label>
-                                            <input type="number" value={ed.startYear} onChange={(e) => handleEducationChange(index, 'startYear', e.target.value)} />
-                                        </div>
-                                        <div className="form-group">
-                                            <label>End year</label>
-                                            <input type="number" value={ed.endYear} onChange={(e) => handleEducationChange(index, 'endYear', e.target.value)} />
-                                        </div>
-                                    </div>
-                                    {educations.length > 1 && (
-                                        <button type="button" className="btn btn-sm btn-danger" onClick={() => removeEducation(index)}>
-                                            Remove
-                                        </button>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-
-                        {questions.length > 0 && (
-                            <div className="card">
-                                <h2>Additional Questions</h2>
-                                <p style={{ color: '#6b7280', marginBottom: 16 }}>
-                                    Questions set by the administrator.
-                                </p>
-                                {questions.map((q) => (
-                                    <div className="form-group" key={q.id}>
-                                        <label>
-                                            {q.questionText}
-                                            {q.required && <span style={{ color: '#dc2626' }}> *</span>}
-                                            <span className="chip" style={{ marginLeft: 8 }}>{q.category}</span>
-                                        </label>
-                                        {renderQuestionInput(q, answers[q.id], handleAnswerChange, toggleMultiChoice)}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        <button type="submit" className="btn" disabled={saving}>
-                            {saving ? 'Saving...' : 'Save Profile'}
-                        </button>
-                    </form>
-                ) : (
-                    <>
-                        <div className="profile-view-grid">
-                            <div className="card profile-summary-card">
-                                <div className="profile-summary-header">
-                                    <div>
-                                        <h2>{user?.displayName || user?.firstName}</h2>
-                                        <p className="muted">{user?.email}</p>
-                                    </div>
-                                    {photoUrl ? (
-                                        <img className="avatar" src={getMediaUrl(photoUrl)} alt="Profile" />
-                                    ) : (
-                                        <div className="avatar-placeholder">
-                                            {user?.firstName?.[0]?.toUpperCase()}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="profile-display-row">
-                                    <span className="profile-display-label">About</span>
-                                    <span className="profile-display-value">{form.aboutMe || <span className="muted">Not added yet</span>}</span>
-                                </div>
-                                <div className="profile-display-row">
-                                    <span className="profile-display-label">Occupation</span>
-                                    <span className="profile-display-value">{form.occupation || <span className="muted">Not added yet</span>}</span>
-                                </div>
-                            </div>
-
-                            <div className="card profile-info-card">
-                                <div className="flex-between" style={{ marginBottom: 12 }}>
-                                    <h2 style={{ margin: 0 }}>Identity & Background</h2>
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary btn-sm"
-                                        onClick={() => navigate('/onboarding/identity')}
-                                    >
-                                        Edit
-                                    </button>
-                                </div>
-                                {renderField(
-                                    'Legal name',
-                                    [identity?.namePrefix, identity?.firstName, identity?.middleName, identity?.lastName, identity?.nameSuffix]
-                                        .filter(Boolean)
-                                        .join(' ')
-                                        || [user?.firstName, user?.lastName].filter(Boolean).join(' ')
-                                )}
-                                {renderField('Preferred name', identity?.preferredName || user?.preferredName || user?.displayName)}
-                                {renderField('Date of Birth', identity?.dateOfBirth || form.dateOfBirth)}
-                                {renderField(
-                                    'Age',
-                                    identity?.age != null ? `${identity.age} years` : null
-                                )}
-                                {renderField('Pronouns', identity?.pronouns)}
-                                {renderField('Gender identity', identity?.gender || form.gender)}
-                                {renderField('Religion', form.religion)}
-                                {renderField('Preferred religion', form.preferredReligion)}
-                                <div style={{ marginTop: 12 }}>
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary btn-sm"
-                                        onClick={() => navigate('/onboarding/faith')}
-                                    >
-                                        Edit Faith
-                                    </button>
-                                </div>
-                                {renderField(
-                                    'Gender visibility',
-                                    identity?.genderShownToMatches === 'HIDDEN'
-                                        ? 'Hidden'
-                                        : identity?.genderShownToMatches === 'PUBLIC'
-                                            ? 'Public'
-                                            : identity?.genderShownToMatches
-                                                ? 'Shown to potential matches'
-                                                : null
-                                )}
-                                {renderField('Primary email', identity?.primaryEmail || user?.email)}
-                                {renderField('Secondary email', identity?.secondaryEmail)}
-                                {renderField('Primary phone', identity?.primaryPhone || user?.phoneNumber)}
-                                {renderField('Secondary phone', identity?.secondaryPhone)}
-                                {renderField('Home phone', identity?.homePhone)}
-                                {renderField('Preferred contact', identity?.preferredContactMethod)}
-                                {renderField('Best time to contact', identity?.bestTimeToContact)}
-                                {renderField('City', identity?.locationCity || form.locationCity)}
-                                {renderField('Country', identity?.locationCountry || form.locationCountry)}
-                                {renderField(
-                                    'Marital status',
-                                    identity?.relationship?.maritalStatus
-                                        ? String(identity.relationship.maritalStatus).replace(/_/g, ' ')
-                                        : null
-                                )}
-                            </div>
-
-                            <div className="card profile-info-card">
-                                <h2>Location</h2>
-                                {renderField('City', form.locationCity)}
-                                {renderField('Country', form.locationCountry)}
-                            </div>
-
-                            <div className="card profile-info-card">
-                                <h2>Interests</h2>
-                                <div className="profile-display-value">
-                                    {form.interests.split(',').map((item) => item.trim()).filter(Boolean).map((item, idx) => (
-                                        <span className="chip" key={idx}>{item}</span>
-                                    ))}
-                                    {!form.interests && <span className="muted">Not added yet</span>}
-                                </div>
-                            </div>
-
-                            <div className="card profile-info-card">
-                                <h2>Education</h2>
-                                {educations.every((ed) => !ed.institution) ? (
-                                    <p className="muted">No education details added yet.</p>
-                                ) : (
-                                    educations.map((ed, index) => (
-                                        <div key={index} className="profile-info-section">
-                                            <strong>{ed.institution+ ' ' || 'Unknown institution'}</strong>
-                                            <span>{ed.degreex || 'No degree provided'} • {ed.fieldOfStudy || 'No field'} • {ed.startYear || ''}{ed.endYear ? ` - ${ed.endYear}` : ''}</span>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-
-                            {/* Photos & Videos Gallery */}
-                            <div className="card">
-                                <div className="flex-between">
-                                    <h2>Photos & Videos</h2>
-                                    <button className="btn btn-secondary btn-sm" onClick={() => navigate('/profile/media')} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                        <Camera size={14} /> Manage
-                                    </button>
-                                </div>
-                                {mediaLoading ? (
-                                    <div className="center" style={{ padding: '10px 0' }}>
-                                        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Loading media...</p>
-                                    </div>
-                                ) : filteredMedia.length === 0 ? (
-                                    <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--muted)' }}>
-                                        <Film size={36} style={{ opacity: 0.3, marginBottom: 8 }} />
-                                        <p style={{ fontSize: 14, marginBottom: 8 }}>No photos or videos uploaded yet</p>
-                                        <button className="btn btn-sm" onClick={() => navigate('/profile/media')}>
-                                            Upload Media
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
-                                            {filteredMedia.map((m) => (
-                                                <div
-                                                    key={m.id}
-                                                    style={{
-                                                        aspectRatio: '4/5', borderRadius: 10, overflow: 'hidden',
-                                                        border: '2px solid var(--border)', position: 'relative', background: '#000',
-                                                        cursor: 'pointer',
-                                                    }}
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        setActiveMedia(m);
-                                                    }}
-                                                    title={m.caption || 'View media'}
-                                                >
-                                                    {m.mediaType === 'PHOTO' ? (
-                                                        <img src={getMediaUrl(m)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                    ) : (
-                                                        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                                                            <video src={getMediaUrl(m)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)' }}>
-                                                                <Play size={20} color="#fff" fill="#fff" />
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {m.caption && (
-                                                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.7))', padding: '16px 6px 4px' }}>
-                                                            <p style={{ color: '#fff', fontSize: 10, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                                {m.caption}
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, textAlign: 'center' }}>
-                                            {filteredMedia.length} media item(s)
-                                        </p>
-                                    </>
-                                )}
-                            </div>
-
-                            {questions.length > 0 && (
-                                <div className="card profile-info-card">
-                                    <h2>Additional Questions</h2>
-                                    {questions.map((q) => (
-                                        <div key={q.id} className="profile-display-row">
-                                            <span className="profile-display-label">{q.questionText}</span>
-                                            <span className="profile-display-value">{(answers[q.id] && answers[q.id].toString()) || <span className="muted">No answer provided</span>}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </>
-                )}
-                
-                {/* Media Lightbox Modal */}
-                <MediaModal
-                  activeMedia={activeMedia}
-                  mediaList={filteredMedia}
-                  onClose={() => setActiveMedia(null)}
-                  onNavigate={setActiveMedia}
-                />
-            </div>
-        </>
-    )
+function calcAge(dateOfBirth) {
+  if (!dateOfBirth) return null
+  const dob = new Date(dateOfBirth)
+  if (Number.isNaN(dob.getTime())) return null
+  const today = new Date()
+  let age = today.getFullYear() - dob.getFullYear()
+  const m = today.getMonth() - dob.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age -= 1
+  return age
 }
 
-function renderQuestionInput(q, value, onChange, toggleMulti) {
-    switch (q.type) {
-        case 'TEXT':
-            return <textarea value={value || ''} onChange={(e) => onChange(q.id, e.target.value)} />
-        case 'NUMBER':
-            return <input type="number" value={value || ''} onChange={(e) => onChange(q.id, e.target.value)} />
-        case 'DATE':
-            return <input type="date" value={value || ''} onChange={(e) => onChange(q.id, e.target.value)} />
-        case 'SINGLE_CHOICE':
-            return (
-                <select value={value || ''} onChange={(e) => onChange(q.id, e.target.value)}>
-                    <option value="">-- Select --</option>
-                    {q.options.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                </select>
-            )
-        case 'MULTI_CHOICE': {
-            const selected = (value || '').split(',').map((s) => s.trim()).filter(Boolean)
-            return (
-                <div>
-                    {q.options.map((opt) => (
-                        <label className="checkbox" key={opt}>
-                            <input
-                                type="checkbox"
-                                checked={selected.includes(opt)}
-                                onChange={() => toggleMulti(q.id, opt)}
-                            />
-                            {opt}
-                        </label>
-                    ))}
-                </div>
-            )
-        }
-        default:
-            return <input type="text" value={value || ''} onChange={(e) => onChange(q.id, e.target.value)} />
+function strengthLabel(pct) {
+  const tone = profileScoreTone(pct)
+  if (tone === 'high') return pct >= 85 ? 'Excellent' : 'Good'
+  if (tone === 'mid') return 'Getting there'
+  return 'Needs attention'
+}
+
+export default function Profile() {
+  const { user, loading: authLoading, refreshUser } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [loading, setLoading] = useState(true)
+  const [profileMedia, setProfileMedia] = useState([])
+  const [mediaLoading, setMediaLoading] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [photoUrl, setPhotoUrl] = useState('')
+  const [photoBroken, setPhotoBroken] = useState(false)
+  const [activeMedia, setActiveMedia] = useState(null)
+  const [activeTab, setActiveTab] = useState('overview')
+  const [showPreview, setShowPreview] = useState(false)
+  const [completionPct, setCompletionPct] = useState(0)
+  const [savingBio, setSavingBio] = useState(false)
+
+  const [form, setForm] = useState({
+    aboutMe: '',
+    occupation: '',
+    lifestyle: '',
+    locationCity: '',
+    locationCountry: '',
+    dateOfBirth: '',
+    gender: '',
+    religion: '',
+    preferredReligion: '',
+    interests: '',
+  })
+  const [educations, setEducations] = useState([emptyEducation])
+  const [questions, setQuestions] = useState([])
+  const [answers, setAnswers] = useState({})
+  const [identity, setIdentity] = useState(null)
+
+  const fetchUserMedia = useCallback(async () => {
+    setMediaLoading(true)
+    try {
+      const mediaRes = await api.get('/media/my-uploads')
+      setProfileMedia((mediaRes.data || []).sort((a, b) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999)))
+    } catch {
+      setProfileMedia([])
+    } finally {
+      setMediaLoading(false)
     }
+  }, [])
+
+  const loadProfile = useCallback(async () => {
+    try {
+      const [profileRes, questionsRes, identityRes, completionRes] = await Promise.all([
+        api.get('/profile'),
+        api.get('/questions'),
+        api.get('/onboarding/identity').catch(() => ({ data: null })),
+        api.get('/profile/completion').catch(() => ({ data: null })),
+      ])
+
+      setCompletionPct(readCompletionPercentage(completionRes))
+
+      const p = profileRes.data?.profile
+      if (p) {
+        setForm({
+          aboutMe: p.aboutMe || '',
+          occupation: p.occupation || '',
+          lifestyle: p.lifestyle || '',
+          locationCity: p.locationCity || '',
+          locationCountry: p.locationCountry || '',
+          dateOfBirth: p.dateOfBirth || identityRes.data?.dateOfBirth || '',
+          gender: p.gender || identityRes.data?.gender || '',
+          religion: p.religion || '',
+          preferredReligion: p.preferredReligion || '',
+          interests: (p.interests || []).join(', '),
+        })
+        setPhotoUrl(p.profilePhotoUrl || '')
+        setPhotoBroken(false)
+        if (p.educations?.length > 0) {
+          setEducations(p.educations.map((e) => ({
+            institution: e.institution || '',
+            degree: e.degree || '',
+            fieldOfStudy: e.fieldOfStudy || '',
+            startYear: e.startYear || '',
+            endYear: e.endYear || '',
+          })))
+        } else {
+          setEducations([emptyEducation])
+        }
+      } else {
+        setEducations([emptyEducation])
+      }
+
+      setIdentity(identityRes.data || null)
+      setQuestions(questionsRes.data || [])
+      const initialAnswers = {}
+      ;(questionsRes.data || []).forEach((q) => {
+        initialAnswers[q.id] = q.answerValue || ''
+      })
+      setAnswers(initialAnswers)
+    } catch {
+      setError('Failed to load profile data')
+      // Still try to refresh completion independently so the score stays accurate
+      try {
+        const completionRes = await api.get('/profile/completion')
+        setCompletionPct(readCompletionPercentage(completionRes))
+      } catch {
+        /* ignore */
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!authLoading) {
+      loadProfile()
+      fetchUserMedia()
+    }
+  }, [authLoading, location.key, loadProfile, fetchUserMedia])
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setError('')
+    setMessage('')
+    const preview = createBlobUrl(file)
+    setPhotoUrl((prev) => {
+      if (prev?.startsWith('blob:')) revokeBlobUrl(prev)
+      return preview
+    })
+    setPhotoBroken(false)
+    const data = new FormData()
+    data.append('file', file)
+    try {
+      await api.post('/profile/photo', data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      setMessage('Photo updated')
+      await Promise.all([refreshUser(), fetchUserMedia()])
+    } catch (err) {
+      setError(err.response?.data?.message || 'Photo upload failed')
+    }
+  }
+
+  const handleEditBio = async () => {
+    const next = window.prompt('Update your bio', form.aboutMe || '')
+    if (next === null) return
+    setSavingBio(true)
+    setError('')
+    try {
+      await api.put('/profile', {
+        aboutMe: next,
+        occupation: form.occupation,
+        lifestyle: form.lifestyle,
+        locationCity: form.locationCity,
+        locationCountry: form.locationCountry,
+        dateOfBirth: form.dateOfBirth || null,
+        gender: form.gender || null,
+        religion: form.religion || null,
+        preferredReligion: form.preferredReligion || null,
+        interests: form.interests.split(',').map((s) => s.trim()).filter(Boolean),
+        educations: educations
+          .filter((ed) => ed.institution.trim())
+          .map((ed) => ({
+            institution: ed.institution,
+            degree: ed.degree,
+            fieldOfStudy: ed.fieldOfStudy,
+            startYear: ed.startYear ? parseInt(ed.startYear, 10) : null,
+            endYear: ed.endYear ? parseInt(ed.endYear, 10) : null,
+          })),
+      })
+      setForm((prev) => ({ ...prev, aboutMe: next }))
+      setMessage('Bio updated')
+      await refreshUser()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update bio')
+    } finally {
+      setSavingBio(false)
+    }
+  }
+
+  const displayName = identity?.preferredName || user?.preferredName || user?.displayName || user?.firstName || 'Member'
+  const age = identity?.age ?? calcAge(identity?.dateOfBirth || form.dateOfBirth)
+  const legalName = [identity?.namePrefix, identity?.firstName, identity?.middleName, identity?.lastName, identity?.nameSuffix]
+    .filter(Boolean)
+    .join(' ') || [user?.firstName, user?.lastName].filter(Boolean).join(' ')
+  const locationLabel = [identity?.locationCity || form.locationCity, identity?.locationCountry || form.locationCountry]
+    .filter(Boolean)
+    .join(', ')
+  const marital = identity?.relationship?.maritalStatus
+    ? String(identity.relationship.maritalStatus).replace(/_/g, ' ')
+    : null
+  const interests = form.interests.split(',').map((s) => s.trim()).filter(Boolean)
+  const educationLine = educations.find((ed) => ed.institution)?.institution
+    ? (() => {
+        const ed = educations.find((e) => e.institution)
+        return [ed.degree, ed.fieldOfStudy, ed.institution].filter(Boolean).join(' · ')
+      })()
+    : null
+  const filteredMedia = useMemo(
+    () => profileMedia.filter((m) => m.status === 'APPROVED'),
+    [profileMedia],
+  )
+  const primaryMedia = filteredMedia.find((m) => m.mediaType === 'PHOTO' && (m.isCover || m.mediaCategory === 'PRIMARY'))
+    || filteredMedia.find((m) => m.mediaType === 'PHOTO')
+  const usablePhotoUrl = photoUrl && !isLegacyDiskPhoto(photoUrl) ? photoUrl : ''
+  const avatarSrc = !photoBroken && usablePhotoUrl
+    ? getMediaUrl(usablePhotoUrl)
+    : !photoBroken && primaryMedia
+      ? getMediaUrl(primaryMedia)
+      : null
+  const answeredPrompts = questions.filter((q) => answers[q.id])
+  const dash = (value) => value || 'Not added yet'
+  const tabBtn = (id, Icon, label) => (
+    <button
+      type="button"
+      id={`tab-${id}`}
+      onClick={() => setActiveTab(id)}
+      className={`sp-profile-tab ${activeTab === id ? 'active' : ''}`}
+    >
+      <Icon className="w-4 h-4" />
+      <span>{label}</span>
+    </button>
+  )
+
+  if (loading) {
+    return (
+      <>
+        <Navbar />
+        <div className="center">Loading...</div>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <Navbar />
+      <main className="sp-profile-page">
+        {message && <div className="success sp-profile-banner-msg">{message}</div>}
+        {error && <div className="error sp-profile-banner-msg">{error}</div>}
+
+        {/* Cover + identity hero */}
+        <section className="sp-profile-hero">
+          <div className="sp-profile-cover">
+            <div className="sp-profile-cover-dots" aria-hidden="true" />
+            <button
+              type="button"
+              className="sp-profile-cover-btn"
+              onClick={() => navigate('/profile/media')}
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>Edit Cover</span>
+            </button>
+          </div>
+
+          <div className="sp-profile-hero-body">
+            <div className="sp-profile-identity">
+              <div className="sp-profile-avatar-wrap">
+                <label className="sp-profile-avatar-picker" title="Change photo">
+                  <div className="sp-profile-avatar">
+                    {avatarSrc ? (
+                      <img
+                        id="main-avatar"
+                        key={avatarSrc}
+                        src={avatarSrc}
+                        alt={displayName}
+                        onError={() => {
+                          if (avatarSrc.startsWith('blob:') || avatarSrc.startsWith('data:')) return
+                          setPhotoBroken(true)
+                        }}
+                      />
+                    ) : (
+                      <div className="sp-profile-avatar-fallback">
+                        {(displayName?.[0] || 'S').toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <span className="sp-profile-avatar-cam">
+                    <Camera className="w-4 h-4" />
+                  </span>
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                </label>
+              </div>
+
+              <div className="sp-profile-id-text">
+                <div className="sp-profile-name-row">
+                  <h1>
+                    {displayName}
+                    {age != null && <span className="sp-profile-age">, {age}</span>}
+                  </h1>
+                  {user?.verified && (
+                    <span className="sp-pill sp-pill-ok">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Verified
+                    </span>
+                  )}
+                </div>
+                <p className="sp-profile-meta">
+                  <span>{user?.email}</span>
+                  {identity?.pronouns && (
+                    <>
+                      <span>•</span>
+                      <span className="font-semibold text-slate-700">{identity.pronouns}</span>
+                    </>
+                  )}
+                </p>
+                <div className="sp-profile-chips">
+                  {locationLabel && (
+                    <span className="sp-chip sp-chip-purple">
+                      <MapPin className="w-3 h-3" /> {locationLabel}
+                    </span>
+                  )}
+                  {marital && (
+                    <span className="sp-chip sp-chip-rose">
+                      <User className="w-3 h-3" /> {marital}
+                    </span>
+                  )}
+                  {form.occupation && (
+                    <span className="sp-chip sp-chip-blue">
+                      <Briefcase className="w-3 h-3" /> {form.occupation}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="sp-profile-actions">
+              <button type="button" className="sp-btn-outline" onClick={() => setShowPreview(true)}>
+                <Eye className="w-4 h-4 text-purple-600" />
+                <span>Match Preview</span>
+              </button>
+              <button
+                type="button"
+                className="sp-btn-brand"
+                onClick={() => navigate('/onboarding/identity')}
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>Edit Details</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Strength + phone */}
+        <section className={`sp-profile-strength score-tone-${profileScoreTone(completionPct)}`}>
+          <div className="sp-profile-strength-left">
+            <div
+              className={`sp-ring score-tone-${profileScoreTone(completionPct)}`}
+              style={{ '--pct': completionPct }}
+              data-score={completionPct}
+            >
+              <svg viewBox="0 0 36 36" className="sp-ring-svg" aria-hidden="true">
+                <path
+                  className="sp-ring-bg"
+                  strokeWidth="3.5"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path
+                  className="sp-ring-fg"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  fill="none"
+                  strokeDasharray={`${Math.max(0, Math.min(100, completionPct))}, 100`}
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+              </svg>
+              <span>{completionPct}%</span>
+            </div>
+            <div>
+              <h3>
+                Profile Strength: {strengthLabel(completionPct)}
+                {completionPct >= 70 && <span className="sp-boost">+3.5x Matches</span>}
+              </h3>
+              <p>{profileScoreHint(completionPct)}</p>
+            </div>
+          </div>
+
+          <div className="sp-profile-phone-card">
+            <div className="sp-profile-phone-left">
+              <div className="sp-profile-phone-icon">
+                <PhoneCall className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="label">Mobile</div>
+                <div className="value">{user?.phoneNumber || identity?.primaryPhone || 'Not added'}</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="sp-link-pill"
+              onClick={() => setActiveTab('contact')}
+            >
+              Manage
+            </button>
+          </div>
+        </section>
+
+        {/* Tabs */}
+        <nav className="sp-profile-tabs" aria-label="Profile sections">
+          {tabBtn('overview', LayoutDashboard, 'Overview & Gallery')}
+          {tabBtn('identity', UserCheck, 'Identity & Background')}
+          {tabBtn('lifestyle', Sparkles, 'Lifestyle & Prompts')}
+          {tabBtn('contact', Shield, 'Contact & Privacy')}
+        </nav>
+
+        {/* OVERVIEW */}
+        {activeTab === 'overview' && (
+          <div className="sp-profile-grid">
+            <div className="sp-profile-main-col">
+              <section className="sp-card">
+                <div className="sp-card-head">
+                  <div>
+                    <h2><Images className="w-5 h-5 text-rose-500" /> Photos & Videos</h2>
+                    <p>Use the camera on your avatar to change your profile photo. Gallery photos are extra shots.</p>
+                  </div>
+                  <button type="button" className="sp-soft-btn rose" onClick={() => navigate('/profile/media')}>
+                    <Plus className="w-4 h-4" /> Add Media
+                  </button>
+                </div>
+
+                {mediaLoading ? (
+                  <p className="sp-muted">Loading media…</p>
+                ) : filteredMedia.length === 0 ? (
+                  <button
+                    type="button"
+                    className="sp-upload-slot"
+                    onClick={() => navigate('/profile/media')}
+                  >
+                    <UploadCloud className="w-5 h-5" />
+                    <span>Upload Photo</span>
+                    <small>JPG, PNG or video</small>
+                  </button>
+                ) : (
+                  <div className="sp-gallery">
+                    {filteredMedia.map((m, idx) => (
+                      <button
+                        type="button"
+                        key={m.id}
+                        className={`sp-gallery-item ${idx === 0 ? 'primary' : ''}`}
+                        onClick={() => setActiveMedia(m)}
+                      >
+                        {m.mediaType === 'PHOTO' ? (
+                          <img src={getMediaUrl(m)} alt="" />
+                        ) : (
+                          <>
+                            <video src={getMediaUrl(m)} muted />
+                            <span className="sp-video-badge"><Video className="w-3 h-3" /> Video</span>
+                            <span className="sp-play"><Play className="w-5 h-5" fill="currentColor" /></span>
+                          </>
+                        )}
+                        {idx === 0 && <span className="sp-primary-badge">Primary</span>}
+                      </button>
+                    ))}
+                    <button type="button" className="sp-upload-slot" onClick={() => navigate('/profile/media')}>
+                      <UploadCloud className="w-5 h-5" />
+                      <span>Upload Photo</span>
+                    </button>
+                  </div>
+                )}
+              </section>
+
+              <section className="sp-card">
+                <div className="sp-card-head">
+                  <h2><User className="w-5 h-5 text-purple-600" /> About & Bio</h2>
+                  <button type="button" className="sp-soft-btn purple" onClick={handleEditBio} disabled={savingBio}>
+                    <Edit3 className="w-3.5 h-3.5" /> {savingBio ? 'Saving…' : 'Edit Bio'}
+                  </button>
+                </div>
+                <div className="sp-bio-box">
+                  <p>
+                    {form.aboutMe
+                      ? `"${form.aboutMe}"`
+                      : 'Add a short bio so matches can get to know you.'}
+                  </p>
+                </div>
+                <div className="sp-highlights">
+                  <div className="sp-highlight">
+                    <div className="icon blue"><Briefcase className="w-4 h-4" /></div>
+                    <div>
+                      <div className="label">Occupation</div>
+                      <div className="value">{dash(form.occupation)}</div>
+                    </div>
+                  </div>
+                  <div className="sp-highlight">
+                    <div className="icon green"><GraduationCap className="w-4 h-4" /></div>
+                    <div>
+                      <div className="label">Education</div>
+                      <div className="value">{dash(educationLine)}</div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="sp-card">
+                <div className="sp-card-head">
+                  <h2><MessageSquareQuote className="w-5 h-5 text-rose-500" /> Icebreaker Prompts</h2>
+                  <button type="button" className="sp-soft-btn rose" onClick={() => navigate('/onboarding/personality')}>
+                    <Plus className="w-3.5 h-3.5" /> Edit
+                  </button>
+                </div>
+                {answeredPrompts.length === 0 ? (
+                  <p className="sp-muted">No prompts answered yet.</p>
+                ) : (
+                  <div className="sp-prompts">
+                    {answeredPrompts.slice(0, 4).map((q, i) => (
+                      <div key={q.id} className={`sp-prompt ${i % 2 ? 'alt' : ''}`}>
+                        <div className="q">{q.questionText}</div>
+                        <div className="a">&ldquo;{answers[q.id]}&rdquo;</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+
+            <aside className="sp-profile-side-col">
+              <section className="sp-card">
+                <h3><Sliders className="w-4 h-4 text-purple-600" /> Quick Profile Details</h3>
+                <ul className="sp-kv">
+                  <li><span>Pronouns</span><strong>{dash(identity?.pronouns)}</strong></li>
+                  <li><span>Gender</span><strong>{dash(identity?.gender || form.gender)}</strong></li>
+                  <li><span>Age</span><strong>{age != null ? `${age} Years` : '—'}</strong></li>
+                  <li><span>Religion</span><strong>{dash(form.religion)}</strong></li>
+                  <li><span>Marital Status</span><strong>{dash(marital)}</strong></li>
+                </ul>
+              </section>
+
+              <section className="sp-card">
+                <div className="sp-card-head tight">
+                  <h3><Heart className="w-4 h-4 text-rose-500" /> Interests & Passions</h3>
+                  <button type="button" className="sp-text-link" onClick={() => navigate('/onboarding/personality')}>Edit</button>
+                </div>
+                <div className="sp-interest-wrap">
+                  {interests.length === 0 ? (
+                    <p className="sp-muted">No interests added yet.</p>
+                  ) : interests.map((item) => (
+                    <span key={item} className="sp-interest">{item}</span>
+                  ))}
+                </div>
+              </section>
+
+              <section className="sp-card">
+                <h3><Users className="w-4 h-4 text-purple-600" /> Ideal Partner Match</h3>
+                <div className="sp-pref-list">
+                  <div><span>Looking For</span><strong>{dash(form.lifestyle || 'Meaningful connection')}</strong></div>
+                  <div><span>Preferred Faith</span><strong>{dash(form.preferredReligion)}</strong></div>
+                  <div><span>Location</span><strong>{dash(locationLabel)}</strong></div>
+                </div>
+              </section>
+            </aside>
+          </div>
+        )}
+
+        {/* IDENTITY */}
+        {activeTab === 'identity' && (
+          <section className="sp-card">
+            <div className="sp-section-head">
+              <div>
+                <h2>Identity & Personal Background</h2>
+                <p>Your personal details, preferred identity, and demographics.</p>
+              </div>
+              <button type="button" className="sp-btn-brand sm" onClick={() => navigate('/onboarding/identity')}>
+                Update Identity
+              </button>
+            </div>
+            <div className="sp-info-grid">
+              <div className="sp-info-tile"><label>Legal Name</label><div>{dash(legalName)}</div></div>
+              <div className="sp-info-tile"><label>Preferred Name</label><div>{dash(displayName)}</div></div>
+              <div className="sp-info-tile"><label>Date of Birth</label><div>{dash(identity?.dateOfBirth || form.dateOfBirth)}{age != null ? ` (${age} yrs)` : ''}</div></div>
+              <div className="sp-info-tile"><label>Gender Identity</label><div>{dash([identity?.gender || form.gender, identity?.pronouns].filter(Boolean).join(' · '))}</div></div>
+              <div className="sp-info-tile"><label>Religion / Faith</label><div>{dash([form.religion, form.preferredReligion].filter(Boolean).join(' / '))}</div></div>
+              <div className="sp-info-tile">
+                <label>Gender Visibility</label>
+                <div className="ok">
+                  <Eye className="w-4 h-4" />
+                  {identity?.genderShownToMatches === 'HIDDEN'
+                    ? 'Hidden'
+                    : identity?.genderShownToMatches === 'PUBLIC'
+                      ? 'Public'
+                      : 'Shown to potential matches'}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* LIFESTYLE */}
+        {activeTab === 'lifestyle' && (
+          <section className="sp-card">
+            <div className="sp-section-head">
+              <div>
+                <h2>Lifestyle, Habits & Values</h2>
+                <p>Help potential matches understand your daily life and aspirations.</p>
+              </div>
+              <button type="button" className="sp-soft-btn purple" onClick={() => navigate('/onboarding/personality')}>
+                Edit Lifestyle
+              </button>
+            </div>
+            <div className="sp-lifestyle-grid">
+              <div className="sp-lifestyle-tile purple">
+                <div className="label">Interests</div>
+                <div className="sp-interest-wrap">
+                  {interests.length ? interests.map((i) => <span key={i} className="sp-interest">{i}</span>) : <span className="sp-muted">Not added yet</span>}
+                </div>
+              </div>
+              <div className="sp-lifestyle-tile rose">
+                <div className="label">Relationship Goals</div>
+                <p>{dash(marital)}{form.lifestyle ? ` · ${form.lifestyle}` : ''}</p>
+              </div>
+              {answeredPrompts.slice(0, 2).map((q) => (
+                <div key={q.id} className="sp-lifestyle-tile">
+                  <div className="label">{q.questionText}</div>
+                  <p>{answers[q.id]}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* CONTACT */}
+        {activeTab === 'contact' && (
+          <div className="space-y-6">
+            <section className="sp-card">
+              <div className="sp-section-head">
+                <div>
+                  <h2>Contact Details & Privacy Control</h2>
+                  <p>Your contact info stays confidential unless you choose to share it.</p>
+                </div>
+              </div>
+              <div className="sp-info-grid two">
+                <div className="sp-info-tile"><label>Primary Email</label><div>{dash(identity?.primaryEmail || user?.email)}</div></div>
+                <div className="sp-info-tile"><label>Primary Phone</label><div>{dash(identity?.primaryPhone || user?.phoneNumber)}</div></div>
+                <div className="sp-info-tile"><label>Preferred Contact Method</label><div>{dash(identity?.preferredContactMethod)}</div></div>
+                <div className="sp-info-tile"><label>Best Time To Contact</label><div>{dash(identity?.bestTimeToContact)}</div></div>
+              </div>
+            </section>
+            <section className="sp-card">
+              <h2 className="sp-card-title-only">Verify / change mobile number</h2>
+              <PhoneVerifyPanel />
+            </section>
+          </div>
+        )}
+      </main>
+
+      {/* Match preview modal */}
+      {showPreview && (
+        <div className="sp-preview-overlay" role="presentation" onClick={() => setShowPreview(false)}>
+          <div className="sp-preview-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="sp-preview-close" onClick={() => setShowPreview(false)} aria-label="Close">
+              <X className="w-4 h-4" />
+            </button>
+            <div className="sp-preview-media">
+              {avatarSrc ? <img src={avatarSrc} alt="" /> : <div className="sp-preview-fallback">{(displayName?.[0] || 'S').toUpperCase()}</div>}
+              <div className="sp-preview-grad" />
+              <div className="sp-preview-copy">
+                <h2>
+                  {displayName}{age != null ? `, ${age}` : ''}
+                  {user?.verified && <CheckCircle2 className="w-5 h-5 text-blue-400" />}
+                </h2>
+                {locationLabel && (
+                  <p><MapPin className="w-3.5 h-3.5 text-rose-400" /> {locationLabel}</p>
+                )}
+                {form.aboutMe && <p className="bio">&ldquo;{form.aboutMe}&rdquo;</p>}
+              </div>
+            </div>
+            <div className="sp-preview-actions">
+              <span className="ghost"><X className="w-6 h-6" /></span>
+              <span className="heart"><Heart className="w-7 h-7" fill="currentColor" /></span>
+              <span className="ghost spark"><Sparkles className="w-6 h-6" /></span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <MediaModal
+        activeMedia={activeMedia}
+        mediaList={filteredMedia}
+        onClose={() => setActiveMedia(null)}
+        onNavigate={setActiveMedia}
+      />
+      <SiteFooter />
+    </>
+  )
 }

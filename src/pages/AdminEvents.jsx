@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Navbar from '../components/Navbar'
+import SiteFooter from '../components/SiteFooter'
 import api from '../api/axios'
 import { getMediaUrl } from '../utils/mediaUrl'
 import {
@@ -1060,7 +1061,8 @@ export default function AdminEvents() {
                         </div>
                     )}
                 </div>
-            </div>
+            </div>
+        <SiteFooter />
         </>
     )
 }

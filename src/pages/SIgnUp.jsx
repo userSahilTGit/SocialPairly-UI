@@ -6,8 +6,8 @@ import { auth } from '../config/firebase'
 import { IS_PHONE_VERIFICATION_MANDATORY, PHONE_VERIFY_DISMISS_KEY, useAuth } from '../context/AuthContext'
 import { postAuthPath } from '../utils/user'
 import api from '../api/axios'
-import GlassCard from '../components/GlassCard'
 import AuthHeroPanel from '../components/AuthHeroPanel'
+import AuthPageLayout from '../components/AuthPageLayout'
 import {
   firebasePhoneErrorMessage,
   getInvisibleRecaptcha,
@@ -228,15 +228,21 @@ export default function SignUp() {
   }
 
   return (
-    <div className="auth-shell auth-shell-fullbleed">
-      <div className="auth-shell-glow" aria-hidden="true" />
-      <AuthHeroPanel />
+    <AuthPageLayout>
+      {({ openPrivacy }) => (
+        <>
+          <AuthHeroPanel onPrivacyClick={openPrivacy} />
 
-      <aside className="auth-side">
-        <GlassCard className="auth-glass-card auth-signin-card auth-card-design !max-w-[480px]">
-          <p className="auth-kicker">Create account</p>
-          <h2>Join Socialpairly</h2>
-          <p className="auth-side-sub">Four quick steps to a verified, intentional profile.</p>
+          <aside className="auth-side">
+            <div className="auth-glass-card auth-signin-card auth-card-design auth-signup-card">
+              <div className="auth-card-ribbon" aria-hidden="true" />
+              <div className="auth-card-head">
+                <div>
+                  <h2 className="auth-welcome-title">Create Account</h2>
+                  <p className="auth-side-sub">Join the private verified community</p>
+                </div>
+                <Link to="/signin" className="auth-mode-switch">Sign In</Link>
+              </div>
 
           <ol className="signup-stepper">
             {STEPS.map((s) => (
@@ -487,19 +493,13 @@ export default function SignUp() {
             </div>
           )}
 
-          <p className="switch-text">
+          <p className="switch-text auth-switch">
             Already have an account? <Link to="/signin">Sign in</Link>
           </p>
-        </GlassCard>
-      </aside>
-
-      <p className="auth-page-privacy">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <rect x="5" y="11" width="14" height="10" rx="2" />
-          <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-        </svg>
-        Your privacy is our priority
-      </p>
-    </div>
+            </div>
+          </aside>
+        </>
+      )}
+    </AuthPageLayout>
   )
 }

@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Lock as LockIcon } from 'lucide-react'
+import { Eye, EyeOff, Mail, Smartphone, Lock as LockIcon, ArrowRight, Shield } from 'lucide-react'
 import { GoogleLogin } from '@react-oauth/google'
 import { useAuth, PHONE_VERIFY_DISMISS_KEY, IDENTITY_CONTINUE_LATER_KEY } from '../context/AuthContext'
 import { postAuthPath } from '../utils/user'
 import api from '../api/axios'
-import GlassCard from '../components/GlassCard'
 import AuthHeroPanel from '../components/AuthHeroPanel'
+import AuthPageLayout from '../components/AuthPageLayout'
 import { AppleGlyph, GoogleGlyph } from '../components/AuthBrandAssets'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -212,184 +212,216 @@ export default function SignIn() {
     }
   }
 
+  const [privacyOpen, setPrivacyOpen] = useState(false)
+
   return (
-    <div className="auth-shell auth-shell-fullbleed">
-      <div className="auth-shell-glow" aria-hidden="true" />
-      <AuthHeroPanel />
+    <>
+    <AuthPageLayout
+      privacyOpen={privacyOpen}
+      onPrivacyOpen={() => setPrivacyOpen(true)}
+      onPrivacyClose={() => setPrivacyOpen(false)}
+    >
+      {({ openPrivacy }) => (
+        <>
+          <AuthHeroPanel onPrivacyClick={openPrivacy} />
 
-      <aside className="auth-side">
-        <div className="auth-side-stack">
-          <GlassCard className="auth-glass-card auth-signin-card auth-card-design">
-            <h2 className="auth-welcome-title">Welcome Back</h2>
-            <p className="auth-side-sub">Sign in to continue your journey</p>
+          <aside className="auth-side">
+            <div className="auth-side-stack">
+              <div className="auth-glass-card auth-signin-card auth-card-design">
+                <div className="auth-card-ribbon" aria-hidden="true" />
 
-            {error && (
-              <div className="error" role="alert" aria-live="polite" id="signin-error">
-                {error}
-              </div>
-            )}
+                <div className="auth-card-head">
+                  <div>
+                    <h2 className="auth-welcome-title">Welcome Back</h2>
+                    <p className="auth-side-sub">Sign in to continue your journey</p>
+                  </div>
+                  <Link to="/signup" className="auth-mode-switch">Sign Up</Link>
+                </div>
 
-            <div className="auth-tabs auth-tabs-underline" role="tablist" aria-label="Sign in method">
-              <button
-                type="button"
-                role="tab"
-                id="tab-email"
-                aria-controls="panel-signin"
-                aria-selected={authTab === 'email'}
-                className={authTab === 'email' ? 'active' : ''}
-                onClick={() => { setAuthTab('email'); setIdentifier(''); setError('') }}
-              >
-                Email
-              </button>
-              <button
-                type="button"
-                role="tab"
-                id="tab-phone"
-                aria-controls="panel-signin"
-                aria-selected={authTab === 'phone'}
-                className={authTab === 'phone' ? 'active' : ''}
-                onClick={() => { setAuthTab('phone'); setIdentifier(''); setError('') }}
-              >
-                Phone
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="auth-form" id="panel-signin" role="tabpanel" aria-labelledby={authTab === 'email' ? 'tab-email' : 'tab-phone'}>
-              <div className="form-group">
-                <label htmlFor="signin-identifier">{authTab === 'email' ? 'Email address' : 'Mobile number'}</label>
-                {authTab === 'email' ? (
-                  <input
-                    id="signin-identifier"
-                    className="auth-input"
-                    type="email"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                    required
-                    aria-invalid={!!error || undefined}
-                    aria-describedby={error ? 'signin-error' : undefined}
-                  />
-                ) : (
-                  <div className="phone-field">
-                    <select
-                      className="phone-code"
-                      value={countryCode}
-                      onChange={(e) => setCountryCode(e.target.value)}
-                      aria-label="Country code"
-                    >
-                      <option value="+91">+91</option>
-                      <option value="+1">+1</option>
-                      <option value="+44">+44</option>
-                      <option value="+971">+971</option>
-                    </select>
-                    <input
-                      id="signin-identifier"
-                      className="auth-input"
-                      type="tel"
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value.replace(/[^\d\s-]/g, ''))}
-                      placeholder="98765 43210"
-                      autoComplete="tel-national"
-                      required
-                      aria-invalid={!!error || undefined}
-                      aria-describedby={error ? 'signin-error' : undefined}
-                    />
+                {error && (
+                  <div className="error" role="alert" aria-live="polite" id="signin-error">
+                    {error}
                   </div>
                 )}
-                {authTab === 'phone' && (
-                  <p className="field-hint">Sign in with the mobile number linked to your account (password required).</p>
-                )}
-              </div>
 
-              <div className="form-group">
-                <label htmlFor="signin-password">Password</label>
-                <div className="password-field">
-                  <input
-                    id="signin-password"
-                    className="auth-input"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="current-password"
-                    required
-                    aria-describedby={error ? 'signin-error' : undefined}
-                  />
+                <div className="auth-tabs auth-tabs-pill" role="tablist" aria-label="Sign in method">
                   <button
                     type="button"
-                    className="password-toggle"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    role="tab"
+                    id="tab-email"
+                    aria-controls="panel-signin"
+                    aria-selected={authTab === 'email'}
+                    className={authTab === 'email' ? 'active' : ''}
+                    onClick={() => { setAuthTab('email'); setIdentifier(''); setError('') }}
                   >
-                    {showPassword ? <EyeOff size={18} strokeWidth={1.8} /> : <Eye size={18} strokeWidth={1.8} />}
+                    <Mail className="w-4 h-4 text-purple-600" />
+                    <span>Email</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    id="tab-phone"
+                    aria-controls="panel-signin"
+                    aria-selected={authTab === 'phone'}
+                    className={authTab === 'phone' ? 'active' : ''}
+                    onClick={() => { setAuthTab('phone'); setIdentifier(''); setError('') }}
+                  >
+                    <Smartphone className="w-4 h-4 text-purple-600" />
+                    <span>Phone</span>
                   </button>
                 </div>
-              </div>
 
-              <div className="auth-row">
-                <label className="checkbox remember-me">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                  />
-                  Remember me
-                </label>
-                <button type="button" className="link-btn auth-forgot" onClick={handleOpenForgot}>
-                  Forgot password?
-                </button>
-              </div>
+                <form onSubmit={handleSubmit} className="auth-form" id="panel-signin" role="tabpanel" aria-labelledby={authTab === 'email' ? 'tab-email' : 'tab-phone'}>
+                  <div className="form-group auth-identifier-group">
+                    <label htmlFor="signin-identifier">{authTab === 'email' ? 'Email Address' : 'Mobile number'}</label>
+                    <div className="auth-identifier-control">
+                      {authTab === 'email' ? (
+                        <div className="auth-input-icon">
+                          <Mail className="auth-field-icon" />
+                          <input
+                            id="signin-identifier"
+                            className="auth-input"
+                            type="email"
+                            value={identifier}
+                            onChange={(e) => setIdentifier(e.target.value)}
+                            placeholder="you@example.com"
+                            autoComplete="email"
+                            required
+                            aria-invalid={!!error || undefined}
+                            aria-describedby={error ? 'signin-error' : undefined}
+                          />
+                        </div>
+                      ) : (
+                        <div className="phone-field">
+                          <select
+                            className="phone-code"
+                            value={countryCode}
+                            onChange={(e) => setCountryCode(e.target.value)}
+                            aria-label="Country code"
+                          >
+                            <option value="+91">🇮🇳 +91</option>
+                            <option value="+1">🇺🇸 +1</option>
+                            <option value="+44">🇬🇧 +44</option>
+                            <option value="+971">🇦🇪 +971</option>
+                          </select>
+                          <input
+                            id="signin-identifier"
+                            className="auth-input"
+                            type="tel"
+                            value={identifier}
+                            onChange={(e) => setIdentifier(e.target.value.replace(/[^\d\s-]/g, ''))}
+                            placeholder="98765 43210"
+                            autoComplete="tel-national"
+                            required
+                            aria-invalid={!!error || undefined}
+                            aria-describedby={error ? 'signin-error' : undefined}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <p
+                      className={`field-hint${authTab === 'phone' ? '' : ' field-hint-placeholder'}`}
+                      id="signin-identifier-hint"
+                      aria-hidden={authTab !== 'phone'}
+                    >
+                      Sign in with the mobile number linked to your account (password required).
+                    </p>
+                  </div>
 
-              <button className="btn btn-block auth-primary-btn" type="submit" disabled={loading}>
-                {loading ? 'Signing in...' : 'Sign In'}
-              </button>
-            </form>
+                  <div className="form-group">
+                    <div className="auth-label-row">
+                      <label htmlFor="signin-password">Password</label>
+                      <button type="button" className="link-btn auth-forgot" onClick={handleOpenForgot}>
+                        Forgot password?
+                      </button>
+                    </div>
+                    <div className="password-field auth-input-icon">
+                      <LockIcon className="auth-field-icon" />
+                      <input
+                        id="signin-password"
+                        className="auth-input"
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        autoComplete="current-password"
+                        required
+                        aria-describedby={error ? 'signin-error' : undefined}
+                      />
+                      <button
+                        type="button"
+                        className="password-toggle"
+                        onClick={() => setShowPassword((v) => !v)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff size={18} strokeWidth={1.8} /> : <Eye size={18} strokeWidth={1.8} />}
+                      </button>
+                    </div>
+                  </div>
 
-            <div className="auth-divider"><span>or continue with</span></div>
+                  <div className="auth-row">
+                    <label className="checkbox remember-me">
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                      />
+                      Remember me
+                    </label>
+                    <button type="button" className="link-btn auth-privacy-link" onClick={openPrivacy}>
+                      <Shield className="w-3.5 h-3.5 text-emerald-500" />
+                      Privacy Guarantee
+                    </button>
+                  </div>
 
-            <div className="oauth-stack">
-              <div className="oauth-google-shell">
-                <button type="button" className="oauth-btn oauth-google" tabIndex={-1} aria-hidden="true">
-                  <GoogleGlyph size={18} />
-                  Continue with Google
-                </button>
-                <div className="oauth-google-overlay">
-                  <GoogleLogin
-                    onSuccess={handleGoogleSuccess}
-                    onError={() => setError('Google authentication failed')}
-                    theme="outline"
-                    size="large"
-                    shape="rectangular"
-                    text="continue_with"
-                    width="366"
-                  />
+                  <button className="btn btn-block auth-primary-btn" type="submit" disabled={loading}>
+                    <span>{loading ? 'Signing in...' : 'Sign In'}</span>
+                    {!loading && <ArrowRight className="w-4 h-4" />}
+                  </button>
+                </form>
+
+                <div className="auth-divider"><span>Or continue with</span></div>
+
+                <div className="oauth-stack oauth-grid-2">
+                  <div className="oauth-google-shell">
+                    <button type="button" className="oauth-btn oauth-google" tabIndex={-1} aria-hidden="true">
+                      <GoogleGlyph size={18} />
+                      <span>Google</span>
+                    </button>
+                    <div className="oauth-google-overlay">
+                      <GoogleLogin
+                        onSuccess={handleGoogleSuccess}
+                        onError={() => setError('Google authentication failed')}
+                        theme="outline"
+                        size="large"
+                        shape="rectangular"
+                        text="continue_with"
+                        width="180"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="oauth-btn oauth-apple"
+                    disabled
+                    aria-disabled="true"
+                    title="Apple Sign-In coming soon"
+                  >
+                    <AppleGlyph size={18} />
+                    <span>Apple</span>
+                  </button>
                 </div>
+
+                <p className="switch-text auth-switch">
+                  New here? <Link to="/signup">Create an account</Link>
+                </p>
               </div>
-
-              <button
-                type="button"
-                className="oauth-btn oauth-apple"
-                disabled
-                aria-disabled="true"
-                title="Apple Sign-In coming soon"
-              >
-                <AppleGlyph size={18} />
-                Continue with Apple — Coming soon
-              </button>
             </div>
-
-            <p className="switch-text auth-switch">
-              New here? <Link to="/signup">Create an account</Link>
-            </p>
-          </GlassCard>
-        </div>
-      </aside>
-
-      <p className="auth-page-privacy">
-        <LockIcon size={14} strokeWidth={2.2} />
-        Your privacy is our priority
-      </p>
+          </aside>
+        </>
+      )}
+    </AuthPageLayout>
 
       {forgotOpen && createPortal(
         <div
@@ -526,6 +558,6 @@ export default function SignIn() {
         </div>,
         document.body
       )}
-    </div>
+    </>
   )
 }

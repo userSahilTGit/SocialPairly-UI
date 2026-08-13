@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Navbar from '../components/Navbar'
+import SiteFooter from '../components/SiteFooter'
 import api from '../api/axios'
 import { getMediaUrl } from '../utils/mediaUrl'
 import {
@@ -291,7 +292,8 @@ export default function EventWorkspace() {
                         ← Back to Home
                     </button>
                 </div>
-            </div>
+            </div>
+        <SiteFooter />
         </>
     )
 }

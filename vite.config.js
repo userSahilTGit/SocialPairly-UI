@@ -7,10 +7,10 @@ import path from 'path'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server:{
-    port:3001,
+    port:3002,
     proxy: {
       '/api': {
-        target: 'http://localhost:9010',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false
       }
@@ -18,6 +18,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      '@': path.resolve(__dirname, 'src'),
       '@mediapipe/selfie_segmentation': path.resolve(__dirname, 'src/mocks/selfie-segmentation.js'),
     },
   },
@@ -31,6 +32,19 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-    setupFiles: './src/test/setup.js',
+    setupFiles: './tests/setup.js',
+    include: ['tests/**/*.{test,spec}.{js,jsx}'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      include: ['src/utils/**'],
+      exclude: ['src/utils/faceRecognition.js', 'tests/**'],
+      thresholds: {
+        lines: 5,
+        statements: 5,
+        functions: 5,
+        branches: 90,
+      },
+    },
   },
 })

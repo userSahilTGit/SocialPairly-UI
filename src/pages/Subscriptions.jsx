@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Navbar from '../components/Navbar'
+import SiteFooter from '../components/SiteFooter'
 import PaymentReceiptPreview from '../components/PaymentReceiptPreview'
 import RefundTracker from '../components/RefundTracker'
 import { DiscontinueModal, ScheduleSlotModal, BankDetailsModal } from '../components/RefundModals'
@@ -751,7 +752,8 @@ export default function Subscriptions() {
           onSubmit={handleBankDetailsSubmit}
           loading={refundLoading}
         />
-      </div>
+      </div>
+    <SiteFooter />
     </>
   )
 }

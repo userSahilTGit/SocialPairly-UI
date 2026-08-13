@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, X } from 'lucide-react'
+import {
+  Plus, X, Sparkles, UserRound, Heart, Compass, Target, Coffee, Users, Home,
+} from 'lucide-react'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
+import { readCompletionPercentage } from '../../utils/profileCompletion'
 import OnboardingShell from '../../components/onboarding/OnboardingShell'
 import AccordionSection from '../../components/onboarding/AccordionSection'
 
@@ -49,11 +52,12 @@ const EMPTY = {
 
 const MAX_ABOUT = 500
 const MAX_FRIEND_WORDS = 3
+const ALL_SECTIONS = ['about', 'personality', 'interests', 'lifestyle', 'goals', 'firstDate', 'partner', 'family']
 
 export default function PersonalityLifestylePage() {
   const navigate = useNavigate()
-  const { refreshUser } = useAuth()
-  const [openSection, setOpenSection] = useState('about')
+  const { refreshUser, user } = useAuth()
+  const [openSections, setOpenSections] = useState(() => new Set(['about']))
   const [form, setForm] = useState(EMPTY)
   const [tagDraft, setTagDraft] = useState('')
   const [loading, setLoading] = useState(true)
@@ -61,6 +65,9 @@ export default function PersonalityLifestylePage() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
+  const [completionPct, setCompletionPct] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const editMode = !!user?.identityPage1Complete
 
   const aboutLen = form.aboutStory?.length || 0
 
@@ -68,7 +75,11 @@ export default function PersonalityLifestylePage() {
     setLoading(true)
     setLoadError('')
     try {
-      const { data } = await api.get('/onboarding/personality')
+      const [personalityRes, completionRes] = await Promise.all([
+        api.get('/onboarding/personality'),
+        api.get('/profile/completion').catch(() => ({ data: null })),
+      ])
+      const data = personalityRes.data
       setForm({
         headline: data.headline || '',
         aboutStory: data.aboutStory || '',
@@ -85,6 +96,7 @@ export default function PersonalityLifestylePage() {
         religion: data.religion || '',
         preferredReligion: data.preferredReligion || '',
       })
+      setCompletionPct(readCompletionPercentage(completionRes))
     } catch (err) {
       setLoadError(err.response?.data?.message || 'Could not load Personality & Lifestyle.')
     } finally {
@@ -101,7 +113,20 @@ export default function PersonalityLifestylePage() {
   }
 
   const toggleSection = (id) => {
-    setOpenSection((prev) => (prev === id ? '' : id))
+    setOpenSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  const isOpen = (id) => openSections.has(id)
+  const expandAll = () => setOpenSections(new Set(ALL_SECTIONS))
+  const collapseAll = () => setOpenSections(new Set())
+  const sectionVisible = (id, keywords = []) => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return true
+    return [id, ...keywords].some((k) => String(k).toLowerCase().includes(q))
   }
 
   const validateContinue = () => {
@@ -157,7 +182,7 @@ export default function PersonalityLifestylePage() {
     setFieldErrors(errors)
     if (Object.keys(errors).length) {
       setFormError('Please complete About You before continuing.')
-      setOpenSection('about')
+      setOpenSections(new Set(['about']))
       return
     }
     setSaving(true)
@@ -224,21 +249,42 @@ export default function PersonalityLifestylePage() {
     <OnboardingShell
       currentStepId="personality"
       saving={saving}
+      editMode={editMode}
       onBack={() => navigate('/onboarding/identity')}
       onSaveLater={handleSaveLater}
       onContinue={handleContinue}
-      continueLabel="Save & Continue"
-      saveLaterLabel="Save & continue later"
+      continueLabel="Save & Continue to Step 3"
+      saveLaterLabel={editMode ? 'Cancel' : 'Save & continue later'}
+      completionPct={completionPct}
+      jumpLinks={[
+        { id: 'about', label: 'About You', status: 'ok' },
+        { id: 'personality', label: 'Personality Traits', status: 'active' },
+        { id: 'interests', label: 'Interests & Hobbies', status: 'muted' },
+        { id: 'goals', label: 'Relationship Goals', status: 'muted' },
+        { id: 'partner', label: 'Ideal Partner', status: 'muted' },
+      ]}
+      onJump={(id) => setOpenSections((prev) => new Set([...prev, id]))}
+      searchEnabled
+      searchQuery={searchQuery}
+      onSearch={setSearchQuery}
+      searchMatchCount={ALL_SECTIONS.filter((id) => sectionVisible(id, [id])).length}
+      expandAll={expandAll}
+      collapseAll={collapseAll}
     >
       {formError && <div className="error ob-form-error" role="alert">{formError}</div>}
 
       <AccordionSection
         id="about"
-        title="A. About You"
-        open={openSection === 'about'}
+        title="About You"
+        icon={UserRound}
+        iconTone="indigo"
+        subtitle="Headline, story, and how friends describe you."
+        badge={{ label: 'Public Display', tone: 'purple' }}
+        summary={form.headline || 'Required'}
+        open={isOpen('about')}
         onToggle={toggleSection}
-      >
-        <div className="form-group">
+        hidden={!sectionVisible('about', ['about', 'headline', 'story', 'friends'])}
+      >        <div className="form-group">
           <label htmlFor="p-headline">Short headline</label>
           <input
             id="p-headline"
@@ -333,11 +379,15 @@ export default function PersonalityLifestylePage() {
 
       <AccordionSection
         id="personality"
-        title="B. Personality"
-        open={openSection === 'personality'}
+        title="Personality Traits"
+        icon={Sparkles}
+        iconTone="purple"
+        subtitle="Select traits that fit you best."
+        summary={form.personalityTraits?.length ? `${form.personalityTraits.length} selected` : 'Optional'}
+        open={isOpen('personality')}
         onToggle={toggleSection}
-      >
-        <p style={{ marginTop: 0, color: '#6b7280' }}>Select traits that fit you best.</p>
+        hidden={!sectionVisible('personality', ['personality', 'traits'])}
+      >        <p style={{ marginTop: 0, color: '#6b7280' }}>Select traits that fit you best.</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {TRAIT_OPTIONS.map((trait) => {
             const selected = form.personalityTraits.includes(trait)
@@ -357,11 +407,14 @@ export default function PersonalityLifestylePage() {
 
       <AccordionSection
         id="interests"
-        title="C. Interests & Hobbies"
-        open={openSection === 'interests'}
+        title="Interests & Hobbies"
+        icon={Compass}
+        iconTone="cyan"
+        subtitle="What you love spending time on."
+        open={isOpen('interests')}
         onToggle={toggleSection}
-      >
-        <div className="form-group">
+        hidden={!sectionVisible('interests', ['interests', 'hobbies'])}
+      >        <div className="form-group">
           <label htmlFor="p-interests">Interests & hobbies</label>
           <textarea
             id="p-interests"
@@ -375,11 +428,14 @@ export default function PersonalityLifestylePage() {
 
       <AccordionSection
         id="lifestyle"
-        title="D. Lifestyle"
-        open={openSection === 'lifestyle'}
+        title="Lifestyle"
+        icon={Heart}
+        iconTone="pink"
+        subtitle="Daily routines and how you live."
+        open={isOpen('lifestyle')}
         onToggle={toggleSection}
-      >
-        <div className="form-group">
+        hidden={!sectionVisible('lifestyle', ['lifestyle', 'routine'])}
+      >        <div className="form-group">
           <label htmlFor="p-lifestyle">Lifestyle</label>
           <textarea
             id="p-lifestyle"
@@ -393,11 +449,14 @@ export default function PersonalityLifestylePage() {
 
       <AccordionSection
         id="goals"
-        title="E. Relationship Goals"
-        open={openSection === 'goals'}
+        title="Relationship Goals"
+        icon={Target}
+        iconTone="violet"
+        subtitle="What you’re looking for long term."
+        open={isOpen('goals')}
         onToggle={toggleSection}
-      >
-        <div className="form-group">
+        hidden={!sectionVisible('goals', ['goals', 'relationship', 'marriage'])}
+      >        <div className="form-group">
           <label htmlFor="p-goals">Relationship goals</label>
           <textarea
             id="p-goals"
@@ -411,11 +470,14 @@ export default function PersonalityLifestylePage() {
 
       <AccordionSection
         id="firstDate"
-        title="F. First Date"
-        open={openSection === 'firstDate'}
+        title="First Date Preferences"
+        icon={Coffee}
+        iconTone="orange"
+        subtitle="What a great first meetup looks like for you."
+        open={isOpen('firstDate')}
         onToggle={toggleSection}
-      >
-        <div className="form-group">
+        hidden={!sectionVisible('firstDate', ['first date', 'date', 'meetup'])}
+      >        <div className="form-group">
           <label htmlFor="p-first-date">First date preferences</label>
           <textarea
             id="p-first-date"
@@ -429,11 +491,14 @@ export default function PersonalityLifestylePage() {
 
       <AccordionSection
         id="partner"
-        title="G. Ideal Partner"
-        open={openSection === 'partner'}
+        title="Ideal Partner"
+        icon={Users}
+        iconTone="blue"
+        subtitle="Qualities and values you hope to share."
+        open={isOpen('partner')}
         onToggle={toggleSection}
-      >
-        <div className="form-group">
+        hidden={!sectionVisible('partner', ['ideal partner', 'partner'])}
+      >        <div className="form-group">
           <label htmlFor="p-partner">Ideal partner</label>
           <textarea
             id="p-partner"
@@ -447,11 +512,14 @@ export default function PersonalityLifestylePage() {
 
       <AccordionSection
         id="family"
-        title="H. Extended Family"
-        open={openSection === 'family'}
+        title="Extended Family"
+        icon={Home}
+        iconTone="teal"
+        subtitle="Family involvement, traditions, and boundaries."
+        open={isOpen('family')}
         onToggle={toggleSection}
-      >
-        <div className="form-group">
+        hidden={!sectionVisible('family', ['family', 'extended', 'traditions'])}
+      >        <div className="form-group">
           <label htmlFor="p-family">Extended family expectations</label>
           <textarea
             id="p-family"

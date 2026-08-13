@@ -4,8 +4,6 @@ const DEFAULT_STEPS = [
   { id: 'identity', label: 'Identity' },
   { id: 'personality', label: 'Personality' },
   { id: 'faith', label: 'Faith' },
-  { id: 'media', label: 'Media' },
-  { id: 'payment', label: 'Payment' },
 ]
 
 /**

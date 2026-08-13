@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Church, HeartHandshake } from 'lucide-react'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
+import { readCompletionPercentage } from '../../utils/profileCompletion'
 import OnboardingShell from '../../components/onboarding/OnboardingShell'
+import AccordionSection from '../../components/onboarding/AccordionSection'
 
 const RELIGION_OPTIONS = [
   'Christianity',
@@ -24,6 +27,7 @@ const RELIGION_OPTIONS = [
 ]
 
 const PREFERRED_RELIGION_OPTIONS = ['Open to all', ...RELIGION_OPTIONS]
+const ALL_SECTIONS = ['myFaith', 'preferredFaith']
 
 /**
  * Faith / Religion step — stores on user_profiles_details via personality API
@@ -31,7 +35,7 @@ const PREFERRED_RELIGION_OPTIONS = ['Open to all', ...RELIGION_OPTIONS]
  */
 export default function FaithOnboardingPage() {
   const navigate = useNavigate()
-  const { refreshUser } = useAuth()
+  const { refreshUser, user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -40,14 +44,21 @@ export default function FaithOnboardingPage() {
   const [preferredReligion, setPreferredReligion] = useState('')
   const [religionOptions, setReligionOptions] = useState(RELIGION_OPTIONS)
   const [preferredReligionOptions, setPreferredReligionOptions] = useState(PREFERRED_RELIGION_OPTIONS)
-  /** Snapshot of personality payload so we do not clear lifestyle fields on save */
   const [personalitySnapshot, setPersonalitySnapshot] = useState(null)
+  const [openSections, setOpenSections] = useState(() => new Set(['myFaith', 'preferredFaith']))
+  const [completionPct, setCompletionPct] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const editMode = !!user?.identityPage1Complete
 
   const load = async () => {
     setLoading(true)
     setLoadError('')
     try {
-      const { data } = await api.get('/onboarding/personality')
+      const [personalityRes, completionRes] = await Promise.all([
+        api.get('/onboarding/personality'),
+        api.get('/profile/completion').catch(() => ({ data: null })),
+      ])
+      const data = personalityRes.data
       setReligion(data.religion || '')
       setPreferredReligion(data.preferredReligion || '')
       if (Array.isArray(data.religionOptions) && data.religionOptions.length) {
@@ -70,6 +81,7 @@ export default function FaithOnboardingPage() {
         idealPartner: data.idealPartner || null,
         extendedFamily: data.extendedFamily || null,
       })
+      setCompletionPct(readCompletionPercentage(completionRes))
     } catch (err) {
       setLoadError(err.response?.data?.message || 'Could not load Faith preferences.')
     } finally {
@@ -96,7 +108,7 @@ export default function FaithOnboardingPage() {
     setSaving(true)
     try {
       await persist('SAVE_LATER')
-      navigate('/', { replace: true })
+      navigate(editMode ? '/profile' : '/', { replace: true })
     } catch (err) {
       setFormError(err.response?.data?.message || 'Unable to save. Please try again.')
     } finally {
@@ -109,12 +121,29 @@ export default function FaithOnboardingPage() {
     setSaving(true)
     try {
       await persist('SAVE_LATER')
-      navigate('/profile/media', { replace: true })
+      navigate('/profile', { replace: true })
     } catch (err) {
       setFormError(err.response?.data?.message || 'Unable to save. Please try again.')
     } finally {
       setSaving(false)
     }
+  }
+
+  const toggleSection = (id) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  const isOpen = (id) => openSections.has(id)
+  const expandAll = () => setOpenSections(new Set(ALL_SECTIONS))
+  const collapseAll = () => setOpenSections(new Set())
+  const sectionVisible = (id, keywords = []) => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return true
+    return [id, ...keywords].some((k) => String(k).toLowerCase().includes(q))
   }
 
   if (loading) {
@@ -146,41 +175,82 @@ export default function FaithOnboardingPage() {
   return (
     <OnboardingShell
       currentStepId="faith"
+      editMode={editMode}
       onSaveLater={handleSaveLater}
       onBack={() => navigate('/onboarding/personality')}
       onContinue={handleContinue}
       continueLabel="Save & Continue"
+      saveLaterLabel={editMode ? 'Cancel' : 'Save & continue later'}
       saving={saving}
+      completionPct={completionPct}
+      jumpLinks={[
+        { id: 'myFaith', label: 'My Faith', status: 'ok' },
+        { id: 'preferredFaith', label: 'Preferred Faith', status: 'active' },
+      ]}
+      onJump={(id) => setOpenSections((prev) => new Set([...prev, id]))}
+      searchEnabled
+      searchQuery={searchQuery}
+      onSearch={setSearchQuery}
+      searchMatchCount={ALL_SECTIONS.filter((id) => sectionVisible(id, [id])).length}
+      expandAll={expandAll}
+      collapseAll={collapseAll}
     >
       {formError && <div className="error ob-form-error" role="alert">{formError}</div>}
 
-      <div className="form-group">
-        <label htmlFor="faith-religion">My religion</label>
-        <select
-          id="faith-religion"
-          value={religion}
-          onChange={(e) => setReligion(e.target.value)}
-        >
-          <option value="">-- Select --</option>
-          {religionOptions.map((r) => (
-            <option key={r} value={r}>{r}</option>
-          ))}
-        </select>
-      </div>
+      <AccordionSection
+        id="myFaith"
+        title="My Faith"
+        icon={Church}
+        iconTone="violet"
+        subtitle="Your religion or spiritual tradition."
+        badge={{ label: 'Optional', tone: 'slate' }}
+        summary={religion || 'Not selected'}
+        open={isOpen('myFaith')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('myFaith', ['my faith', 'religion', 'belief'])}
+      >
+        <label className="ob-field">
+          <span>My religion</span>
+          <select
+            id="faith-religion"
+            value={religion}
+            onChange={(e) => setReligion(e.target.value)}
+          >
+            <option value="">-- Select --</option>
+            {religionOptions.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        </label>
+        <p className="ob-hint">You control whether this appears on your public profile.</p>
+      </AccordionSection>
 
-      <div className="form-group">
-        <label htmlFor="faith-preferred">Preferred religion (looking for)</label>
-        <select
-          id="faith-preferred"
-          value={preferredReligion}
-          onChange={(e) => setPreferredReligion(e.target.value)}
-        >
-          <option value="">-- Select --</option>
-          {preferredReligionOptions.map((r) => (
-            <option key={r} value={r}>{r}</option>
-          ))}
-        </select>
-      </div>
+      <AccordionSection
+        id="preferredFaith"
+        title="Preferred Faith in a Match"
+        icon={HeartHandshake}
+        iconTone="indigo"
+        subtitle="What faith background you hope to share with a partner."
+        badge={{ label: 'Matching Preference', tone: 'indigo' }}
+        summary={preferredReligion || 'Open'}
+        open={isOpen('preferredFaith')}
+        onToggle={toggleSection}
+        hidden={!sectionVisible('preferredFaith', ['preferred', 'looking for', 'match'])}
+      >
+        <label className="ob-field">
+          <span>Preferred religion (looking for)</span>
+          <select
+            id="faith-preferred"
+            value={preferredReligion}
+            onChange={(e) => setPreferredReligion(e.target.value)}
+          >
+            <option value="">-- Select --</option>
+            {preferredReligionOptions.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        </label>
+      </AccordionSection>
     </OnboardingShell>
   )
 }

@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { Menu, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import { BrandMark } from './AuthBrandAssets'
+import ThemeToggle from './ThemeToggle'
 
 export default function Navbar() {
     const { user, logout } = useAuth()
     const navigate = useNavigate()
+    const location = useLocation()
+    const [menuOpen, setMenuOpen] = useState(false)
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const [deleteModalOpen, setDeleteModalOpen] = useState(false)
     const [deletePassword, setDeletePassword] = useState('')
@@ -24,6 +28,16 @@ export default function Navbar() {
         document.addEventListener('mousedown', handleClickOutside)
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
+
+    useEffect(() => {
+        setMenuOpen(false)
+        setDropdownOpen(false)
+    }, [location.pathname])
+
+    useEffect(() => {
+        document.body.classList.toggle('nav-menu-open', menuOpen)
+        return () => document.body.classList.remove('nav-menu-open')
+    }, [menuOpen])
 
     const handleLogout = () => {
         setDropdownOpen(false)
@@ -73,11 +87,22 @@ export default function Navbar() {
                     <BrandMark size={36} className="nav-brand-logo" />
                     <span className="nav-brand-name">Socialpairly</span>
                 </NavLink>
-                <div className="nav-links">
+                <div className="nav-toolbar">
+                    <ThemeToggle />
+                    <button
+                        type="button"
+                        className="nav-menu-toggle"
+                        aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+                        aria-expanded={menuOpen}
+                        onClick={() => setMenuOpen((open) => !open)}
+                    >
+                        {menuOpen ? <X size={22} /> : <Menu size={22} />}
+                    </button>
+                </div>
+                <div className={`nav-links ${menuOpen ? 'is-open' : ''}`}>
                     {user?.role !== 'ADMIN' && (
                         <NavLink to="/">Home</NavLink>
                     )}
-                    <NavLink to="/notifications">Notification</NavLink>
                     {user?.role !== 'ADMIN' && (
                         <NavLink to="/subscriptions">Subscription</NavLink>
                     )}
@@ -99,6 +124,10 @@ export default function Navbar() {
                         </>
                     )}
 
+                    <div className="nav-theme-desktop">
+                        <ThemeToggle />
+                    </div>
+
                     <div className="profile-dropdown" ref={dropdownRef}>
                         <button
                             type="button"
@@ -115,9 +144,11 @@ export default function Navbar() {
                                 <button type="button" onClick={() => { setDropdownOpen(false); navigate('/profile') }}>
                                     Profile
                                 </button>
-                                <button type="button" onClick={() => { setDropdownOpen(false); navigate('/onboarding/identity') }}>
-                                    Identity & Background
-                                </button>
+                                {user?.role !== 'ADMIN' && (
+                                    <button type="button" onClick={() => { setDropdownOpen(false); navigate('/onboarding/identity') }}>
+                                        Identity & Background
+                                    </button>
+                                )}
                                 <button type="button" onClick={() => { setDropdownOpen(false); navigate('/settings') }}>
                                     Settings
                                 </button>
