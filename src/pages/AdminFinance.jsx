@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Navbar from '../components/Navbar'
 import SiteFooter from '../components/SiteFooter'
 import AdminRefundInspectionModal from '../components/AdminRefundInspectionModal'
+import AdminUpgradeInspectionModal from '../components/AdminUpgradeInspectionModal'
 import api from '../api/axios'
 import './AdminFinance.css'
 
@@ -9,6 +10,7 @@ const PAGE_SIZE = 10
 
 const PAYMENT_STATUS_OPTIONS = ['All Statuses', 'Succeeded', 'Failed', 'Pending', 'Refunded']
 const REFUND_STATUS_OPTIONS = ['All Statuses', 'Initiated', 'In-Progress', 'Completed', 'Rejected']
+const UPGRADE_STATUS_OPTIONS = ['All Statuses', 'Started', 'InProgress', 'Completed', 'Rejected']
 
 function getInitials(name) {
     if (!name) return '?'
@@ -43,7 +45,8 @@ function getRefundStatusClass(status) {
     switch (status) {
         case 'Completed': return 'refund-row-status-complete'
         case 'Rejected': return 'refund-row-status-rejected'
-        case 'In-Progress': return 'refund-row-status-progress'
+        case 'In-Progress':
+        case 'InProgress': return 'refund-row-status-progress'
         default: return 'refund-row-status-pending'
     }
 }
@@ -52,6 +55,7 @@ export default function AdminFinance() {
     const [activeTab, setActiveTab] = useState('refunds')
     const [payments, setPayments] = useState([])
     const [refunds, setRefunds] = useState([])
+    const [upgrades, setUpgrades] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
@@ -60,6 +64,9 @@ export default function AdminFinance() {
     const [selectedRefund, setSelectedRefund] = useState(null)
     const [refundDetail, setRefundDetail] = useState(null)
     const [inspectionOpen, setInspectionOpen] = useState(false)
+    const [selectedUpgrade, setSelectedUpgrade] = useState(null)
+    const [upgradeDetail, setUpgradeDetail] = useState(null)
+    const [upgradeInspectionOpen, setUpgradeInspectionOpen] = useState(false)
     const [actionLoading, setActionLoading] = useState(false)
 
     const fetchPayments = useCallback(async () => {
@@ -80,17 +87,26 @@ export default function AdminFinance() {
         }
     }, [])
 
+    const fetchUpgrades = useCallback(async () => {
+        try {
+            const { data } = await api.get('/admin/upgrades')
+            setUpgrades(data || [])
+        } catch (err) {
+            console.error('Fetch upgrades error:', err)
+        }
+    }, [])
+
     const fetchAll = useCallback(async () => {
         try {
             setLoading(true)
             setError('')
-            await Promise.all([fetchPayments(), fetchRefunds()])
+            await Promise.all([fetchPayments(), fetchRefunds(), fetchUpgrades()])
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to load financial data')
         } finally {
             setLoading(false)
         }
-    }, [fetchPayments, fetchRefunds])
+    }, [fetchPayments, fetchRefunds, fetchUpgrades])
 
     useEffect(() => {
         fetchAll()
@@ -100,17 +116,37 @@ export default function AdminFinance() {
         const hasActiveRefunds = refunds.some(
             (r) => r.status !== 'Completed' && r.status !== 'Rejected'
         )
-        if (!hasActiveRefunds) return undefined
+        const hasActiveUpgrades = upgrades.some(
+            (u) => u.status !== 'Completed' && u.status !== 'Rejected'
+        )
+        if (!hasActiveRefunds && !hasActiveUpgrades) return undefined
 
         const interval = setInterval(() => {
-            fetchRefunds()
-            if (inspectionOpen && selectedRefund) {
-                api.get(`/admin/refunds/${selectedRefund}`).then(({ data }) => setRefundDetail(data))
+            if (hasActiveRefunds) {
+                fetchRefunds()
+                if (inspectionOpen && selectedRefund) {
+                    api.get(`/admin/refunds/${selectedRefund}`).then(({ data }) => setRefundDetail(data))
+                }
+            }
+            if (hasActiveUpgrades) {
+                fetchUpgrades()
+                if (upgradeInspectionOpen && selectedUpgrade) {
+                    api.get(`/admin/upgrades/${selectedUpgrade}`).then(({ data }) => setUpgradeDetail(data))
+                }
             }
         }, 5000)
 
         return () => clearInterval(interval)
-    }, [refunds, inspectionOpen, selectedRefund, fetchRefunds])
+    }, [
+        refunds,
+        upgrades,
+        inspectionOpen,
+        selectedRefund,
+        upgradeInspectionOpen,
+        selectedUpgrade,
+        fetchRefunds,
+        fetchUpgrades,
+    ])
 
     const openRefundInspection = async (refundId) => {
         try {
@@ -136,6 +172,37 @@ export default function AdminFinance() {
             const { data } = await api.post(`/admin/refunds/${selectedRefund}/${action}`)
             setRefundDetail(data)
             await fetchRefunds()
+        } catch (err) {
+            setError(err.response?.data?.message || 'Action failed')
+        } finally {
+            setActionLoading(false)
+        }
+    }
+
+    const openUpgradeInspection = async (upgradeId) => {
+        try {
+            const { data } = await api.get(`/admin/upgrades/${upgradeId}`)
+            setSelectedUpgrade(upgradeId)
+            setUpgradeDetail(data)
+            setUpgradeInspectionOpen(true)
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to load upgrade details')
+        }
+    }
+
+    const closeUpgradeInspection = () => {
+        setUpgradeInspectionOpen(false)
+        setSelectedUpgrade(null)
+        setUpgradeDetail(null)
+    }
+
+    const handleUpgradeAction = async (action) => {
+        if (!selectedUpgrade) return
+        setActionLoading(true)
+        try {
+            const { data } = await api.post(`/admin/upgrades/${selectedUpgrade}/${action}`)
+            setUpgradeDetail(data)
+            await fetchUpgrades()
         } catch (err) {
             setError(err.response?.data?.message || 'Action failed')
         } finally {
@@ -175,6 +242,23 @@ export default function AdminFinance() {
         })
     }, [refunds, searchQuery, filterStatus])
 
+    const filteredUpgrades = useMemo(() => {
+        const query = searchQuery.toLowerCase().trim()
+        return upgrades.filter((upgrade) => {
+            const matchesStatus =
+                filterStatus === 'All Statuses'
+                || upgrade.status === filterStatus
+
+            const matchesSearch =
+                !query
+                || String(upgrade.userId || '').includes(query)
+                || (upgrade.formattedUpgradeId && upgrade.formattedUpgradeId.toLowerCase().includes(query))
+                || (upgrade.upgradePlan && upgrade.upgradePlan.toLowerCase().includes(query))
+
+            return matchesStatus && matchesSearch
+        })
+    }, [upgrades, searchQuery, filterStatus])
+
     useEffect(() => {
         setCurrentPage(1)
     }, [searchQuery, filterStatus, activeTab])
@@ -207,14 +291,31 @@ export default function AdminFinance() {
         return { pending, totalRefundVolume: totalRefundVolume.toFixed(2), successRate }
     }, [refunds])
 
-    const currentData = activeTab === 'payments' ? filteredPayments : filteredRefunds
+    const upgradeStats = useMemo(() => {
+        const pending = upgrades.filter((u) => u.status === 'Started' || u.status === 'InProgress').length
+        const completed = upgrades.filter((u) => u.status === 'Completed').length
+        const successRate = upgrades.length > 0
+            ? ((completed / upgrades.length) * 100).toFixed(1)
+            : '0.0'
+        return { pending, completed, successRate, total: upgrades.length }
+    }, [upgrades])
+
+    const currentData = activeTab === 'payments'
+        ? filteredPayments
+        : activeTab === 'upgrades'
+            ? filteredUpgrades
+            : filteredRefunds
     const totalPages = Math.max(1, Math.ceil(currentData.length / PAGE_SIZE))
     const paginatedData = currentData.slice(
         (currentPage - 1) * PAGE_SIZE,
         currentPage * PAGE_SIZE
     )
 
-    const statusOptions = activeTab === 'payments' ? PAYMENT_STATUS_OPTIONS : REFUND_STATUS_OPTIONS
+    const statusOptions = activeTab === 'payments'
+        ? PAYMENT_STATUS_OPTIONS
+        : activeTab === 'upgrades'
+            ? UPGRADE_STATUS_OPTIONS
+            : REFUND_STATUS_OPTIONS
 
     const copyChargeId = async (chargeId) => {
         if (!chargeId) return
@@ -223,6 +324,12 @@ export default function AdminFinance() {
         } catch (err) {
             console.error('Failed to copy charge ID', err)
         }
+    }
+
+    const switchTab = (tab) => {
+        setActiveTab(tab)
+        setFilterStatus('All Statuses')
+        setSearchQuery('')
     }
 
     return (
@@ -234,7 +341,7 @@ export default function AdminFinance() {
                         <div className="header-content">
                             <div className="breadcrumb-tag">Financial Administration</div>
                             <h1>Payment & Refund Operations</h1>
-                            <p>Monitor account billing histories, process refund requests, and approve settlement payouts.</p>
+                            <p>Monitor account billing histories, process refund requests, and approve plan upgrades.</p>
                         </div>
                         <button
                             type="button"
@@ -254,16 +361,23 @@ export default function AdminFinance() {
                         <button
                             type="button"
                             className={`finance-tab ${activeTab === 'refunds' ? 'active' : ''}`}
-                            onClick={() => { setActiveTab('refunds'); setFilterStatus('All Statuses'); setSearchQuery('') }}
+                            onClick={() => switchTab('refunds')}
                         >
                             Refund Applications
                         </button>
                         <button
                             type="button"
                             className={`finance-tab ${activeTab === 'payments' ? 'active' : ''}`}
-                            onClick={() => { setActiveTab('payments'); setFilterStatus('All Statuses'); setSearchQuery('') }}
+                            onClick={() => switchTab('payments')}
                         >
                             Payment Details
+                        </button>
+                        <button
+                            type="button"
+                            className={`finance-tab ${activeTab === 'upgrades' ? 'active' : ''}`}
+                            onClick={() => switchTab('upgrades')}
+                        >
+                            Upgrade Requests
                         </button>
                     </div>
 
@@ -271,9 +385,15 @@ export default function AdminFinance() {
                         <div className="stat-card">
                             <div className="stat-icon icon-red">$</div>
                             <div className="stat-content">
-                                <div className="stat-label">Total Processed Volume</div>
+                                <div className="stat-label">
+                                    {activeTab === 'upgrades' ? 'Total Upgrade Requests' : 'Total Processed Volume'}
+                                </div>
                                 <div className="stat-value">
-                                    ${activeTab === 'payments' ? paymentStats.totalVolume : refundStats.totalRefundVolume}
+                                    {activeTab === 'payments'
+                                        ? `$${paymentStats.totalVolume}`
+                                        : activeTab === 'upgrades'
+                                            ? upgradeStats.total
+                                            : `$${refundStats.totalRefundVolume}`}
                                 </div>
                             </div>
                         </div>
@@ -284,7 +404,11 @@ export default function AdminFinance() {
                                     {activeTab === 'payments' ? 'Successful Charges' : 'Pending Requests'}
                                 </div>
                                 <div className="stat-value">
-                                    {activeTab === 'payments' ? paymentStats.successfulCharges : refundStats.pending}
+                                    {activeTab === 'payments'
+                                        ? paymentStats.successfulCharges
+                                        : activeTab === 'upgrades'
+                                            ? upgradeStats.pending
+                                            : refundStats.pending}
                                 </div>
                             </div>
                         </div>
@@ -292,10 +416,18 @@ export default function AdminFinance() {
                             <div className="stat-icon icon-purple">▤</div>
                             <div className="stat-content">
                                 <div className="stat-label">
-                                    {activeTab === 'payments' ? 'Avg. Charge Value' : 'Total Refunds'}
+                                    {activeTab === 'payments'
+                                        ? 'Avg. Charge Value'
+                                        : activeTab === 'upgrades'
+                                            ? 'Completed Upgrades'
+                                            : 'Total Refunds'}
                                 </div>
                                 <div className="stat-value">
-                                    {activeTab === 'payments' ? `$${paymentStats.avgValue}` : refunds.length}
+                                    {activeTab === 'payments'
+                                        ? `$${paymentStats.avgValue}`
+                                        : activeTab === 'upgrades'
+                                            ? upgradeStats.completed
+                                            : refunds.length}
                                 </div>
                             </div>
                         </div>
@@ -304,7 +436,11 @@ export default function AdminFinance() {
                             <div className="stat-content">
                                 <div className="stat-label">Settlement Success Rate</div>
                                 <div className="stat-value">
-                                    {activeTab === 'payments' ? `${paymentStats.successRate}%` : `${refundStats.successRate}%`}
+                                    {activeTab === 'payments'
+                                        ? `${paymentStats.successRate}%`
+                                        : activeTab === 'upgrades'
+                                            ? `${upgradeStats.successRate}%`
+                                            : `${refundStats.successRate}%`}
                                 </div>
                             </div>
                         </div>
@@ -315,9 +451,13 @@ export default function AdminFinance() {
                             <span className="search-icon">🔍</span>
                             <input
                                 type="text"
-                                placeholder={activeTab === 'payments'
-                                    ? 'Search user, email, or Stripe ID (ch_...)'
-                                    : 'Search by refund ID...'}
+                                placeholder={
+                                    activeTab === 'payments'
+                                        ? 'Search user, email, or Stripe ID (ch_...)'
+                                        : activeTab === 'upgrades'
+                                            ? 'Search by request ID, user ID, or upgrade plan...'
+                                            : 'Search by refund ID...'
+                                }
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="search-input"
@@ -346,12 +486,20 @@ export default function AdminFinance() {
                                 <span>Select any record to review details and perform administrative actions.</span>
                             </div>
                         )}
+                        {activeTab === 'upgrades' && (
+                            <div className="refund-table-header">
+                                <h3><i className="fa-solid fa-arrow-trend-up" /> Plan Upgrade Requests</h3>
+                                <span>Select any record to review details and approve or decline the upgrade.</span>
+                            </div>
+                        )}
 
                         {loading && currentData.length === 0 ? (
                             <div className="loading-state">Loading records...</div>
                         ) : currentData.length === 0 ? (
                             <div className="empty-state">
-                                <div className="empty-icon">{activeTab === 'payments' ? '💳' : '📋'}</div>
+                                <div className="empty-icon">
+                                    {activeTab === 'payments' ? '💳' : activeTab === 'upgrades' ? '⬆️' : '📋'}
+                                </div>
                                 <h3>No Records Found</h3>
                                 <p>No records match your search or filter criteria.</p>
                             </div>
@@ -424,6 +572,41 @@ export default function AdminFinance() {
                                     </tbody>
                                 </table>
                             </>
+                        ) : activeTab === 'upgrades' ? (
+                            <table className="finance-table refund-table">
+                                <thead>
+                                    <tr>
+                                        <th>Request ID</th>
+                                        <th>User ID</th>
+                                        <th>Upgrade Plan Name</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                        <th>Submission Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {paginatedData.map((upgrade) => (
+                                        <tr
+                                            key={upgrade.id}
+                                            className="refund-row-clickable"
+                                            onClick={() => openUpgradeInspection(upgrade.id)}
+                                        >
+                                            <td className="col-refund-id">{upgrade.formattedUpgradeId || `UPG-${upgrade.id}`}</td>
+                                            <td>{upgrade.userId}</td>
+                                            <td>{upgrade.upgradePlan}</td>
+                                            <td>
+                                                <span className={`refund-row-status ${getRefundStatusClass(upgrade.status)}`}>
+                                                    {upgrade.status}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span className="refund-action-badge">{upgrade.action}</span>
+                                            </td>
+                                            <td className="col-date">{formatDate(upgrade.submissionDate)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         ) : (
                             <table className="finance-table refund-table">
                                 <thead>
@@ -463,7 +646,11 @@ export default function AdminFinance() {
                             <div className="finance-pagination">
                                 <span>
                                     Showing {paginatedData.length} of {currentData.length}{' '}
-                                    {activeTab === 'payments' ? 'transactions' : 'refund records'}
+                                    {activeTab === 'payments'
+                                        ? 'transactions'
+                                        : activeTab === 'upgrades'
+                                            ? 'upgrade records'
+                                            : 'refund records'}
                                 </span>
                                 <div className="pagination-controls">
                                     <button
@@ -499,7 +686,16 @@ export default function AdminFinance() {
                 onCloseRefund={() => handleRefundAction('close')}
                 onCompletePayout={() => handleRefundAction('complete')}
                 actionLoading={actionLoading}
-            />
+            />
+
+            <AdminUpgradeInspectionModal
+                open={upgradeInspectionOpen}
+                upgrade={upgradeDetail}
+                onClose={closeUpgradeInspection}
+                onApprove={() => handleUpgradeAction('approve')}
+                onReject={() => handleUpgradeAction('close')}
+                actionLoading={actionLoading}
+            />
         <SiteFooter />
         </>
     )

@@ -32,7 +32,7 @@ function getStatusBadgeClass(status) {
   }
 }
 
-export default function RefundTracker({ refund, onScheduleSlot, onProvideBankDetails }) {
+export default function RefundTracker({ refund, onScheduleSlot, onProvideBankDetails, onDismiss }) {
   if (!refund || refund.active === false) return null
 
   const { status, action, formattedRefundId, createdAt, slot, amount, refundAmount } = refund
@@ -43,6 +43,7 @@ export default function RefundTracker({ refund, onScheduleSlot, onProvideBankDet
   const isSlotProvided = action === 'Provided Slot'
   const isApproved = action === 'Approved'
   const isBankDetailsProvided = action === 'Provided Bank Details'
+  const canDismiss = isCompleted || isRejected
 
   return (
     <section className="refund-tracker-card">
@@ -51,9 +52,22 @@ export default function RefundTracker({ refund, onScheduleSlot, onProvideBankDet
           <i className="fa-solid fa-clock-rotate-left" aria-hidden />
           <h3>Refund Status & History Tracker</h3>
         </div>
-        <span className={`refund-status-badge ${getStatusBadgeClass(status)}`}>
-          Status: {status || 'Pending'}
-        </span>
+        <div className="refund-tracker-header-actions">
+          <span className={`refund-status-badge ${getStatusBadgeClass(status)}`}>
+            Status: {status || 'Pending'}
+          </span>
+          {canDismiss && (
+            <button
+              type="button"
+              className="btn-tracker-dismiss"
+              onClick={onDismiss}
+              aria-label="Close tracker"
+              title="Close"
+            >
+              <i className="fa-solid fa-xmark" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="refund-tracker-body">
