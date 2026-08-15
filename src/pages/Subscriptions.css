@@ -826,6 +826,13 @@ a:focus-visible {
   filter: brightness(1.08);
 }
 
+.btn-subscription-discontinue:disabled,
+.btn-subscription-upgrade:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: none;
+}
+
 @media (max-width: 640px) {
   .current-subscription-banner {
     flex-wrap: wrap;
@@ -1018,6 +1025,32 @@ a:focus-visible {
   flex-wrap: wrap;
 }
 
+.refund-tracker-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-tracker-dismiss {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-slate-300);
+  background: #fff;
+  color: var(--color-slate-500);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-tracker-dismiss:hover {
+  background: var(--color-slate-50);
+  color: var(--color-slate-800);
+  border-color: var(--color-slate-400);
+}
+
 .refund-tracker-title {
   display: flex;
   align-items: center;
@@ -1164,6 +1197,34 @@ a:focus-visible {
 .btn-refund-bank {
   background: #047857;
   color: #fff;
+}
+
+.upgrade-cost-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  max-width: 360px;
+  margin: 1rem auto 0;
+}
+
+.upgrade-cost-summary > div {
+  background: #fff;
+  border: 1px solid #a7f3d0;
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.upgrade-cost-summary span {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-slate-500);
+  margin-bottom: 0.25rem;
+}
+
+.upgrade-cost-summary strong {
+  font-size: 1.1rem;
+  color: #065f46;
 }
 
 /* Refund Modals */

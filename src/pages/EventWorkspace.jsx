@@ -124,7 +124,7 @@ export default function EventWorkspace() {
         <>
             <Navbar />
             <div className="event-workspace-page">
-                <div className="container event-workspace-container">
+                <div className="event-workspace-container">
                     <div className="event-workspace-banner">
                         <div>
                             <span className="event-workspace-kicker">YOUR ASSIGNED EVENT</span>
@@ -292,7 +292,7 @@ export default function EventWorkspace() {
                         ← Back to Home
                     </button>
                 </div>
-            </div>
+            </div>
         <SiteFooter />
         </>
     )

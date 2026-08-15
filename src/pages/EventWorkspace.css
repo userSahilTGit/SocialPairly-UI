@@ -6,7 +6,10 @@
 }
 
 .event-workspace-container {
+    width: 100%;
     max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 20px;
 }
 
 .event-workspace-loading {

@@ -5,6 +5,8 @@ import SiteFooter from '../components/SiteFooter'
 import PaymentReceiptPreview from '../components/PaymentReceiptPreview'
 import RefundTracker from '../components/RefundTracker'
 import { DiscontinueModal, ScheduleSlotModal, BankDetailsModal } from '../components/RefundModals'
+import UpgradeTracker from '../components/UpgradeTracker'
+import { UpgradeRequestModal } from '../components/UpgradeModals'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import { downloadReceiptPdf } from '../utils/downloadReceiptPdf'
@@ -32,6 +34,14 @@ export default function Subscriptions() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
   const [bankModalOpen, setBankModalOpen] = useState(false)
   const [refundLoading, setRefundLoading] = useState(false)
+  const [currentUpgrade, setCurrentUpgrade] = useState(null)
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  const [eligibleUpgradePlans, setEligibleUpgradePlans] = useState([])
+  const [upgradeLoading, setUpgradeLoading] = useState(false)
+  const [upgradeCheckoutLoading, setUpgradeCheckoutLoading] = useState(false)
+  const [upgradeModalError, setUpgradeModalError] = useState(null)
+  const [refundTrackerDismissed, setRefundTrackerDismissed] = useState(false)
+  const [upgradeTrackerDismissed, setUpgradeTrackerDismissed] = useState(false)
   const [subscriptionResolved, setSubscriptionResolved] = useState(false)
   const receiptPreviewRef = useRef(null)
   const confirmSessionHandledRef = useRef(false)
@@ -46,12 +56,43 @@ export default function Subscriptions() {
       const { data } = await api.get('/refunds/current')
       if (data && data.active === false) {
         setCurrentRefund(null)
+        setRefundTrackerDismissed(false)
         return null
       }
       setCurrentRefund(data)
+      const terminal = data?.status === 'Completed' || data?.status === 'Rejected'
+      if (!terminal) {
+        setRefundTrackerDismissed(false)
+      } else if (data?.refundId) {
+        const dismissed = sessionStorage.getItem(`hideRefundTracker_${data.refundId}`) === '1'
+        setRefundTrackerDismissed(dismissed)
+      }
       return data
     } catch (err) {
       console.error('Failed to load refund status', err)
+      return null
+    }
+  }, [])
+
+  const fetchCurrentUpgrade = useCallback(async () => {
+    try {
+      const { data } = await api.get('/upgrades/current')
+      if (data && data.active === false) {
+        setCurrentUpgrade(null)
+        setUpgradeTrackerDismissed(false)
+        return null
+      }
+      setCurrentUpgrade(data)
+      const terminal = data?.status === 'Completed' || data?.status === 'Rejected'
+      if (!terminal) {
+        setUpgradeTrackerDismissed(false)
+      } else if (data?.id) {
+        const dismissed = sessionStorage.getItem(`hideUpgradeTracker_${data.id}`) === '1'
+        setUpgradeTrackerDismissed(dismissed)
+      }
+      return data
+    } catch (err) {
+      console.error('Failed to load upgrade status', err)
       return null
     }
   }, [])
@@ -159,9 +200,10 @@ export default function Subscriptions() {
       if (!cancelled) setSubscriptionResolved(true)
     })
     fetchCurrentRefund()
+    fetchCurrentUpgrade()
 
     return () => { cancelled = true }
-  }, [fetchCurrentSubscription, fetchCurrentRefund, paymentResult])
+  }, [fetchCurrentSubscription, fetchCurrentRefund, fetchCurrentUpgrade, paymentResult])
 
   useEffect(() => {
     if (plans.length === 0) return
@@ -192,6 +234,17 @@ export default function Subscriptions() {
   }, [currentRefund, fetchCurrentRefund])
 
   useEffect(() => {
+    const isTerminal = currentUpgrade && (currentUpgrade.status === 'Completed' || currentUpgrade.status === 'Rejected')
+    if (!currentUpgrade || isTerminal) return undefined
+
+    const interval = setInterval(() => {
+      fetchCurrentUpgrade()
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [currentUpgrade, fetchCurrentUpgrade])
+
+  useEffect(() => {
     if (currentRefund?.status === 'Completed') {
       fetchCurrentSubscription().then((subscription) => {
         if (subscription && subscription.active === false) {
@@ -201,6 +254,18 @@ export default function Subscriptions() {
       })
     }
   }, [currentRefund?.status, fetchCurrentSubscription])
+
+  useEffect(() => {
+    if (currentUpgrade?.status === 'Completed') {
+      fetchCurrentSubscription().then((subscription) => {
+        if (subscription && subscription.active !== false) {
+          setCurrentSubscription(subscription)
+          setShowSubscriptionBanner(true)
+        }
+      })
+      refreshUserRef.current?.()
+    }
+  }, [currentUpgrade?.status, fetchCurrentSubscription])
 
   useEffect(() => {
     if (paymentResult !== 'success' || !sessionId) return
@@ -221,6 +286,7 @@ export default function Subscriptions() {
           } catch {
             // token balance will sync on next /users/me refresh
           }
+          await fetchCurrentUpgrade()
           if (data.receipt) {
             setReceiptModal({ open: true, data: data.receipt })
           } else {
@@ -415,8 +481,102 @@ export default function Subscriptions() {
   const closeCheckoutModal = () => setIsModalOpen(false)
 
   const hasActiveRefund = currentRefund && currentRefund.status !== 'Completed' && currentRefund.status !== 'Rejected'
+  const hasActiveUpgrade = currentUpgrade && currentUpgrade.status !== 'Completed' && currentUpgrade.status !== 'Rejected'
   const hasActiveSubscription = !!currentSubscription
-  const showRefundTracker = currentRefund && currentRefund.refundId
+  const showRefundTracker = currentRefund && currentRefund.refundId && !refundTrackerDismissed
+  const showUpgradeTracker = currentUpgrade && currentUpgrade.id && !upgradeTrackerDismissed
+
+  const dismissRefundTracker = () => {
+    if (currentRefund?.refundId) {
+      sessionStorage.setItem(`hideRefundTracker_${currentRefund.refundId}`, '1')
+    }
+    setRefundTrackerDismissed(true)
+  }
+
+  const dismissUpgradeTracker = () => {
+    if (currentUpgrade?.id) {
+      sessionStorage.setItem(`hideUpgradeTracker_${currentUpgrade.id}`, '1')
+    }
+    setUpgradeTrackerDismissed(true)
+  }
+
+  const openUpgradeModal = async () => {
+    if (hasActiveRefund) {
+      setPaymentBanner({
+        type: 'warning',
+        title: 'Refund In Progress',
+        message: 'You cannot request a plan upgrade while a refund request is active.',
+      })
+      return
+    }
+    if (hasActiveUpgrade) {
+      setPaymentBanner({
+        type: 'info',
+        title: 'Upgrade In Progress',
+        message: 'You already have an active upgrade request. Track its status below.',
+      })
+      return
+    }
+
+    setUpgradeModalError(null)
+    setUpgradeLoading(true)
+    try {
+      const { data } = await api.get('/upgrades/eligible-plans')
+      setEligibleUpgradePlans(data || [])
+      if (!data || data.length === 0) {
+        setUpgradeModalError('No higher-token plans are available for your current balance.')
+      }
+      setUpgradeModalOpen(true)
+    } catch (err) {
+      setPaymentBanner({
+        type: 'error',
+        title: 'Unable to Load Plans',
+        message: err.response?.data?.message || 'Could not load upgrade plans.',
+      })
+    } finally {
+      setUpgradeLoading(false)
+    }
+  }
+
+  const handleUpgradeSubmit = async ({ upgradePlanId, reason }) => {
+    setUpgradeLoading(true)
+    setUpgradeModalError(null)
+    try {
+      const { data } = await api.post('/upgrades', { upgradePlanId, reason })
+      setCurrentUpgrade(data)
+      setUpgradeModalOpen(false)
+    } catch (err) {
+      setUpgradeModalError(err.response?.data?.message || 'Unable to submit upgrade request.')
+    } finally {
+      setUpgradeLoading(false)
+    }
+  }
+
+  const handleUpgradeCheckout = async () => {
+    if (!currentUpgrade?.id) return
+    setUpgradeCheckoutLoading(true)
+    setPaymentBanner(null)
+    try {
+      const { data } = await api.post(`/upgrades/${currentUpgrade.id}/checkout`)
+      if (data?.sessionUrl) {
+        window.location.href = data.sessionUrl
+        return
+      }
+      setPaymentBanner({
+        type: 'error',
+        title: 'Checkout Error',
+        message: data?.message || 'Unable to start upgrade checkout.',
+      })
+    } catch (err) {
+      setPaymentBanner({
+        type: 'error',
+        title: 'Checkout Error',
+        message: err.response?.data?.message || 'Unable to start upgrade checkout.',
+      })
+    } finally {
+      setUpgradeCheckoutLoading(false)
+    }
+  }
 
   const handleDiscontinueSubmit = async (reason) => {
     setRefundLoading(true)
@@ -528,12 +688,22 @@ export default function Subscriptions() {
                     type="button"
                     className="btn-subscription-discontinue"
                     onClick={() => setDiscontinueModalOpen(true)}
-                    disabled={hasActiveRefund}
+                    disabled={hasActiveRefund || hasActiveUpgrade}
                   >
                     Discontinue Plan
                   </button>
-                  <button type="button" className="btn-subscription-upgrade" disabled title="Upgrade is unavailable while your current plan is active">
-                    Upgrade
+                  <button
+                    type="button"
+                    className="btn-subscription-upgrade"
+                    onClick={openUpgradeModal}
+                    disabled={hasActiveRefund || hasActiveUpgrade || upgradeLoading}
+                    title={hasActiveRefund
+                      ? 'Upgrade unavailable while a refund is active'
+                      : hasActiveUpgrade
+                        ? 'An upgrade request is already in progress'
+                        : 'Request a plan upgrade'}
+                  >
+                    {upgradeLoading ? 'Loading...' : 'Upgrade'}
                   </button>
                 </div>
               </section>
@@ -544,6 +714,16 @@ export default function Subscriptions() {
                 refund={currentRefund}
                 onScheduleSlot={() => setScheduleModalOpen(true)}
                 onProvideBankDetails={() => setBankModalOpen(true)}
+                onDismiss={dismissRefundTracker}
+              />
+            )}
+
+            {showUpgradeTracker && (
+              <UpgradeTracker
+                upgrade={currentUpgrade}
+                onCheckout={handleUpgradeCheckout}
+                checkoutLoading={upgradeCheckoutLoading}
+                onDismiss={dismissUpgradeTracker}
               />
             )}
 
@@ -752,7 +932,16 @@ export default function Subscriptions() {
           onSubmit={handleBankDetailsSubmit}
           loading={refundLoading}
         />
-      </div>
+
+        <UpgradeRequestModal
+          open={upgradeModalOpen}
+          onClose={() => setUpgradeModalOpen(false)}
+          onSubmit={handleUpgradeSubmit}
+          plans={eligibleUpgradePlans}
+          loading={upgradeLoading}
+          error={upgradeModalError}
+        />
+      </div>
     <SiteFooter />
     </>
   )
