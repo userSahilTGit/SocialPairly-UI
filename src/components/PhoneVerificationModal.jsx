@@ -24,7 +24,8 @@ const CARD_STYLE = {
   maxWidth: 440,
   padding: '28px 28px 24px',
   borderRadius: 16,
-  background: '#fff',
+  background: 'var(--card)',
+  color: 'var(--text)',
   boxShadow: '0 24px 48px rgba(48, 28, 120, 0.28)',
 }
 

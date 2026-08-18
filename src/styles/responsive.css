@@ -1,0 +1,679 @@
+/* =============================================================================
+   Device responsiveness — phones, tablets, iPhones.
+   Desktop styles stay unchanged: every rule lives inside a max-width query
+   (or only adds safe-area / overflow guards that do not alter desktop layout).
+   ============================================================================= */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+iframe {
+  max-width: 100%;
+}
+
+/* ---------- Tablets (iPad portrait / Android tablets) ---------- */
+@media (max-width: 1024px) {
+  .admin-moderation-stats,
+  .stats-grid,
+  .events-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-dashboard-header,
+  .admin-events-header,
+  .admin-plans-header,
+  .admin-finance-header,
+  .admin-questions-header,
+  .admin-moderation-header,
+  .ms-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .admin-dashboard-header h1,
+  .admin-events-header h1,
+  .admin-plans-header h1,
+  .admin-finance-header h1,
+  .admin-questions-header h1 {
+    font-size: 26px;
+  }
+
+  .event-workspace-banner {
+    flex-wrap: wrap;
+  }
+
+  .ms-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .ms-preview {
+    position: static;
+  }
+
+  .ow-body {
+    grid-template-columns: 1fr;
+  }
+
+  .events-manage-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .events-filter-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- Small tablets / large phones ---------- */
+@media (max-width: 900px) {
+  .home-events-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .home-hero-title {
+    font-size: 24px;
+  }
+
+  .event-workspace-banner {
+    flex-direction: column;
+    padding: 18px 16px;
+  }
+
+  .event-workspace-tokens {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .event-workspace-banner h1 {
+    font-size: 20px;
+  }
+
+  .event-profile-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .event-reactions-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ow-page {
+    padding: 12px;
+  }
+
+  .ow-page-title {
+    font-size: 18px;
+    padding: 20px 16px 4px;
+  }
+
+  .auth-main-grid {
+    grid-template-columns: 1fr;
+    padding: 1rem 0.85rem 1.5rem;
+  }
+
+  .ob-topbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 56px;
+    gap: 0.5rem;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .ob-topbar-right {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 0.4rem;
+  }
+
+  .ob-cancel-link {
+    font-size: 0.7rem;
+  }
+}
+
+/* ---------- Phones (Android + iPhone) ---------- */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  button,
+  [role="button"],
+  .home-btn,
+  .nav-menu-toggle,
+  .profile-icon-btn,
+  .theme-toggle {
+    touch-action: manipulation;
+  }
+
+  .user-home-container,
+  .event-workspace-container,
+  .admin-dashboard-container,
+  .admin-events-container,
+  .admin-questions-container,
+  .admin-plans-container,
+  .admin-finance-container,
+  .admin-moderation-container {
+    padding: 16px 14px 24px;
+  }
+
+  .sp-profile-page,
+  .ms-page {
+    padding: 1rem 0.85rem 2.5rem;
+  }
+
+  .main-content {
+    padding: 1.25rem 0.85rem 0;
+  }
+
+  .user-home-page .home-hero-card {
+    padding: 18px 16px;
+  }
+
+  .home-hero-top,
+  .user-home-page .home-phone-banner,
+  .home-event-tile {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .home-token-balance {
+    width: 100%;
+    text-align: left;
+    min-width: 0;
+  }
+
+  .home-event-action,
+  .user-home-page .home-phone-banner-actions .home-btn,
+  .user-home-page .home-progress-actions .home-btn {
+    width: 100%;
+    justify-content: center;
+    white-space: normal;
+  }
+
+  .user-home-page .home-phone-banner-actions {
+    width: 100%;
+  }
+
+  .home-event-title {
+    font-size: 16px;
+  }
+
+  .sp-profile-actions,
+  .sp-btn-outline,
+  .sp-btn-brand {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .sp-profile-phone-card {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .sp-profile-tabs {
+    gap: 1rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .sp-profile-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sp-card,
+  .sp-profile-strength {
+    padding: 1.1rem;
+    border-radius: 1.15rem;
+  }
+
+  .sp-card-head,
+  .sp-section-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sp-info-grid,
+  .sp-info-grid.two,
+  .sp-lifestyle-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ms-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ms-header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .ms-stepper {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ms-slots-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ms-card {
+    padding: 1.15rem;
+  }
+
+  .auth-topbar {
+    padding: 0.9rem 0.85rem;
+    gap: 0.5rem;
+  }
+
+  .auth-top-logo {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .auth-top-brand-text strong {
+    font-size: 1.15rem;
+  }
+
+  .auth-top-brand-text span {
+    font-size: 0.62rem;
+  }
+
+  .auth-privacy-pill {
+    display: inline-flex !important;
+    padding: 0.45rem 0.55rem;
+  }
+
+  .auth-card-design,
+  .auth-signin-card.auth-card-design,
+  .auth-glass-card.auth-card-design {
+    padding: 1.15rem !important;
+    border-radius: 1.15rem !important;
+  }
+
+  .auth-page-footer {
+    text-align: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .admin-dashboard-header,
+  .admin-events-header,
+  .admin-plans-header,
+  .admin-finance-header,
+  .admin-moderation-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-dashboard-header h1,
+  .admin-events-header h1,
+  .admin-plans-header h1,
+  .admin-finance-header h1,
+  .admin-questions-header h1 {
+    font-size: 22px;
+  }
+
+  .btn-dashboard-action,
+  .btn-add-plan,
+  .btn-refresh-payments,
+  .btn-refresh-subscriptions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .dashboard-charts-grid,
+  .events-info-grid,
+  .questions-form-row,
+  .form-grid-2,
+  .events-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .finance-tabs,
+  .events-tabs,
+  .pricing-tabs {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+  }
+
+  .finance-tab,
+  .events-tab,
+  .plan-tab {
+    flex-shrink: 0;
+  }
+
+  table {
+    font-size: 13px;
+  }
+
+  .plans-table-wrapper,
+  .finance-table-wrapper,
+  .subscribed-users-table-wrapper,
+  .questions-table,
+  .dashboard-overview-table,
+  .events-table-wrapper {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sticky-bottom-bar {
+    padding: 0.75rem 0.85rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .bottom-bar-inner .btn,
+  .bottom-bar-inner button,
+  .modal-button,
+  .modal-actions button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .current-subscription-banner {
+    flex-direction: column;
+    text-align: left;
+    align-items: stretch;
+  }
+
+  .current-subscription-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .current-subscription-actions button,
+  .btn-subscription-upgrade,
+  .btn-subscription-discontinue {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .event-profile-nav-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+
+  .event-profile-nav-bar button {
+    flex: 1 1 calc(50% - 8px);
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .gallery-nav.left { left: 12px; }
+  .gallery-nav.right { right: 12px; }
+
+  .phone-verify-overlay,
+  .auth-modal-overlay,
+  .plan-modal-overlay,
+  .sp-preview-overlay,
+  .ob-preview-overlay,
+  .event-invite-overlay,
+  .modal-overlay,
+  .modern-modal-overlay {
+    padding: 12px !important;
+    align-items: flex-end !important;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .phone-verify-modal,
+  .auth-privacy-modal,
+  .modal,
+  .delete-confirm-card,
+  .plan-modal-card,
+  .event-invite-modal,
+  .sp-preview-modal,
+  .ob-preview-modal,
+  .modal-container,
+  .receipt-modal-container,
+  .refund-modal-container,
+  .admin-refund-modal,
+  .prompt-modal-card {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    max-height: min(92dvh, 920px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .event-invite-actions,
+  .delete-buttons-row,
+  .modal-actions,
+  .receipt-modal-actions,
+  .refund-modal-footer {
+    flex-direction: column-reverse;
+  }
+
+  .event-invite-decline,
+  .event-invite-accept,
+  .btn-delete-cancel,
+  .btn-delete-confirm {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .ow-content-footer {
+    position: sticky;
+    bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .ow-continue-btn,
+  .ow-save-exit {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .site-footer-inner,
+  .site-footer-bottom {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .coming-soon-page {
+    padding: 16px 12px;
+  }
+
+  .coming-soon-page .coming-soon-card,
+  .coming-soon-card {
+    padding: 48px 16px;
+  }
+
+  .profile-display-value {
+    max-width: 100%;
+    text-align: left;
+  }
+
+  .biometric-modal {
+    width: 100%;
+    max-width: 100%;
+    padding: 1rem;
+  }
+
+  .biometric-scanner-frame {
+    width: min(72vw, 260px);
+    height: min(72vw, 260px);
+  }
+
+  .ob-row-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ob-row-actions input,
+  .ob-row-actions button {
+    width: 100%;
+  }
+}
+
+/* ---------- Compact phones (iPhone SE, small Android) ---------- */
+@media (max-width: 640px) {
+  .auth-privacy-pill span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .admin-moderation-stats,
+  .stats-grid,
+  .events-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .events-filter-panel,
+  .events-candidates-grid,
+  .events-perks-checkboxes {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-moderation-search {
+    max-width: none;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .admin-moderation-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-moderation-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pricing-header h1 {
+    font-size: 1.85rem;
+  }
+
+  .pricing-tabs {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .plan-tab {
+    flex: 1;
+    text-align: center;
+  }
+
+  .plans-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-title,
+  .summary-duration {
+    white-space: normal;
+  }
+
+  .ob-save-btn span {
+    display: none;
+  }
+
+  .home-hero-meta,
+  .sp-profile-meta,
+  .sp-profile-name-row h1 {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
+
+/* ---------- Small iPhones ---------- */
+@media (max-width: 480px) {
+  .navbar .nav-brand-name {
+    max-width: 42vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .auth-hero-headline {
+    font-size: 1.65rem;
+  }
+
+  .auth-benefit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-top-brand-text span {
+    display: none;
+  }
+
+  .site-footer-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .sp-profile-avatar {
+    width: 6.5rem;
+    height: 6.5rem;
+  }
+
+  .ms-slots-grid,
+  .admin-moderation-grid,
+  .sp-gallery {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem;
+  }
+
+  .event-reactions-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .home-hero-title {
+    font-size: 22px;
+  }
+
+  .user-home-page .home-hero-subtitle {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 390px) {
+  .admin-moderation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .navbar .nav-brand-name {
+    max-width: 36vw;
+  }
+
+  .theme-toggle-label {
+    display: none;
+  }
+}
+
+/* Landscape phones: keep content usable under the notch */
+@media (max-height: 500px) and (orientation: landscape) {
+  .navbar .nav-links {
+    top: calc(52px + env(safe-area-inset-top, 0px));
+    max-height: calc(100dvh - 52px - env(safe-area-inset-top, 0px));
+  }
+
+  .phone-verify-overlay,
+  .plan-modal-overlay,
+  .modal-overlay,
+  .event-invite-overlay {
+    align-items: center !important;
+  }
+
+  .phone-verify-modal,
+  .plan-modal-card,
+  .event-invite-modal,
+  .modal-container {
+    max-height: 88dvh;
+  }
+}

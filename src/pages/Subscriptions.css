@@ -1383,4 +1383,50 @@ a:focus-visible {
   .refund-form-row {
     grid-template-columns: 1fr;
   }
+
+  .pricing-header h1 {
+    font-size: 1.85rem;
+  }
+
+  .pricing-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .plan-card {
+    padding: 1.25rem;
+  }
+
+  .sticky-bottom-bar {
+    padding: 0.75rem 0.85rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .bottom-bar-inner {
+    gap: 0.75rem;
+  }
+
+  .summary-title,
+  .summary-duration {
+    white-space: normal;
+  }
+
+  .modal-container,
+  .receipt-modal-container,
+  .refund-modal-container {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    max-height: min(92dvh, 920px);
+    overflow-y: auto;
+  }
+
+  .modal-actions,
+  .receipt-modal-actions,
+  .refund-modal-footer {
+    flex-direction: column-reverse;
+  }
+
+  .modal-button {
+    width: 100%;
+    justify-content: center;
+  }
 }

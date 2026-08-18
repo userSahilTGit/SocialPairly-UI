@@ -288,4 +288,19 @@
     .questions-form-row {
         grid-template-columns: 1fr;
     }
+
+    .admin-questions-header h1 {
+        font-size: 22px;
+    }
+
+    .questions-card {
+        padding: 16px;
+    }
+
+    .questions-table {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
 }

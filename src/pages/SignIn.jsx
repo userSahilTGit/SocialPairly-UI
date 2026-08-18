@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Mail, Smartphone, Lock as LockIcon, ArrowRight, Shield } from 'lucide-react'
 import { GoogleLogin } from '@react-oauth/google'
 import { useAuth, PHONE_VERIFY_DISMISS_KEY, IDENTITY_CONTINUE_LATER_KEY } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 import { postAuthPath } from '../utils/user'
 import api from '../api/axios'
 import AuthHeroPanel from '../components/AuthHeroPanel'
@@ -21,6 +22,7 @@ function authErrorMessage(err, fallback) {
 
 export default function SignIn() {
   const { login, persist, refreshUser } = useAuth()
+  const { isDark } = useTheme()
   const navigate = useNavigate()
 
   const [authTab, setAuthTab] = useState('email')
@@ -392,7 +394,7 @@ export default function SignIn() {
                       <GoogleLogin
                         onSuccess={handleGoogleSuccess}
                         onError={() => setError('Google authentication failed')}
-                        theme="outline"
+                        theme={isDark ? 'filled_black' : 'outline'}
                         size="large"
                         shape="rectangular"
                         text="continue_with"

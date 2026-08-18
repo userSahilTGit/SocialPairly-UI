@@ -312,8 +312,43 @@
 }
 
 @media (max-width: 800px) {
+    .event-workspace-banner {
+        flex-direction: column;
+        padding: 18px 16px;
+    }
+
+    .event-workspace-tokens {
+        width: 100%;
+        justify-content: space-between;
+        flex-wrap: wrap;
+    }
+
+    .event-workspace-banner h1 {
+        font-size: 20px;
+        overflow-wrap: anywhere;
+    }
+
+    .event-profile-gallery {
+        padding: 16px;
+    }
+
+    .gallery-nav.left { left: 16px; }
+    .gallery-nav.right { right: 16px; }
+
     .event-reactions-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .event-profile-nav-bar {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 12px 14px;
+    }
+
+    .event-profile-nav-bar button {
+        flex: 1 1 calc(50% - 8px);
+        justify-content: center;
+        min-height: 44px;
     }
 }
 
