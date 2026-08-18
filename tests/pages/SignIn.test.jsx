@@ -19,6 +19,10 @@ vi.mock('@/context/AuthContext', () => ({
   IDENTITY_CONTINUE_LATER_KEY: 'sp_identity_continue_later',
 }))
 
+vi.mock('@/context/ThemeContext', () => ({
+  useTheme: () => ({ isDark: false, theme: 'light', toggleTheme: vi.fn(), setTheme: vi.fn() }),
+}))
+
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
   return {

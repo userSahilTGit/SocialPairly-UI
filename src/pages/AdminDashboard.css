@@ -292,11 +292,21 @@
         align-items: stretch;
     }
 
+    .admin-dashboard-header h1 {
+        font-size: 22px;
+    }
+
     .btn-dashboard-action {
-        align-self: flex-start;
+        align-self: stretch;
+        width: 100%;
+        justify-content: center;
     }
 
     .dashboard-charts-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .stats-grid {
         grid-template-columns: 1fr;
     }
 }

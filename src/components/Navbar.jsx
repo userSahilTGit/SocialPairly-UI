@@ -39,6 +39,27 @@ export default function Navbar() {
         return () => document.body.classList.remove('nav-menu-open')
     }, [menuOpen])
 
+    useEffect(() => {
+        const media = window.matchMedia('(min-width: 961px)')
+        const closeOnDesktop = (event) => {
+            if (event.matches) {
+                setMenuOpen(false)
+                setDropdownOpen(false)
+            }
+        }
+        media.addEventListener('change', closeOnDesktop)
+        return () => media.removeEventListener('change', closeOnDesktop)
+    }, [])
+
+    useEffect(() => {
+        if (!menuOpen) return
+        const onKeyDown = (event) => {
+            if (event.key === 'Escape') setMenuOpen(false)
+        }
+        document.addEventListener('keydown', onKeyDown)
+        return () => document.removeEventListener('keydown', onKeyDown)
+    }, [menuOpen])
+
     const handleLogout = () => {
         setDropdownOpen(false)
         logout()
@@ -82,6 +103,14 @@ export default function Navbar() {
 
     return (
         <>
+            {menuOpen && (
+                <button
+                    type="button"
+                    className="nav-backdrop"
+                    aria-label="Close menu"
+                    onClick={() => setMenuOpen(false)}
+                />
+            )}
             <nav className="navbar">
                 <NavLink to="/" className="brand">
                     <BrandMark size={36} className="nav-brand-logo" />
@@ -94,12 +123,13 @@ export default function Navbar() {
                         className="nav-menu-toggle"
                         aria-label={menuOpen ? 'Close menu' : 'Open menu'}
                         aria-expanded={menuOpen}
+                        aria-controls="primary-nav"
                         onClick={() => setMenuOpen((open) => !open)}
                     >
                         {menuOpen ? <X size={22} /> : <Menu size={22} />}
                     </button>
                 </div>
-                <div className={`nav-links ${menuOpen ? 'is-open' : ''}`}>
+                <div id="primary-nav" className={`nav-links ${menuOpen ? 'is-open' : ''}`}>
                     {user?.role !== 'ADMIN' && (
                         <NavLink to="/">Home</NavLink>
                     )}

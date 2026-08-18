@@ -169,3 +169,27 @@
     cursor: not-allowed;
     transform: none;
 }
+
+@media (max-width: 560px) {
+    .plan-modal-overlay {
+        padding: 12px;
+        padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        align-items: flex-end;
+    }
+
+    .delete-confirm-card {
+        max-width: 100%;
+        padding: 24px 18px;
+        border-radius: 16px;
+    }
+
+    .delete-buttons-row {
+        flex-direction: column-reverse;
+    }
+
+    .btn-delete-cancel,
+    .btn-delete-confirm {
+        width: 100%;
+        min-height: 44px;
+    }
+}

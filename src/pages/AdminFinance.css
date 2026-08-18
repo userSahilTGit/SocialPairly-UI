@@ -498,12 +498,30 @@
         align-items: stretch;
     }
 
+    .admin-finance-header h1 {
+        font-size: 22px;
+    }
+
     .btn-refresh-payments {
-        align-self: flex-end;
+        align-self: stretch;
+        width: 100%;
+        justify-content: center;
+    }
+
+    .finance-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+    }
+
+    .finance-tab {
+        flex-shrink: 0;
+        white-space: nowrap;
     }
 
     .finance-table-wrapper {
         overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .finance-table {

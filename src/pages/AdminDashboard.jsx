@@ -3,23 +3,23 @@ import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import SiteFooter from '../components/SiteFooter'
 import api from '../api/axios'
+import { useTheme } from '../context/ThemeContext'
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, Legend, CartesianGrid,
 } from 'recharts'
 import './AdminDashboard.css'
 
-const CHART_PURPLE = '#7c3aed'
+const CHART_PURPLE = '#d946ef'
 const CHART_PINK = '#ec4899'
-const CHART_VIOLET = '#8b5cf6'
-const CHART_INDIGO = '#6366f1'
-const CHART_GREEN = '#16a34a'
+const CHART_VIOLET = '#a855f7'
 const CHART_RED = '#dc2626'
 
 const PIE_COLORS = [CHART_PURPLE, CHART_PINK]
 const ROLE_COLORS = [CHART_VIOLET, CHART_RED]
 
 export default function AdminDashboard() {
+    const { isDark } = useTheme()
     const [stats, setStats] = useState(null)
     const [users, setUsers] = useState([])
     const [loading, setLoading] = useState(true)
@@ -42,6 +42,12 @@ export default function AdminDashboard() {
         }
         load()
     }, [])
+
+    const chartGrid = isDark ? '#1f293d' : '#e2e8f0'
+    const chartTick = isDark ? '#94a3b8' : '#64748b'
+    const tooltipStyle = isDark
+        ? { background: '#111726', border: '1px solid #1f293d', color: '#f1f5f9' }
+        : undefined
 
     if (loading) {
         return (
@@ -97,10 +103,10 @@ export default function AdminDashboard() {
                             <h3>Registrations (last 7 days)</h3>
                             <ResponsiveContainer width="100%" height={260}>
                                 <BarChart data={stats.registrationsByDay}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                    <XAxis dataKey="label" fontSize={12} tick={{ fill: '#64748b' }} />
-                                    <YAxis allowDecimals={false} fontSize={12} tick={{ fill: '#64748b' }} />
-                                    <Tooltip />
+                                    <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
+                                    <XAxis dataKey="label" fontSize={12} tick={{ fill: chartTick }} />
+                                    <YAxis allowDecimals={false} fontSize={12} tick={{ fill: chartTick }} />
+                                    <Tooltip contentStyle={tooltipStyle} />
                                     <Bar dataKey="count" fill={CHART_PURPLE} radius={[4, 4, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
@@ -116,7 +122,7 @@ export default function AdminDashboard() {
                                         ))}
                                     </Pie>
                                     <Legend />
-                                    <Tooltip />
+                                    <Tooltip contentStyle={tooltipStyle} />
                                 </PieChart>
                             </ResponsiveContainer>
                         </div>
@@ -131,7 +137,7 @@ export default function AdminDashboard() {
                                         ))}
                                     </Pie>
                                     <Legend />
-                                    <Tooltip />
+                                    <Tooltip contentStyle={tooltipStyle} />
                                 </PieChart>
                             </ResponsiveContainer>
                         </div>
@@ -158,10 +164,10 @@ export default function AdminDashboard() {
                                         <h3>{question}</h3>
                                         <ResponsiveContainer width="100%" height={220}>
                                             <BarChart data={dist}>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                                <XAxis dataKey="label" fontSize={11} tick={{ fill: '#64748b' }} />
-                                                <YAxis allowDecimals={false} fontSize={12} tick={{ fill: '#64748b' }} />
-                                                <Tooltip />
+                                                <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
+                                                <XAxis dataKey="label" fontSize={11} tick={{ fill: chartTick }} />
+                                                <YAxis allowDecimals={false} fontSize={12} tick={{ fill: chartTick }} />
+                                                <Tooltip contentStyle={tooltipStyle} />
                                                 <Bar dataKey="count" fill={CHART_VIOLET} radius={[4, 4, 0, 0]} />
                                             </BarChart>
                                         </ResponsiveContainer>

@@ -19,6 +19,7 @@ function readStoredTheme() {
 function applyTheme(theme) {
   const root = document.documentElement
   root.setAttribute('data-theme', theme)
+  root.classList.toggle('dark', theme === 'dark')
   root.style.colorScheme = theme
 }
 

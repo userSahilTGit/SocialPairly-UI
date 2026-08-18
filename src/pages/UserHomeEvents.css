@@ -404,6 +404,8 @@
 
     .home-event-action {
         width: 100%;
+        white-space: normal;
+        text-align: center;
     }
 
     .home-hero-top {
@@ -413,6 +415,7 @@
     .home-token-balance {
         width: 100%;
         text-align: left;
+        min-width: 0;
     }
 
     .user-home-page .home-phone-banner-actions {
@@ -422,5 +425,27 @@
     .user-home-page .home-phone-banner-actions .home-btn {
         flex: 1;
         min-width: 120px;
+    }
+
+    .home-events-head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .user-home-page .home-hero-title {
+        font-size: 22px;
+        overflow-wrap: anywhere;
+    }
+
+    .user-home-page .home-hero-card {
+        padding: 18px 16px;
+    }
+
+    .user-home-page .home-phone-banner,
+    .user-home-page .profile-progress-card,
+    .home-event-tile {
+        padding-left: 16px;
+        padding-right: 16px;
     }
 }

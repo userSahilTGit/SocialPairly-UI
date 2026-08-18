@@ -6,7 +6,6 @@ import { getMediaUrl } from '../utils/mediaUrl'
 import {
     Bookmark,
     Calendar,
-    CalendarPlus,
     Check,
     ChevronDown,
     ClipboardList,
@@ -130,11 +129,11 @@ export default function AdminEvents() {
         setStats(res.data)
     }, [])
 
-    const loadEvents = useCallback(async (filter = listFilter) => {
+    const loadEvents = useCallback(async (filter = 'all') => {
         const res = await api.get('/admin/events', { params: { status: filter } })
         setEvents(res.data)
         return res.data
-    }, [listFilter])
+    }, [])
 
     const loadEventDetail = useCallback(async (id) => {
         const res = await api.get(`/admin/events/${id}`)
@@ -185,7 +184,10 @@ export default function AdminEvents() {
             }
         }
         init()
-    }, [loadStats, loadEvents])
+        // Load dashboard once on mount. Filter changes are handled separately so
+        // "All / Published / Drafts" is not overwritten by a full reload.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     useEffect(() => {
         if (selectedEventId) {
@@ -194,16 +196,29 @@ export default function AdminEvents() {
     }, [selectedEventId, loadEventDetail])
 
     useEffect(() => {
-        loadEvents(listFilter).catch(() => {})
-    }, [listFilter, loadEvents])
-
-    useEffect(() => {
         if (activeTab === 'builder') {
             loadCandidates()
         }
     }, [activeTab, loadCandidates])
 
-    const filteredEventsCount = useMemo(() => totalEventCount, [totalEventCount])
+    const visibleEvents = useMemo(() => {
+        if (listFilter === 'all') return events
+        return events.filter((ev) => String(ev.status).toLowerCase() === listFilter)
+    }, [events, listFilter])
+
+    useEffect(() => {
+        if (visibleEvents.length === 0) {
+            if (selectedEventId != null) {
+                setSelectedEventId(null)
+                setEventDetail(null)
+            }
+            return
+        }
+        const stillVisible = visibleEvents.some((ev) => ev.id === selectedEventId)
+        if (!stillVisible) {
+            setSelectedEventId(visibleEvents[0].id)
+        }
+    }, [visibleEvents, selectedEventId])
 
     const openCreateBuilder = () => {
         setBuilderMode('create')
@@ -305,7 +320,7 @@ export default function AdminEvents() {
     }
 
     const refreshAfterSave = async (eventId) => {
-        await Promise.all([loadStats(), loadEvents(listFilter)])
+        await Promise.all([loadStats(), loadEvents('all')])
         const allRes = await api.get('/admin/events', { params: { status: 'all' } })
         setTotalEventCount(allRes.data.length)
         setSelectedEventId(eventId)
@@ -372,7 +387,7 @@ export default function AdminEvents() {
             setMessage({ type: 'success', text: 'Draft event deleted' })
             setSelectedEventId(null)
             setEventDetail(null)
-            await Promise.all([loadStats(), loadEvents(listFilter)])
+            await Promise.all([loadStats(), loadEvents('all')])
             const allRes = await api.get('/admin/events', { params: { status: 'all' } })
             setTotalEventCount(allRes.data.length)
             setActiveTab('manage')
@@ -451,10 +466,17 @@ export default function AdminEvents() {
                             <h1>Admin Dashboard &amp; Event Builder</h1>
                             <p>Create groups, organize matched events, assign members, and manage invitations.</p>
                         </div>
-                        <button type="button" className="btn-dashboard-action" onClick={openCreateBuilder}>
-                            <Plus size={16} style={{ marginRight: 6 }} />
-                            Create New Event
-                        </button>
+                        {activeTab === 'manage' ? (
+                            <button type="button" className="btn-dashboard-action" onClick={openCreateBuilder}>
+                                <Plus size={16} style={{ marginRight: 6 }} />
+                                Create New Event
+                            </button>
+                        ) : (
+                            <button type="button" className="btn-events-cancel" onClick={() => setActiveTab('manage')}>
+                                <X size={16} style={{ marginRight: 6 }} />
+                                Back to Events
+                            </button>
+                        )}
                     </div>
 
                     {message.text && (
@@ -492,26 +514,6 @@ export default function AdminEvents() {
                         </div>
                     </div>
 
-                    <div className="events-tabs">
-                        <button
-                            type="button"
-                            className={`events-tab ${activeTab === 'manage' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('manage')}
-                        >
-                            <ClipboardList size={16} />
-                            Manage Events &amp; Groups
-                            <span className="events-tab-count">( {filteredEventsCount} )</span>
-                        </button>
-                        <button
-                            type="button"
-                            className={`events-tab ${activeTab === 'builder' ? 'active' : ''}`}
-                            onClick={() => activeTab !== 'builder' && openCreateBuilder()}
-                        >
-                            <CalendarPlus size={16} />
-                            Event Builder Studio
-                        </button>
-                    </div>
-
                     {activeTab === 'manage' && (
                         <div className="events-manage-layout">
                             <div className="events-sidebar">
@@ -532,10 +534,14 @@ export default function AdminEvents() {
                                     ))}
                                 </div>
                                 <div className="events-list">
-                                    {events.length === 0 && (
-                                        <div className="events-empty-state">No events yet. Create your first event.</div>
+                                    {visibleEvents.length === 0 && (
+                                        <div className="events-empty-state">
+                                            {listFilter === 'all'
+                                                ? 'No events yet. Create your first event.'
+                                                : `No ${listFilter === 'draft' ? 'draft' : 'published'} events.`}
+                                        </div>
                                     )}
-                                    {events.map((ev) => (
+                                    {visibleEvents.map((ev) => (
                                         <div
                                             key={ev.id}
                                             className={`events-list-item ${selectedEventId === ev.id ? 'selected' : ''}`}
@@ -1061,7 +1067,7 @@ export default function AdminEvents() {
                         </div>
                     )}
                 </div>
-            </div>
+            </div>
         <SiteFooter />
         </>
     )

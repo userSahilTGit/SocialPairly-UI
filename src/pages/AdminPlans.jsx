@@ -371,7 +371,7 @@ export default function AdminPlans() {
                         /* GRID VIEW CARDS (Matches Image 4) */
                         <div className="plans-cards-grid">
                             {filteredPlans.map((plan) => (
-                                <div className="plan-admin-card" key={plan.id}>
+                                <div className={`plan-admin-card${plan.isFeatured ? ' featured' : ''}`} key={plan.id}>
                                     <div className="card-top-header">
                                         <span className="plan-type-pill">{plan.planType}</span>
                                         <div className="plan-price-tag">${parseFloat(plan.amount || 0).toFixed(2)}</div>
@@ -807,7 +807,7 @@ export default function AdminPlans() {
                         </div>
                     </div>
                 </div>
-            )}
+            )}
         <SiteFooter />
         </>
     )
