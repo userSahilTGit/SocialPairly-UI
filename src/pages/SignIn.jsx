@@ -164,10 +164,13 @@ export default function SignIn() {
       const res = await api.post('/auth/forgot-password/send-otp', {
         identifier: forgotIdentifier,
       })
-      setForgotMessage(res.data?.message || 'OTP sent successfully')
+      setForgotMessage(res.data?.message || 'OTP sent successfully to your registered email or phone number')
       setForgotStep('otp')
     } catch (err) {
-      setForgotError(authErrorMessage(err, 'Failed to send OTP'))
+      setForgotError(authErrorMessage(
+        err,
+        'This is not your registered Email ID. Please try with your registered Email ID.'
+      ))
     } finally {
       setForgotLoading(false)
     }
