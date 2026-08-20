@@ -3537,11 +3537,17 @@ label.checkbox input {
   align-items: center;
   gap: 0.5rem;
 }
-.ob-acc-title-row h3 {
+.ob-acc-title-row h3,
+.ob-acc-title-row .ob-acc-title {
   margin: 0;
   font-size: 0.9rem;
   font-weight: 800;
   color: #0f172a;
+}
+.ob-acc-heading {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
 }
 .ob-acc-copy p {
   margin: 0.2rem 0 0;
@@ -3758,6 +3764,49 @@ label.checkbox input {
   animation: obSpin 0.8s linear infinite;
 }
 @keyframes obSpin { to { transform: rotate(360deg); } }
+
+/* US-026 — Identity accessibility helpers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.ob-required-marker {
+  color: #b91c1c;
+  font-weight: 700;
+}
+.ob-field-error {
+  display: block;
+  margin-top: 0.35rem;
+  color: #b91c1c;
+  font-size: 0.75rem;
+  font-style: normal;
+}
+.ob-shell :focus-visible,
+.ob-state-screen :focus-visible,
+.ob-accordion-header:focus-visible,
+.ob-field input:focus-visible,
+.ob-field select:focus-visible,
+.ob-field textarea:focus-visible,
+.ob-continue-btn:focus-visible,
+.ob-back-btn:focus-visible,
+.ob-save-btn:focus-visible,
+.ob-cancel-link:focus-visible,
+.ob-chip-btn:focus-visible,
+.ob-jump-btn:focus-visible,
+.ob-step:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}
+.ob-form-error:focus {
+  outline: none;
+}
 
 .ob-private-banner {
   margin: 0 0 0.85rem;
@@ -6368,6 +6417,7 @@ button.ob-status-chip { cursor: pointer; }
 [data-theme="dark"] .ob-accordion:hover { border-color: #475569; }
 [data-theme="dark"] .ob-accordion-header:hover { background: rgba(30,41,59,0.7); }
 [data-theme="dark"] .ob-acc-title-row h3,
+[data-theme="dark"] .ob-acc-title-row .ob-acc-title,
 [data-theme="dark"] .ob-banner h1 { color: var(--text); }
 [data-theme="dark"] .ob-acc-copy p,
 [data-theme="dark"] .ob-banner p { color: var(--muted); }
