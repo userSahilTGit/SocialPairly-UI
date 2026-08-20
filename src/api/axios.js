@@ -1,5 +1,18 @@
 import axios from 'axios'
 
+function sanitizeAxiosError(error) {
+    if (error?.config) {
+        if (error.config.headers?.Authorization) {
+            delete error.config.headers.Authorization
+        }
+        const data = error.config.data
+        if (typeof data === 'string' && /password|token|otp|secret/i.test(data)) {
+            error.config.data = '[redacted]'
+        }
+    }
+    return error
+}
+
 const api = axios.create({
     baseURL: '/api',
 })
@@ -26,7 +39,7 @@ api.interceptors.response.use(
                 window.location.href = '/signin'
             }
         }
-        return Promise.reject(error)
+        return Promise.reject(sanitizeAxiosError(error))
     }
 )
 

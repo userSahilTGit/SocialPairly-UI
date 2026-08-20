@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api/axios';
 import { getMediaUrl } from '../utils/mediaUrl';
+import { logClientError } from '../utils/safeLog';
 import Navbar from '../components/Navbar';
 import SiteFooter from '../components/SiteFooter';
 import { ShieldAlert, Search, X, CheckCircle2, Play, Clock, MessageSquare } from 'lucide-react';
@@ -27,7 +28,7 @@ export default function AdminMediaModeration() {
       const res = await api.get('/admin/media/all');
       setAllMedia(res.data || []);
     } catch (err) {
-      console.error('Failed to load media for moderation', err);
+      logClientError('Failed to load media for moderation', err);
       setError('Failed to load media for moderation.');
     } finally {
       setLoading(false);

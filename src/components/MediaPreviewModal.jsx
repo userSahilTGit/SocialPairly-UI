@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { getMediaUrl } from '../utils/mediaUrl';
+import { logClientError } from '../utils/safeLog';
 import { Eye, X } from 'lucide-react';
 
 export default function MediaPreviewModal({ userId, onClose }) {
@@ -15,7 +16,7 @@ export default function MediaPreviewModal({ userId, onClose }) {
         const res = await api.get(`/api/users/${userId}/media?mode=${viewMode}`);
         setPreviewMedia(res.data || []);
       } catch (err) {
-        console.error('Failed to load preview', err);
+        logClientError('Failed to load preview', err);
       } finally {
         setLoading(false);
       }

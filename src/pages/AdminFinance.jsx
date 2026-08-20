@@ -4,6 +4,7 @@ import SiteFooter from '../components/SiteFooter'
 import AdminRefundInspectionModal from '../components/AdminRefundInspectionModal'
 import AdminUpgradeInspectionModal from '../components/AdminUpgradeInspectionModal'
 import api from '../api/axios'
+import { logClientError } from '../utils/safeLog'
 import './AdminFinance.css'
 
 const PAGE_SIZE = 10
@@ -74,7 +75,7 @@ export default function AdminFinance() {
             const { data } = await api.get('/admin/payments')
             setPayments(data || [])
         } catch (err) {
-            console.error('Fetch payments error:', err)
+            logClientError('Fetch payments error:', err)
         }
     }, [])
 
@@ -83,7 +84,7 @@ export default function AdminFinance() {
             const { data } = await api.get('/admin/refunds')
             setRefunds(data || [])
         } catch (err) {
-            console.error('Fetch refunds error:', err)
+            logClientError('Fetch refunds error:', err)
         }
     }, [])
 
@@ -92,7 +93,7 @@ export default function AdminFinance() {
             const { data } = await api.get('/admin/upgrades')
             setUpgrades(data || [])
         } catch (err) {
-            console.error('Fetch upgrades error:', err)
+            logClientError('Fetch upgrades error:', err)
         }
     }, [])
 
@@ -322,7 +323,7 @@ export default function AdminFinance() {
         try {
             await navigator.clipboard.writeText(chargeId)
         } catch (err) {
-            console.error('Failed to copy charge ID', err)
+            logClientError('Failed to copy charge ID', err)
         }
     }
 

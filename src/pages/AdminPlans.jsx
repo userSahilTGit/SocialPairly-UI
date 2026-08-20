@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Navbar from '../components/Navbar'
 import SiteFooter from '../components/SiteFooter'
 import api from '../api/axios'
+import { logClientError } from '../utils/safeLog'
 import './AdminPlans.css'
 
 export default function AdminPlans() {
@@ -47,7 +48,7 @@ export default function AdminPlans() {
             setSubscribedUsers(data || [])
         } catch (err) {
             setSubscriptionsError(err.response?.data?.message || 'Failed to load subscribed users')
-            console.error('Fetch subscribed users error:', err)
+            logClientError('Fetch subscribed users error:', err)
         } finally {
             setSubscriptionsLoading(false)
         }
@@ -66,7 +67,7 @@ export default function AdminPlans() {
             setError('')
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to load subscription plans')
-            console.error('Fetch plans error:', err)
+            logClientError('Fetch plans error:', err)
         } finally {
             setLoading(false)
         }
@@ -164,7 +165,7 @@ export default function AdminPlans() {
             setIsModalOpen(false)
             fetchPlans()
         } catch (err) {
-            console.error('Save plan error:', err)
+            logClientError('Save plan error:', err)
             setError(err.response?.data?.message || 'Failed to save plan')
         }
     }
@@ -180,7 +181,7 @@ export default function AdminPlans() {
             setDeletingPlan(null)
             fetchPlans()
         } catch (err) {
-            console.error('Delete plan error:', err)
+            logClientError('Delete plan error:', err)
             setError(err.response?.data?.message || 'Failed to delete plan')
         }
     }
@@ -202,7 +203,7 @@ export default function AdminPlans() {
             setRemovingSubscription(null)
             fetchSubscribedUsers()
         } catch (err) {
-            console.error('Remove subscription error:', err)
+            logClientError('Remove subscription error:', err)
             setSubscriptionsError(err.response?.data?.message || 'Failed to remove subscription')
         } finally {
             setSubscriptionActionLoading(false)

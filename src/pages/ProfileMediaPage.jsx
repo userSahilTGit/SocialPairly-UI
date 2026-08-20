@@ -8,6 +8,7 @@ import VerifyPhotoModal from '../components/VerifyPhotoModal'
 import VideoPromptModal from '../components/VideoPromptModal'
 import MediaModal from '../components/MediaModal'
 import { getMediaUrl } from '../utils/mediaUrl'
+import { logClientError } from '../utils/safeLog'
 import {
   UploadCloud, Film, Image as ImageIcon, X, Check, GripVertical,
   ChevronLeft, ChevronRight, Play, Pencil, Trash2, Save,
@@ -58,7 +59,7 @@ function ProfileReadinessBanner() {
         const res = await api.get('/users/profile-readiness')
         setReadiness(res.data)
       } catch (err) {
-        console.error('Failed to load profile readiness', err)
+        logClientError('Failed to load profile readiness', err)
       } finally {
         setLoading(false)
       }
@@ -137,7 +138,7 @@ export default function ProfileMediaPage() {
       })
       setMyMedia(normalized)
     } catch (err) {
-      console.error('Failed to load user media', err)
+      logClientError('Failed to load user media', err)
     } finally {
       setLoading(false)
     }

@@ -3,6 +3,7 @@ import api from '../api/axios';
 import * as faceapi from 'face-api.js';
 import { X, ScanFace, ShieldCheck, Camera, RefreshCw } from 'lucide-react';
 import { extractAndAlignFace, loadFaceApiModels } from '../utils/faceRecognition';
+import { logClientError } from '../utils/safeLog';
 
 // 👈 Photo verification (Step 5): Client-side face comparison using face-api.js.
 // No image bytes are sent to the backend. The live webcam snapshot is compared
@@ -33,7 +34,7 @@ const VerifyPhotoModal = ({ onClose, onVerified, coverPhotoUrl }) => {
           setModelsLoaded(true);
         }
       } catch (err) {
-        console.error('Failed to load face-api models', err);
+        logClientError('Failed to load face-api models', err);
         if (!cancelled) {
           setError('Face verification models failed to load. Please refresh and try again.');
         }
@@ -58,7 +59,7 @@ const VerifyPhotoModal = ({ onClose, onVerified, coverPhotoUrl }) => {
       setError('');
     } catch (err) {
       setError('Camera access denied or unavailable. Please allow camera permissions.');
-      console.error('Camera error', err);
+      logClientError('Camera error', err);
     }
   }, []);
 
@@ -126,7 +127,7 @@ const VerifyPhotoModal = ({ onClose, onVerified, coverPhotoUrl }) => {
         setError('Faces do not match. Please ensure you are the same person as your profile photo.');
       }
     } catch (err) {
-      console.error('Verification error', err);
+      logClientError('Verification error', err);
       setError(err.response?.data?.message || err.message || 'Verification failed. Please try again.');
     } finally {
       setBusy(false);

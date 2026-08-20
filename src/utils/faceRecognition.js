@@ -1,4 +1,5 @@
 import * as faceapi from 'face-api.js';
+import { logClientError, logClientWarn } from './safeLog';
 
 // 👈 Use TinyFaceDetector for fast browser execution and smaller footprint (~1.9MB)
 // Reliable without WebGL errors and ideal for real-time verification.
@@ -30,14 +31,14 @@ export async function loadFaceApiModels(MODEL_URL = '/models') {
     faceApiModelsLoaded = true;
     return true;
   } catch (localErr) {
-    console.warn('Local face-api models missing or 404. Falling back to CDN...', localErr);
+    logClientWarn('Local face-api models missing or 404. Falling back to CDN...');
     try {
       // Fallback to CDN so the app NEVER crashes with <!DOCTYPE HTML> error
       await loadAll(API_MODEL_CDN_URL);
       faceApiModelsLoaded = true;
       return true;
     } catch (cdnErr) {
-      console.error('Failed to load face verification models from both local and CDN sources:', cdnErr);
+      logClientError('Failed to load face verification models from both local and CDN sources', cdnErr);
       throw new Error('Unable to load face verification neural network.');
     }
   }

@@ -105,8 +105,39 @@ describe('SignIn', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: /^sign in$/i }))
     await waitFor(() => {
-      expect(loginMock).toHaveBeenCalledWith('+919876543210', 'secret123', true)
+      expect(loginMock).toHaveBeenCalledWith('+91-9876543210', 'secret123', true)
     })
+  })
+
+  it('submits phone login with leading zero stripped', async () => {
+    loginMock.mockResolvedValue({ role: 'USER', identityPage1Complete: true })
+    renderSignIn()
+    fireEvent.click(screen.getByRole('tab', { name: 'Phone' }))
+    fireEvent.change(screen.getByLabelText(/mobile number/i), {
+      target: { value: '09876543210' },
+    })
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: 'secret123' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^sign in$/i }))
+    await waitFor(() => {
+      expect(loginMock).toHaveBeenCalledWith('+91-9876543210', 'secret123', true)
+    })
+  })
+
+  it('preserves email and phone values when toggling tabs', () => {
+    renderSignIn()
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'ada@example.com' },
+    })
+    fireEvent.click(screen.getByRole('tab', { name: 'Phone' }))
+    fireEvent.change(screen.getByLabelText(/mobile number/i), {
+      target: { value: '9876543210' },
+    })
+    fireEvent.click(screen.getByRole('tab', { name: 'Email' }))
+    expect(screen.getByLabelText(/email address/i)).toHaveValue('ada@example.com')
+    fireEvent.click(screen.getByRole('tab', { name: 'Phone' }))
+    expect(screen.getByLabelText(/mobile number/i)).toHaveValue('9876543210')
   })
 
   it('toggles password visibility', () => {
