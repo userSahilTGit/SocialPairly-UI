@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, X } from 'lucide-react'
+import { Eye, EyeOff, Menu, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import { BrandMark, LoggedInBrandName } from './AuthBrandAssets'
@@ -15,6 +15,7 @@ export default function Navbar() {
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const [deleteModalOpen, setDeleteModalOpen] = useState(false)
     const [deletePassword, setDeletePassword] = useState('')
+    const [showDeletePassword, setShowDeletePassword] = useState(false)
     const [deleteError, setDeleteError] = useState('')
     const [deleteLoading, setDeleteLoading] = useState(false)
     const dropdownRef = useRef(null)
@@ -69,6 +70,7 @@ export default function Navbar() {
     const openDeleteModal = () => {
         setDropdownOpen(false)
         setDeletePassword('')
+        setShowDeletePassword(false)
         setDeleteError('')
         setDeleteModalOpen(true)
     }
@@ -76,6 +78,7 @@ export default function Navbar() {
     const closeDeleteModal = () => {
         setDeleteModalOpen(false)
         setDeletePassword('')
+        setShowDeletePassword(false)
         setDeleteError('')
     }
 
@@ -215,20 +218,31 @@ export default function Navbar() {
                         {deleteError && <div className="delete-modal-error">{deleteError}</div>}
                         <div className="delete-form-field">
                             <label htmlFor="delete-account-password">Password</label>
-                            <input
-                                id="delete-account-password"
-                                type="password"
-                                value={deletePassword}
-                                onChange={(e) => setDeletePassword(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !deleteLoading) {
-                                        handleDeleteAccount()
-                                    }
-                                }}
-                                placeholder="Enter your password"
-                                autoFocus
-                                disabled={deleteLoading}
-                            />
+                            <div className="password-field">
+                                <input
+                                    id="delete-account-password"
+                                    type={showDeletePassword ? 'text' : 'password'}
+                                    value={deletePassword}
+                                    onChange={(e) => setDeletePassword(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !deleteLoading) {
+                                            handleDeleteAccount()
+                                        }
+                                    }}
+                                    placeholder="Enter your password"
+                                    autoFocus
+                                    disabled={deleteLoading}
+                                />
+                                <button
+                                    type="button"
+                                    className="password-toggle"
+                                    onClick={() => setShowDeletePassword((v) => !v)}
+                                    aria-label={showDeletePassword ? 'Hide password' : 'Show password'}
+                                    disabled={deleteLoading}
+                                >
+                                    {showDeletePassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
                         </div>
                         <div className="delete-buttons-row">
                             <button

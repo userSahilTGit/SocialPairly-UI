@@ -113,6 +113,10 @@
     box-sizing: border-box;
 }
 
+.delete-form-field .password-field input {
+    padding-right: 46px;
+}
+
 .delete-form-field input:focus {
     border-color: #8b5cf6;
     box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
