@@ -34,10 +34,15 @@ describe('api axios interceptors', () => {
     sessionStorage.setItem('token', 'abc')
     sessionStorage.setItem('user', '{}')
     vi.stubGlobal('location', { pathname: '/profile', href: '/profile' })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
     const handler = api.interceptors.response.handlers[0].rejected
-    await expect(handler({ response: { status: 401 } })).rejects.toBeTruthy()
+    await expect(handler({ response: { status: 401 }, config: { url: '/users/me' } })).rejects.toBeTruthy()
     expect(localStorage.getItem('token')).toBeNull()
     expect(window.location.href).toBe('/signin')
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/auth/logout',
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    )
   })
 
   it('does not redirect when already on signin', async () => {

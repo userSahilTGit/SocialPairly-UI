@@ -101,10 +101,12 @@ describe('AuthContext', () => {
       screen.getByText('refresh').click()
     })
     await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('me@x.com'))
+    post.mockResolvedValueOnce({ data: { message: 'Logged out' } })
     await act(async () => {
       screen.getByText('logout').click()
     })
-    expect(screen.getByTestId('user')).toHaveTextContent('none')
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('none'))
     expect(localStorage.getItem('token')).toBeNull()
+    expect(post).toHaveBeenCalledWith('/auth/logout')
   })
 })

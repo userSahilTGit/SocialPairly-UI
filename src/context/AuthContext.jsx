@@ -99,7 +99,12 @@ export function AuthProvider({ children }) {
     return normalizeUser(data.user)
   }
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout')
+    } catch {
+      // Still clear local state if the network call fails
+    }
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     sessionStorage.removeItem('token')

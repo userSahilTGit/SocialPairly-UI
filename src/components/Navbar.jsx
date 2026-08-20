@@ -61,9 +61,9 @@ export default function Navbar() {
         return () => document.removeEventListener('keydown', onKeyDown)
     }, [menuOpen])
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
         setDropdownOpen(false)
-        logout()
+        await logout()
         navigate('/signin')
     }
 
@@ -95,7 +95,7 @@ export default function Navbar() {
                 data: { password: deletePassword },
             })
             closeDeleteModal()
-            logout()
+            await logout()
             navigate('/signin')
         } catch (err) {
             setDeleteError(err.response?.data?.message || 'Failed to delete account')
