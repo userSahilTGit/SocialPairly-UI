@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import api from '../api/axios';
 import GlassCard from '../components/GlassCard';
 import { getMediaUrl } from '../utils/mediaUrl';
+import { logClientError } from '../utils/safeLog';
 
 const MediaStudio = () => {
   const [media, setMedia] = useState([]);
@@ -25,7 +26,7 @@ const MediaStudio = () => {
       });
       setMedia([...media, response.data]);
     } catch (error) {
-      console.error("Upload failed", error);
+      logClientError('Upload failed', error);
     }
   };
 

@@ -596,8 +596,7 @@ iframe {
 @media (max-width: 480px) {
   .navbar .nav-brand-name {
     max-width: 42vw;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
     white-space: nowrap;
   }
 

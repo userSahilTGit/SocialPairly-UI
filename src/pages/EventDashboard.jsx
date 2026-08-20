@@ -12,7 +12,6 @@ const EventDashboard = () => {
   };
 
   const handleReaction = (tokens, reactionType) => {
-    console.log(`Spent ${tokens} tokens on ${reactionType}`);
     // Implement Axios POST to /api/reactions/send here
   };
 

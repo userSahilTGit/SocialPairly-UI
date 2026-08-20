@@ -4,7 +4,8 @@ import { CheckCircle2, ShieldAlert } from 'lucide-react'
 import { auth } from '../config/firebase'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
-import { hasUsablePhoneNumber, splitPhone } from '../utils/verification'
+import { formatPhoneE164, formatPhoneStorage, splitPhone } from '../utils/phoneFormat'
+import { hasUsablePhoneNumber } from '../utils/verification'
 import {
   firebasePhoneErrorMessage,
   getInvisibleRecaptcha,
@@ -33,7 +34,8 @@ export default function PhoneVerifyPanel({
 
   const verified = user?.phoneVerified === true
   const hasPhone = hasUsablePhoneNumber(user)
-  const phoneE164 = `${countryCode}${national.replace(/\D/g, '')}`
+  const phoneE164 = formatPhoneE164(countryCode, national)
+  const phoneStored = formatPhoneStorage(countryCode, national)
   const testMode = import.meta.env.VITE_FIREBASE_PHONE_TEST_MODE === 'true'
 
   useEffect(() => {
@@ -67,7 +69,7 @@ export default function PhoneVerifyPanel({
     }
     setLoading(true)
     try {
-      const { data } = await api.put('/users/me/phone', { phoneNumber: phoneE164 })
+      const { data } = await api.put('/users/me/phone', { phoneNumber: phoneStored })
       applyUser(data)
 
       // Recreate verifier each send — safest after previous confirm/clear

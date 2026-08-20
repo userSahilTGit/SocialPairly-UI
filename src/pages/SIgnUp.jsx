@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import { signInWithPhoneNumber } from 'firebase/auth'
+import { formatPhoneE164, formatPhoneStorage } from '../utils/phoneFormat'
 import { auth } from '../config/firebase'
 import { IS_PHONE_VERIFICATION_MANDATORY, PHONE_VERIFY_DISMISS_KEY, useAuth } from '../context/AuthContext'
 import { postAuthPath } from '../utils/user'
@@ -85,12 +86,13 @@ export default function SignUp() {
     setLoading(true)
     try {
       const { firstName, lastName } = splitFullName(form.fullName)
-      const phoneE164 = `${countryCode}${form.phoneNumber.replace(/\D/g, '')}`
+      const phoneStored = formatPhoneStorage(countryCode, form.phoneNumber)
+      const phoneE164 = formatPhoneE164(countryCode, form.phoneNumber)
       await register({
         firstName,
         lastName,
         email: form.email.trim(),
-        phoneNumber: phoneE164,
+        phoneNumber: phoneStored,
         password: form.password,
         confirmPassword: form.confirmPassword,
         address: '',
@@ -143,7 +145,7 @@ export default function SignUp() {
   const sendFirebasePhoneCode = async () => {
     setError('')
     setMessage('')
-    const phone = registeredPhone || `${countryCode}${form.phoneNumber.replace(/\D/g, '')}`
+    const phone = registeredPhone || formatPhoneE164(countryCode, form.phoneNumber)
     setLoading(true)
     try {
       await resetInvisibleRecaptcha(phoneVerifierRef)
@@ -423,7 +425,7 @@ export default function SignUp() {
           {step === 3 && (
             <form onSubmit={handleVerifyPhone}>
               <p className="auth-side-sub">
-                Verify <strong>{registeredPhone || `${countryCode}${form.phoneNumber}`}</strong> with a Firebase SMS code (optional).
+                Verify <strong>{registeredPhone || formatPhoneE164(countryCode, form.phoneNumber)}</strong> with a Firebase SMS code (optional).
               </p>
               <div id="signup-recaptcha-container" style={{ display: 'none' }} aria-hidden="true" />
               {!phoneCodeSent ? (

@@ -13,6 +13,16 @@ export function BrandMark({ size = 72, className = '' }) {
   )
 }
 
+/** Post-login navbar wordmark — Social (black/white) + pairly (pink→purple gradient). */
+export function LoggedInBrandName({ className = '' }) {
+  return (
+    <span className={`logged-in-brand-name ${className}`.trim()} aria-hidden="true">
+      <span className="logged-in-brand-social">Social</span>
+      <span className="logged-in-brand-pairly">pairly</span>
+    </span>
+  )
+}
+
 /** Couple + hanging lightbulbs / bokeh scene for the auth hero. */
 export function AuthCoupleScene({ className = '' }) {
   return (

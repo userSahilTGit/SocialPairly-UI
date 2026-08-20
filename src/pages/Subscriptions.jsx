@@ -10,6 +10,7 @@ import { UpgradeRequestModal } from '../components/UpgradeModals'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import { downloadReceiptPdf } from '../utils/downloadReceiptPdf'
+import { logClientError } from '../utils/safeLog'
 import './Subscriptions.css'
 
 export default function Subscriptions() {
@@ -69,7 +70,7 @@ export default function Subscriptions() {
       }
       return data
     } catch (err) {
-      console.error('Failed to load refund status', err)
+      logClientError('Failed to load refund status', err)
       return null
     }
   }, [])
@@ -92,7 +93,7 @@ export default function Subscriptions() {
       }
       return data
     } catch (err) {
-      console.error('Failed to load upgrade status', err)
+      logClientError('Failed to load upgrade status', err)
       return null
     }
   }, [])
@@ -112,7 +113,7 @@ export default function Subscriptions() {
       }
       return data
     } catch (err) {
-      console.error('Failed to load current subscription', err)
+      logClientError('Failed to load current subscription', err)
       return null
     }
   }, [])
@@ -129,7 +130,7 @@ export default function Subscriptions() {
       }
       return data
     } catch (err) {
-      console.error('Failed to load payment status', err)
+      logClientError('Failed to load payment status', err)
       return null
     }
   }, [])
@@ -152,7 +153,7 @@ export default function Subscriptions() {
       const safeName = receiptNumber.replace(/[^a-zA-Z0-9-_]/g, '-')
       await downloadReceiptPdf(receiptPreviewRef.current, `receipt-${safeName}.pdf`)
     } catch (err) {
-      console.error('Failed to download receipt PDF', err)
+      logClientError('Failed to download receipt PDF', err)
       setPaymentBanner({
         type: 'error',
         title: 'Download Failed',
@@ -173,7 +174,7 @@ export default function Subscriptions() {
         setPlans(data)
       } catch (err) {
         if (cancelled) return
-        console.error('Failed to load subscription plans', err)
+        logClientError('Failed to load subscription plans', err)
         setError(err.response?.data?.message || err.message || 'Failed to load plans')
       } finally {
         if (!cancelled) setLoading(false)
@@ -301,7 +302,7 @@ export default function Subscriptions() {
           })
         }
       } catch (err) {
-        console.error('Failed to confirm checkout session', err)
+        logClientError('Failed to confirm checkout session', err)
         setPaymentBanner({
           type: 'error',
           title: 'Payment Confirmation Failed',
@@ -456,7 +457,7 @@ export default function Subscriptions() {
         message: data?.message || 'Unable to start checkout. Please try again.',
       })
     } catch (err) {
-      console.error('Checkout failed', err)
+      logClientError('Checkout failed', err)
       setPaymentBanner({
         type: 'error',
         title: 'Checkout Error',

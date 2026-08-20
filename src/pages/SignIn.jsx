@@ -6,6 +6,7 @@ import { GoogleLogin } from '@react-oauth/google'
 import { useAuth, PHONE_VERIFY_DISMISS_KEY, IDENTITY_CONTINUE_LATER_KEY } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { postAuthPath } from '../utils/user'
+import { formatPhoneStorage, isValidPhoneNational } from '../utils/phoneFormat'
 import api from '../api/axios'
 import AuthHeroPanel from '../components/AuthHeroPanel'
 import AuthPageLayout from '../components/AuthPageLayout'
@@ -27,7 +28,8 @@ export default function SignIn() {
 
   const [authTab, setAuthTab] = useState('email')
   const [countryCode, setCountryCode] = useState('+91')
-  const [identifier, setIdentifier] = useState('')
+  const [emailIdentifier, setEmailIdentifier] = useState('')
+  const [phoneIdentifier, setPhoneIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
@@ -79,23 +81,20 @@ export default function SignIn() {
     setError('')
 
     if (authTab === 'email') {
-      if (!EMAIL_RE.test(identifier.trim())) {
+      if (!EMAIL_RE.test(emailIdentifier.trim())) {
         setError('Enter a valid email address.')
         return
       }
-    } else {
-      const digits = identifier.replace(/\D/g, '')
-      if (digits.length < 8 || digits.length > 15) {
-        setError('Enter a valid phone number (8–15 digits).')
-        return
-      }
+    } else if (!isValidPhoneNational(phoneIdentifier)) {
+      setError('Enter a valid phone number (8–15 digits).')
+      return
     }
 
     setLoading(true)
     try {
       const loginId = authTab === 'phone'
-        ? `${countryCode}${identifier.replace(/\D/g, '')}`
-        : identifier.trim()
+        ? formatPhoneStorage(countryCode, phoneIdentifier)
+        : emailIdentifier.trim()
       const user = await login(loginId, password, rememberMe)
       navigate(postAuthPath(user))
     } catch (err) {
@@ -254,7 +253,7 @@ export default function SignIn() {
                     aria-controls="panel-signin"
                     aria-selected={authTab === 'email'}
                     className={authTab === 'email' ? 'active' : ''}
-                    onClick={() => { setAuthTab('email'); setIdentifier(''); setError('') }}
+                    onClick={() => { setAuthTab('email'); setError('') }}
                   >
                     <Mail className="w-4 h-4 text-purple-600" />
                     <span>Email</span>
@@ -266,7 +265,7 @@ export default function SignIn() {
                     aria-controls="panel-signin"
                     aria-selected={authTab === 'phone'}
                     className={authTab === 'phone' ? 'active' : ''}
-                    onClick={() => { setAuthTab('phone'); setIdentifier(''); setError('') }}
+                    onClick={() => { setAuthTab('phone'); setError('') }}
                   >
                     <Smartphone className="w-4 h-4 text-purple-600" />
                     <span>Phone</span>
@@ -275,31 +274,44 @@ export default function SignIn() {
 
                 <form onSubmit={handleSubmit} className="auth-form" id="panel-signin" role="tabpanel" aria-labelledby={authTab === 'email' ? 'tab-email' : 'tab-phone'}>
                   <div className="form-group auth-identifier-group">
-                    <label htmlFor="signin-identifier">{authTab === 'email' ? 'Email Address' : 'Mobile number'}</label>
-                    <div className="auth-identifier-control">
-                      {authTab === 'email' ? (
-                        <div className="auth-input-icon">
+                    <label htmlFor={authTab === 'email' ? 'signin-email' : 'signin-phone'}>
+                      {authTab === 'email' ? 'Email Address' : 'Mobile number'}
+                    </label>
+                    <div className="auth-identifier-slot">
+                      <div
+                        className={`auth-identifier-panel${authTab === 'email' ? ' is-active' : ''}`}
+                        role="group"
+                        aria-hidden={authTab !== 'email'}
+                      >
+                        <div className="auth-input-icon auth-identifier-control">
                           <Mail className="auth-field-icon" />
                           <input
-                            id="signin-identifier"
+                            id="signin-email"
                             className="auth-input"
                             type="email"
-                            value={identifier}
-                            onChange={(e) => setIdentifier(e.target.value)}
+                            value={emailIdentifier}
+                            onChange={(e) => setEmailIdentifier(e.target.value)}
                             placeholder="you@example.com"
                             autoComplete="email"
-                            required
+                            required={authTab === 'email'}
+                            tabIndex={authTab === 'email' ? 0 : -1}
                             aria-invalid={!!error || undefined}
                             aria-describedby={error ? 'signin-error' : undefined}
                           />
                         </div>
-                      ) : (
-                        <div className="phone-field">
+                      </div>
+                      <div
+                        className={`auth-identifier-panel${authTab === 'phone' ? ' is-active' : ''}`}
+                        role="group"
+                        aria-hidden={authTab !== 'phone'}
+                      >
+                        <div className="phone-field auth-identifier-control">
                           <select
                             className="phone-code"
                             value={countryCode}
                             onChange={(e) => setCountryCode(e.target.value)}
                             aria-label="Country code"
+                            tabIndex={authTab === 'phone' ? 0 : -1}
                           >
                             <option value="+91">🇮🇳 +91</option>
                             <option value="+1">🇺🇸 +1</option>
@@ -307,27 +319,21 @@ export default function SignIn() {
                             <option value="+971">🇦🇪 +971</option>
                           </select>
                           <input
-                            id="signin-identifier"
+                            id="signin-phone"
                             className="auth-input"
                             type="tel"
-                            value={identifier}
-                            onChange={(e) => setIdentifier(e.target.value.replace(/[^\d\s-]/g, ''))}
+                            value={phoneIdentifier}
+                            onChange={(e) => setPhoneIdentifier(e.target.value.replace(/[^\d\s-]/g, ''))}
                             placeholder="98765 43210"
                             autoComplete="tel-national"
-                            required
+                            required={authTab === 'phone'}
+                            tabIndex={authTab === 'phone' ? 0 : -1}
                             aria-invalid={!!error || undefined}
                             aria-describedby={error ? 'signin-error' : undefined}
                           />
                         </div>
-                      )}
+                      </div>
                     </div>
-                    <p
-                      className={`field-hint${authTab === 'phone' ? '' : ' field-hint-placeholder'}`}
-                      id="signin-identifier-hint"
-                      aria-hidden={authTab !== 'phone'}
-                    >
-                      Sign in with the mobile number linked to your account (password required).
-                    </p>
                   </div>
 
                   <div className="form-group">

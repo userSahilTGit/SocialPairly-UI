@@ -202,9 +202,13 @@
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-[data-theme="dark"] .navbar .nav-brand-name,
+
+[data-theme="dark"] .navbar .logged-in-brand-social {
+  color: #ffffff;
+}
+
 [data-theme="dark"] .navbar .brand {
-  color: #f1f5f9;
+  color: inherit;
 }
 [data-theme="dark"] .nav-menu-toggle,
 [data-theme="dark"] .theme-toggle {

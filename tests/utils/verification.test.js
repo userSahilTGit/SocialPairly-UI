@@ -15,7 +15,11 @@ describe('hasUsablePhoneNumber', () => {
   })
 
   it('accepts 8+ digit numbers', () => {
-    expect(hasUsablePhoneNumber({ phoneNumber: '+91 98765 43210' })).toBe(true)
+    expect(hasUsablePhoneNumber({ phoneNumber: '+91-9876543210' })).toBe(true)
+  })
+
+  it('rejects oauth placeholders', () => {
+    expect(hasUsablePhoneNumber({ phoneNumber: 'oauth:abc123' })).toBe(false)
   })
 })
 
@@ -34,7 +38,8 @@ describe('userNeedsPhoneVerification', () => {
 
 describe('splitPhone', () => {
   it('splits known country codes', () => {
-    expect(splitPhone('+971501234567')).toEqual({ countryCode: '+971', national: '501234567' })
+    expect(splitPhone('+971-501234567')).toEqual({ countryCode: '+971', national: '501234567' })
+    expect(splitPhone('+91-9876543210')).toEqual({ countryCode: '+91', national: '9876543210' })
     expect(splitPhone('+919876543210')).toEqual({ countryCode: '+91', national: '9876543210' })
     expect(splitPhone('+447911123456')).toEqual({ countryCode: '+44', national: '7911123456' })
     expect(splitPhone('+12025550123')).toEqual({ countryCode: '+1', national: '2025550123' })

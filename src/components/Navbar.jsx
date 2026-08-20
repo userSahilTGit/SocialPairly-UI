@@ -4,7 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
-import { BrandMark } from './AuthBrandAssets'
+import { BrandMark, LoggedInBrandName } from './AuthBrandAssets'
 import ThemeToggle from './ThemeToggle'
 
 export default function Navbar() {
@@ -112,9 +112,9 @@ export default function Navbar() {
                 />
             )}
             <nav className="navbar">
-                <NavLink to="/" className="brand">
+                <NavLink to="/" className="brand" aria-label="Socialpairly home">
                     <BrandMark size={36} className="nav-brand-logo" />
-                    <span className="nav-brand-name">Socialpairly</span>
+                    <LoggedInBrandName className="nav-brand-name" />
                 </NavLink>
                 <div className="nav-toolbar">
                     <ThemeToggle />
