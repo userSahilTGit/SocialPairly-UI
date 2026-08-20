@@ -42,6 +42,8 @@ export default function SignIn() {
   const [otp, setOtp] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [forgotError, setForgotError] = useState('')
   const [forgotMessage, setForgotMessage] = useState('')
   const [forgotLoading, setForgotLoading] = useState(false)
@@ -142,6 +144,8 @@ export default function SignIn() {
     setOtp('')
     setNewPassword('')
     setConfirmPassword('')
+    setShowNewPassword(false)
+    setShowConfirmPassword(false)
     setForgotStep('identifier')
     setForgotOpen(true)
   }
@@ -521,27 +525,47 @@ export default function SignIn() {
               <form onSubmit={handleResetPassword}>
                 <div className="form-group">
                   <label htmlFor="forgot-new-password">New Password</label>
-                  <input
-                    id="forgot-new-password"
-                    className="auth-input"
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="********"
-                    required
-                  />
+                  <div className="password-field">
+                    <input
+                      id="forgot-new-password"
+                      className="auth-input"
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="********"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() => setShowNewPassword((v) => !v)}
+                      aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
                 <div className="form-group">
                   <label htmlFor="forgot-confirm-password">Confirm Password</label>
-                  <input
-                    id="forgot-confirm-password"
-                    className="auth-input"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="********"
-                    required
-                  />
+                  <div className="password-field">
+                    <input
+                      id="forgot-confirm-password"
+                      className="auth-input"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="********"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() => setShowConfirmPassword((v) => !v)}
+                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
                 <button
                   type="submit"
