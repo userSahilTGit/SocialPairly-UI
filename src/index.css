@@ -1760,6 +1760,13 @@ textarea {
   margin-bottom: 16px;
 }
 
+.field-error {
+  margin: 6px 0 0;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .success {
   background: #f0fdf4;
   color: var(--success);

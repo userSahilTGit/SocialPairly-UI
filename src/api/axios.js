@@ -13,28 +13,76 @@ function sanitizeAxiosError(error) {
     return error
 }
 
+function clearClientAuthStorage() {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    sessionStorage.removeItem('token')
+    sessionStorage.removeItem('user')
+}
+
+function readCookie(name) {
+    if (typeof document === 'undefined' || !document.cookie) return null
+    const prefix = `${name}=`
+    const parts = document.cookie.split(';')
+    for (const part of parts) {
+        const trimmed = part.trim()
+        if (trimmed.startsWith(prefix)) {
+            return decodeURIComponent(trimmed.slice(prefix.length))
+        }
+    }
+    return null
+}
+
+function csrfHeaders() {
+    const xsrf = readCookie('XSRF-TOKEN')
+    return xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}
+}
+
+/** Best-effort server logout to clear HttpOnly cookie + revoke JWT (avoids axios interceptor recursion). */
+function revokeServerSession() {
+    try {
+        fetch('/api/auth/logout', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', ...csrfHeaders() },
+        }).catch(() => {})
+    } catch {
+        // ignore
+    }
+}
+
 const api = axios.create({
     baseURL: '/api',
+    withCredentials: true,
+    xsrfCookieName: 'XSRF-TOKEN',
+    xsrfHeaderName: 'X-XSRF-TOKEN',
 })
 
-// Attach JWT token to every request if present
+// Attach JWT token to every request if present (Bearer kept for backward compatibility;
+// HttpOnly SP_AUTH cookie is also sent via withCredentials).
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token')
     if (token) {
         config.headers.Authorization = `Bearer ${token}`
     }
+    const xsrf = readCookie('XSRF-TOKEN')
+    if (xsrf && !config.headers['X-XSRF-TOKEN']) {
+        config.headers['X-XSRF-TOKEN'] = xsrf
+    }
     return config
 })
 
-// Auto-logout on 401 or 403 (invalid/expired token or insufficient permissions)
+// Auto-logout on 401 or 403 (invalid/expired/revoked token or insufficient permissions)
 api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-            localStorage.removeItem('token')
-            localStorage.removeItem('user')
-            sessionStorage.removeItem('token')
-            sessionStorage.removeItem('user')
+            const url = String(error.config?.url || '')
+            const isLogoutCall = url.includes('/auth/logout')
+            clearClientAuthStorage()
+            if (!isLogoutCall) {
+                revokeServerSession()
+            }
             if (window.location.pathname !== '/signin') {
                 window.location.href = '/signin'
             }

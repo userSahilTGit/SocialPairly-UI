@@ -88,6 +88,38 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('user')).toHaveTextContent('me@x.com')
   })
 
+  it('concurrent login calls share one in-flight request', async () => {
+    let resolvePost
+    post.mockImplementation(() => new Promise((resolve) => {
+      resolvePost = resolve
+    }))
+    get.mockResolvedValue({ data: { email: 'me@x.com' } })
+
+    let authApi
+    function Capture() {
+      authApi = useAuth()
+      return null
+    }
+    render(<AuthProvider><Capture /></AuthProvider>)
+    await waitFor(() => expect(authApi).toBeTruthy())
+
+    let first
+    let second
+    await act(async () => {
+      first = authApi.login('a@b.com', 'pw', true)
+      second = authApi.login('a@b.com', 'pw', true)
+    })
+    expect(post).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolvePost({ data: { token: 'shared-tok', user: { email: 'login@x.com' } } })
+      await Promise.all([first, second])
+    })
+
+    expect(localStorage.getItem('token')).toBe('shared-tok')
+    expect(post).toHaveBeenCalledTimes(1)
+  })
+
   it('register, refreshUser, and logout', async () => {
     post.mockResolvedValue({ data: { token: 'tok', user: { email: 'reg@x.com' } } })
     get.mockResolvedValue({ data: { email: 'me@x.com' } })
@@ -101,10 +133,12 @@ describe('AuthContext', () => {
       screen.getByText('refresh').click()
     })
     await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('me@x.com'))
+    post.mockResolvedValueOnce({ data: { message: 'Logged out' } })
     await act(async () => {
       screen.getByText('logout').click()
     })
-    expect(screen.getByTestId('user')).toHaveTextContent('none')
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('none'))
     expect(localStorage.getItem('token')).toBeNull()
+    expect(post).toHaveBeenCalledWith('/auth/logout')
   })
 })

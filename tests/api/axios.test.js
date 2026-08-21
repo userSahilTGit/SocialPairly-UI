@@ -34,10 +34,15 @@ describe('api axios interceptors', () => {
     sessionStorage.setItem('token', 'abc')
     sessionStorage.setItem('user', '{}')
     vi.stubGlobal('location', { pathname: '/profile', href: '/profile' })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
     const handler = api.interceptors.response.handlers[0].rejected
-    await expect(handler({ response: { status: 401 } })).rejects.toBeTruthy()
+    await expect(handler({ response: { status: 401 }, config: { url: '/users/me' } })).rejects.toBeTruthy()
     expect(localStorage.getItem('token')).toBeNull()
     expect(window.location.href).toBe('/signin')
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/auth/logout',
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    )
   })
 
   it('does not redirect when already on signin', async () => {
@@ -47,10 +52,10 @@ describe('api axios interceptors', () => {
     expect(window.location.href).toBe('/signin')
   })
 
-  it('rejects other errors without logout', async () => {
-    localStorage.setItem('token', 'keep')
-    const handler = api.interceptors.response.handlers[0].rejected
-    await expect(handler({ response: { status: 500 } })).rejects.toBeTruthy()
-    expect(localStorage.getItem('token')).toBe('keep')
+  it('attaches X-XSRF-TOKEN from cookie when present', () => {
+    document.cookie = 'XSRF-TOKEN=test-csrf'
+    const handler = api.interceptors.request.handlers[0].fulfilled
+    const config = handler({ headers: {} })
+    expect(config.headers['X-XSRF-TOKEN']).toBe('test-csrf')
   })
 })

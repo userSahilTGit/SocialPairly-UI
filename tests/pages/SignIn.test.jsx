@@ -148,6 +148,75 @@ describe('SignIn', () => {
     expect(password).toHaveAttribute('type', 'text')
   })
 
+  it('shows required validation for empty email and password', async () => {
+    renderSignIn()
+    fireEvent.click(screen.getByRole('button', { name: /^sign in$/i }))
+    expect(await screen.findByText('Email is required.')).toBeInTheDocument()
+    expect(screen.getByText('Password is required.')).toBeInTheDocument()
+    expect(loginMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects invalid email format', async () => {
+    renderSignIn()
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'not-an-email' },
+    })
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: 'secret123' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^sign in$/i }))
+    expect(await screen.findByText('Enter a valid email address.')).toBeInTheDocument()
+    expect(loginMock).not.toHaveBeenCalled()
+  })
+
+  it('clears field validation when input is corrected', async () => {
+    renderSignIn()
+    fireEvent.click(screen.getByRole('button', { name: /^sign in$/i }))
+    expect(await screen.findByText('Email is required.')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'ada@example.com' },
+    })
+    expect(screen.queryByText('Email is required.')).not.toBeInTheDocument()
+  })
+
+  it('shows network error message when server is unreachable', async () => {
+    loginMock.mockRejectedValue({ message: 'Network Error' })
+    renderSignIn()
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'ada@example.com' },
+    })
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: 'secret123' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^sign in$/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/unable to reach the server/i)
+    })
+  })
+
+  it('shows subscribed lock message from API', async () => {
+    loginMock.mockRejectedValue({
+      response: {
+        status: 401,
+        data: {
+          code: 'ACCOUNT_LOCKED',
+          message: 'Your account is temporarily locked due to multiple failed login attempts. Please try again later.',
+        },
+      },
+    })
+    renderSignIn()
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'ada@example.com' },
+    })
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: 'bad' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^sign in$/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/temporarily locked/i)
+    })
+  })
+
   it('stays on page when login fails', async () => {
     loginMock.mockRejectedValue({ response: { data: { message: 'Invalid credentials' } } })
     renderSignIn()

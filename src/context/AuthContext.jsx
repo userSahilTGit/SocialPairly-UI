@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import api from '../api/axios'
 import { normalizeUser } from '../utils/user'
 
@@ -26,6 +26,8 @@ function readStoredAuth() {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  /** Shared in-flight login so duplicate submits reuse one request / one session. */
+  const loginInFlightRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -78,16 +80,31 @@ export function AuthProvider({ children }) {
   }, [persist])
 
   const login = async (identifier, password, rememberMe = true) => {
-    sessionStorage.removeItem(PHONE_VERIFY_DISMISS_KEY)
-    sessionStorage.removeItem(IDENTITY_CONTINUE_LATER_KEY)
-    const { data } = await api.post('/auth/login', { identifier, password, rememberMe })
-    persist(data, rememberMe)
+    if (loginInFlightRef.current) {
+      return loginInFlightRef.current
+    }
+
+    const loginPromise = (async () => {
+      sessionStorage.removeItem(PHONE_VERIFY_DISMISS_KEY)
+      sessionStorage.removeItem(IDENTITY_CONTINUE_LATER_KEY)
+      const { data } = await api.post('/auth/login', { identifier, password, rememberMe })
+      persist(data, rememberMe)
+      try {
+        const { data: me } = await api.get('/users/me')
+        persist({ token: data.token, user: me }, rememberMe)
+        return normalizeUser(me)
+      } catch {
+        return normalizeUser(data.user)
+      }
+    })()
+
+    loginInFlightRef.current = loginPromise
     try {
-      const { data: me } = await api.get('/users/me')
-      persist({ token: data.token, user: me }, rememberMe)
-      return normalizeUser(me)
-    } catch {
-      return normalizeUser(data.user)
+      return await loginPromise
+    } finally {
+      if (loginInFlightRef.current === loginPromise) {
+        loginInFlightRef.current = null
+      }
     }
   }
 
@@ -99,7 +116,12 @@ export function AuthProvider({ children }) {
     return normalizeUser(data.user)
   }
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout')
+    } catch {
+      // Still clear local state if the network call fails
+    }
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     sessionStorage.removeItem('token')
