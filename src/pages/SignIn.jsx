@@ -42,6 +42,8 @@ export default function SignIn() {
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({ identifier: '', password: '' })
   const [loading, setLoading] = useState(false)
+  /** Sync guard so rapid double-clicks cannot start two submits before React re-renders. */
+  const submittingRef = useRef(false)
 
   const [forgotOpen, setForgotOpen] = useState(false)
   const [forgotStep, setForgotStep] = useState('identifier')
@@ -121,8 +123,12 @@ export default function SignIn() {
       setFieldErrors(nextFieldErrors)
       return
     }
+    if (loading || submittingRef.current) {
+      return
+    }
     setFieldErrors({ identifier: '', password: '' })
 
+    submittingRef.current = true
     setLoading(true)
     try {
       const loginId = authTab === 'phone'
@@ -133,6 +139,7 @@ export default function SignIn() {
     } catch (err) {
       setError(authErrorMessage(err, 'Invalid credentials'))
     } finally {
+      submittingRef.current = false
       setLoading(false)
     }
   }
