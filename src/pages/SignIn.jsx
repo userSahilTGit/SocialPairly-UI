@@ -15,8 +15,14 @@ import { AppleGlyph, GoogleGlyph } from '../components/AuthBrandAssets'
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function authErrorMessage(err, fallback) {
+  if (!err.response) {
+    return 'Unable to reach the server. Please check your connection and try again.'
+  }
   if (err.response?.status === 429) {
     return err.response?.data?.message || 'Too many attempts. Try again later.'
+  }
+  if (err.response?.status >= 500) {
+    return err.response?.data?.message || 'Something went wrong on our side. Please try again.'
   }
   return err.response?.data?.message || err.response?.data?.error || fallback
 }
@@ -34,6 +40,7 @@ export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({ identifier: '', password: '' })
   const [loading, setLoading] = useState(false)
 
   const [forgotOpen, setForgotOpen] = useState(false)
@@ -78,19 +85,43 @@ export default function SignIn() {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [forgotOpen])
 
+  const clearIdentifierError = () => {
+    setFieldErrors((prev) => (prev.identifier ? { ...prev, identifier: '' } : prev))
+    setError('')
+  }
+
+  const clearPasswordError = () => {
+    setFieldErrors((prev) => (prev.password ? { ...prev, password: '' } : prev))
+    setError('')
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
 
+    const nextFieldErrors = { identifier: '', password: '' }
     if (authTab === 'email') {
-      if (!EMAIL_RE.test(emailIdentifier.trim())) {
-        setError('Enter a valid email address.')
-        return
+      const email = emailIdentifier.trim()
+      if (!email) {
+        nextFieldErrors.identifier = 'Email is required.'
+      } else if (!EMAIL_RE.test(email)) {
+        nextFieldErrors.identifier = 'Enter a valid email address.'
       }
+    } else if (!phoneIdentifier.trim()) {
+      nextFieldErrors.identifier = 'Phone number is required.'
     } else if (!isValidPhoneNational(phoneIdentifier)) {
-      setError('Enter a valid phone number (8–15 digits).')
+      nextFieldErrors.identifier = 'Enter a valid phone number (8–15 digits).'
+    }
+
+    if (!password) {
+      nextFieldErrors.password = 'Password is required.'
+    }
+
+    if (nextFieldErrors.identifier || nextFieldErrors.password) {
+      setFieldErrors(nextFieldErrors)
       return
     }
+    setFieldErrors({ identifier: '', password: '' })
 
     setLoading(true)
     try {
@@ -100,7 +131,7 @@ export default function SignIn() {
       const user = await login(loginId, password, rememberMe)
       navigate(postAuthPath(user))
     } catch (err) {
-      setError(authErrorMessage(err, 'Login failed. Check your credentials.'))
+      setError(authErrorMessage(err, 'Invalid credentials'))
     } finally {
       setLoading(false)
     }
@@ -260,7 +291,7 @@ export default function SignIn() {
                     aria-controls="panel-signin"
                     aria-selected={authTab === 'email'}
                     className={authTab === 'email' ? 'active' : ''}
-                    onClick={() => { setAuthTab('email'); setError('') }}
+                    onClick={() => { setAuthTab('email'); setError(''); setFieldErrors({ identifier: '', password: '' }) }}
                   >
                     <Mail className="w-4 h-4 text-purple-600" />
                     <span>Email</span>
@@ -272,14 +303,14 @@ export default function SignIn() {
                     aria-controls="panel-signin"
                     aria-selected={authTab === 'phone'}
                     className={authTab === 'phone' ? 'active' : ''}
-                    onClick={() => { setAuthTab('phone'); setError('') }}
+                    onClick={() => { setAuthTab('phone'); setError(''); setFieldErrors({ identifier: '', password: '' }) }}
                   >
                     <Smartphone className="w-4 h-4 text-purple-600" />
                     <span>Phone</span>
                   </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="auth-form" id="panel-signin" role="tabpanel" aria-labelledby={authTab === 'email' ? 'tab-email' : 'tab-phone'}>
+                <form onSubmit={handleSubmit} className="auth-form" id="panel-signin" role="tabpanel" aria-labelledby={authTab === 'email' ? 'tab-email' : 'tab-phone'} noValidate>
                   <div className="form-group auth-identifier-group">
                     <label htmlFor={authTab === 'email' ? 'signin-email' : 'signin-phone'}>
                       {authTab === 'email' ? 'Email Address' : 'Mobile number'}
@@ -297,13 +328,22 @@ export default function SignIn() {
                             className="auth-input"
                             type="email"
                             value={emailIdentifier}
-                            onChange={(e) => setEmailIdentifier(e.target.value)}
+                            onChange={(e) => {
+                              setEmailIdentifier(e.target.value)
+                              clearIdentifierError()
+                            }}
                             placeholder="you@example.com"
                             autoComplete="email"
                             required={authTab === 'email'}
                             tabIndex={authTab === 'email' ? 0 : -1}
-                            aria-invalid={!!error || undefined}
-                            aria-describedby={error ? 'signin-error' : undefined}
+                            aria-invalid={!!fieldErrors.identifier || !!error || undefined}
+                            aria-describedby={
+                              fieldErrors.identifier
+                                ? 'signin-identifier-error'
+                                : error
+                                  ? 'signin-error'
+                                  : undefined
+                            }
                           />
                         </div>
                       </div>
@@ -330,17 +370,31 @@ export default function SignIn() {
                             className="auth-input"
                             type="tel"
                             value={phoneIdentifier}
-                            onChange={(e) => setPhoneIdentifier(e.target.value.replace(/[^\d\s-]/g, ''))}
+                            onChange={(e) => {
+                              setPhoneIdentifier(e.target.value.replace(/[^\d\s-]/g, ''))
+                              clearIdentifierError()
+                            }}
                             placeholder="98765 43210"
                             autoComplete="tel-national"
                             required={authTab === 'phone'}
                             tabIndex={authTab === 'phone' ? 0 : -1}
-                            aria-invalid={!!error || undefined}
-                            aria-describedby={error ? 'signin-error' : undefined}
+                            aria-invalid={!!fieldErrors.identifier || !!error || undefined}
+                            aria-describedby={
+                              fieldErrors.identifier
+                                ? 'signin-identifier-error'
+                                : error
+                                  ? 'signin-error'
+                                  : undefined
+                            }
                           />
                         </div>
                       </div>
                     </div>
+                    {fieldErrors.identifier && (
+                      <p className="field-error" id="signin-identifier-error" role="alert">
+                        {fieldErrors.identifier}
+                      </p>
+                    )}
                   </div>
 
                   <div className="form-group">
@@ -357,11 +411,21 @@ export default function SignIn() {
                         className="auth-input"
                         type={showPassword ? 'text' : 'password'}
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => {
+                          setPassword(e.target.value)
+                          clearPasswordError()
+                        }}
                         placeholder="••••••••"
                         autoComplete="current-password"
                         required
-                        aria-describedby={error ? 'signin-error' : undefined}
+                        aria-invalid={!!fieldErrors.password || !!error || undefined}
+                        aria-describedby={
+                          fieldErrors.password
+                            ? 'signin-password-error'
+                            : error
+                              ? 'signin-error'
+                              : undefined
+                        }
                       />
                       <button
                         type="button"
@@ -372,6 +436,11 @@ export default function SignIn() {
                         {showPassword ? <EyeOff size={18} strokeWidth={1.8} /> : <Eye size={18} strokeWidth={1.8} />}
                       </button>
                     </div>
+                    {fieldErrors.password && (
+                      <p className="field-error" id="signin-password-error" role="alert">
+                        {fieldErrors.password}
+                      </p>
+                    )}
                   </div>
 
                   <div className="auth-row">
