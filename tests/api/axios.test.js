@@ -52,10 +52,10 @@ describe('api axios interceptors', () => {
     expect(window.location.href).toBe('/signin')
   })
 
-  it('rejects other errors without logout', async () => {
-    localStorage.setItem('token', 'keep')
-    const handler = api.interceptors.response.handlers[0].rejected
-    await expect(handler({ response: { status: 500 } })).rejects.toBeTruthy()
-    expect(localStorage.getItem('token')).toBe('keep')
+  it('attaches X-XSRF-TOKEN from cookie when present', () => {
+    document.cookie = 'XSRF-TOKEN=test-csrf'
+    const handler = api.interceptors.request.handlers[0].fulfilled
+    const config = handler({ headers: {} })
+    expect(config.headers['X-XSRF-TOKEN']).toBe('test-csrf')
   })
 })

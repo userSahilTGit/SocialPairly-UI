@@ -20,13 +20,31 @@ function clearClientAuthStorage() {
     sessionStorage.removeItem('user')
 }
 
+function readCookie(name) {
+    if (typeof document === 'undefined' || !document.cookie) return null
+    const prefix = `${name}=`
+    const parts = document.cookie.split(';')
+    for (const part of parts) {
+        const trimmed = part.trim()
+        if (trimmed.startsWith(prefix)) {
+            return decodeURIComponent(trimmed.slice(prefix.length))
+        }
+    }
+    return null
+}
+
+function csrfHeaders() {
+    const xsrf = readCookie('XSRF-TOKEN')
+    return xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}
+}
+
 /** Best-effort server logout to clear HttpOnly cookie + revoke JWT (avoids axios interceptor recursion). */
 function revokeServerSession() {
     try {
         fetch('/api/auth/logout', {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...csrfHeaders() },
         }).catch(() => {})
     } catch {
         // ignore
@@ -36,6 +54,8 @@ function revokeServerSession() {
 const api = axios.create({
     baseURL: '/api',
     withCredentials: true,
+    xsrfCookieName: 'XSRF-TOKEN',
+    xsrfHeaderName: 'X-XSRF-TOKEN',
 })
 
 // Attach JWT token to every request if present (Bearer kept for backward compatibility;
@@ -44,6 +64,10 @@ api.interceptors.request.use((config) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token')
     if (token) {
         config.headers.Authorization = `Bearer ${token}`
+    }
+    const xsrf = readCookie('XSRF-TOKEN')
+    if (xsrf && !config.headers['X-XSRF-TOKEN']) {
+        config.headers['X-XSRF-TOKEN'] = xsrf
     }
     return config
 })
