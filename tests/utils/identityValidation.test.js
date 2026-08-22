@@ -13,6 +13,7 @@ import {
   mapIdentityResponseToForm,
   buildIdentityPayload,
   validateIdentityForm,
+  formatZipInput,
   EMPTY_IDENTITY_FORM,
   MIN_AGE,
 } from '@/utils/identityValidation'
@@ -316,22 +317,32 @@ describe('validateIdentityForm', () => {
     expect(errors['relationship.maritalStatus']).toBeTruthy()
   })
 
-  it('validates postal regex from reference data and form fallback', () => {
+  it('validates US zip as 5 digits or ZIP+4 and labels as zip code', () => {
+    const bad = validateIdentityForm(consented({
+      currentResidence: { ...EMPTY_IDENTITY_FORM.currentResidence, postalCode: '123456', countryCode: 'US' },
+    }), 'SAVE_LATER')
+    expect(bad['currentResidence.postalCode']).toMatch(/Zip code must be 5 digits/)
+
+    const zip5 = validateIdentityForm(consented({
+      currentResidence: { ...EMPTY_IDENTITY_FORM.currentResidence, postalCode: '12345', countryCode: 'US' },
+    }), 'SAVE_LATER')
+    expect(zip5['currentResidence.postalCode']).toBeUndefined()
+
+    const zip9 = validateIdentityForm(consented({
+      currentResidence: { ...EMPTY_IDENTITY_FORM.currentResidence, postalCode: '12345-6789', countryCode: 'US' },
+    }), 'SAVE_LATER')
+    expect(zip9['currentResidence.postalCode']).toBeUndefined()
+
     const withRef = validateIdentityForm(consented({
       currentResidence: { ...EMPTY_IDENTITY_FORM.currentResidence, postalCode: 'XXX', countryCode: 'US' },
     }), 'SAVE_LATER', { countries: [{ code: 'US', postalRegex: '^\\d{5}$' }] })
-    expect(withRef['currentResidence.postalCode']).toMatch(/Invalid postal/)
+    expect(withRef['currentResidence.postalCode']).toMatch(/Zip code must be 5 digits/)
+  })
 
-    const withFormRegex = validateIdentityForm(consented({
-      _countryPostalRegex: '^\\d{5}$',
-      currentResidence: { ...EMPTY_IDENTITY_FORM.currentResidence, postalCode: '12', countryCode: 'US' },
-    }), 'SAVE_LATER')
-    expect(withFormRegex['currentResidence.postalCode']).toMatch(/Invalid postal/)
-
-    const invalidRegex = validateIdentityForm(consented({
-      currentResidence: { ...EMPTY_IDENTITY_FORM.currentResidence, postalCode: '12', countryCode: 'US' },
-    }), 'SAVE_LATER', { countries: [{ code: 'US', postalRegex: '(' }] })
-    expect(invalidRegex['currentResidence.postalCode']).toBeUndefined()
+  it('formats zip input to 5 or 5-4 digits', () => {
+    expect(formatZipInput('123456789012')).toBe('12345-6789')
+    expect(formatZipInput('abc12-345')).toBe('12345')
+    expect(formatZipInput('90210')).toBe('90210')
   })
 
   it('validates previous address dates, postal, education years, and nationality dupes', () => {
@@ -344,7 +355,7 @@ describe('validateIdentityForm', () => {
       currentResidence: EMPTY_IDENTITY_FORM.currentResidence,
     }), 'SAVE_LATER', { countries: [{ code: 'US', postalRegex: '^\\d{5}$' }] })
     expect(errors['previousAddresses.0']).toMatch(/To date/)
-    expect(errors['previousAddresses.0.postalCode']).toMatch(/Invalid postal/)
+    expect(errors['previousAddresses.0.postalCode']).toMatch(/Zip code must be 5 digits/)
     expect(errors['educations.0.graduationYear']).toMatch(/Graduation/)
     expect(errors['nationality.additionalNationalities']).toMatch(/duplicate primary|Duplicate nationality/i)
   })
@@ -385,7 +396,7 @@ describe('validateIdentityForm', () => {
       currentResidence: { ...EMPTY_IDENTITY_FORM.currentResidence, postalCode: 'SW1A', countryCode: 'GB' },
       previousAddresses: [{ postalCode: 'ABCDE', countryCode: 'IN' }],
     }), 'SAVE_LATER', { countries: [{ code: 'IN' }] })
-    expect(errors['currentResidence.postalCode']).toMatch(/Invalid postal/)
+    expect(errors['currentResidence.postalCode']).toMatch(/Invalid zip code/)
     expect(errors['previousAddresses.0.postalCode']).toBeUndefined()
   })
 

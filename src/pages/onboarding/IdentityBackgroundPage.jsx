@@ -32,6 +32,8 @@ import {
   mapIdentityResponseToForm,
   residenceDurationLabel,
   validateIdentityForm,
+  formatZipInput,
+  US_ZIP_REGEX,
 } from '../../utils/identityValidation'
 import {
   identityRequestConfig,
@@ -739,7 +741,7 @@ export default function IdentityBackgroundPage() {
 
       <AccordionSection
         id="preferred"
-        title="Preferred Display Name & Audio"
+        title="Preferred Display Name"
         icon={Sparkles}
         iconTone="purple"
         subtitle="How your matches will see your name on Socialpairly."
@@ -926,8 +928,18 @@ export default function IdentityBackgroundPage() {
             <FieldError name="currentResidence.stateRegion" />
           </label>
           <label className={fieldClass('currentResidence.postalCode')}>
-            <span>Postal code *</span>
-            <input name="postalCode" value={form.currentResidence.postalCode} onChange={onSectionChange('currentResidence')} autoComplete="postal-code" {...inputA11y('currentResidence.postalCode')} />
+            <span>Zip code <span className="ob-required-marker" aria-hidden="true">*</span><span className="sr-only">(required)</span></span>
+            <input
+              name="postalCode"
+              value={form.currentResidence.postalCode}
+              onChange={(e) => patchSection('currentResidence', { postalCode: formatZipInput(e.target.value) })}
+              autoComplete="postal-code"
+              inputMode="numeric"
+              maxLength={10}
+              placeholder="12345 or 12345-6789"
+              aria-label="Zip code"
+              {...inputA11y('currentResidence.postalCode', { required: true })}
+            />
             <FieldError name="currentResidence.postalCode" />
           </label>
           <CountrySelect
@@ -977,13 +989,15 @@ export default function IdentityBackgroundPage() {
             section="currentResidence"
           />
           <label className="ob-field">
-            <span>Event travel radius (km)</span>
+            <span>Event travel radius (Miles)</span>
             <input
-              name="eventTravelRadiusKm"
+              name="eventTravelRadiusMiles"
               type="number"
               min="0"
-              value={form.currentResidence.eventTravelRadiusKm}
+              value={form.currentResidence.eventTravelRadiusMiles}
               onChange={onSectionChange('currentResidence')}
+              placeholder="e.g. 25"
+              aria-label="Event travel radius in miles"
             />
           </label>
         </div>
@@ -1034,8 +1048,17 @@ export default function IdentityBackgroundPage() {
                 <input value={row.stateRegion} onChange={(e) => updatePreviousAddress(idx, 'stateRegion', e.target.value)} />
               </label>
               <label className="ob-field">
-                <span>Postal code</span>
-                <input value={row.postalCode} onChange={(e) => updatePreviousAddress(idx, 'postalCode', e.target.value)} {...inputA11y(`previousAddresses.${idx}.postalCode`)} />
+                <span>Zip code</span>
+                <input
+                  value={row.postalCode}
+                  onChange={(e) => updatePreviousAddress(idx, 'postalCode', formatZipInput(e.target.value))}
+                  autoComplete="postal-code"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="12345 or 12345-6789"
+                  aria-label={`Previous address ${idx + 1} zip code`}
+                  {...inputA11y(`previousAddresses.${idx}.postalCode`)}
+                />
                 <FieldError name={`previousAddresses.${idx}.postalCode`} />
               </label>
               <label className="ob-field">
