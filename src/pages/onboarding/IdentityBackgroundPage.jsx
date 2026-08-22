@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState, startTransition } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   BadgeCheck, Briefcase, Calendar, Check, Eye, Globe2, Info,
@@ -32,7 +32,16 @@ import {
   mapIdentityResponseToForm,
   residenceDurationLabel,
   validateIdentityForm,
+  formatZipInput,
+  US_ZIP_REGEX,
 } from '../../utils/identityValidation'
+import {
+  identityRequestConfig,
+  isTimeoutError,
+  markIdentityEnd,
+  markIdentityStart,
+  readServerDuration,
+} from '../../utils/identityPerf'
 
 const MONTHS = [
   { value: '', label: 'Month' },
@@ -128,7 +137,10 @@ export default function IdentityBackgroundPage() {
   const [locationDraft, setLocationDraft] = useState('')
   const [completionPct, setCompletionPct] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const deferredSearchQuery = useDeferredValue(searchQuery)
   const [showPreview, setShowPreview] = useState(false)
+  const formErrorRef = useRef(null)
+  const workspaceTopRef = useRef(null)
 
   const age = useMemo(() => calcAge(form.dateOfBirth), [form.dateOfBirth])
   const durationLabel = useMemo(
@@ -154,11 +166,13 @@ export default function IdentityBackgroundPage() {
   const load = async () => {
     setLoading(true)
     setLoadError('')
+    const started = markIdentityStart('pageLoad')
     try {
+      const cfg = identityRequestConfig()
       const [identityRes, refRes, completionRes] = await Promise.all([
-        api.get('/onboarding/identity'),
-        api.get('/onboarding/identity/reference-data'),
-        api.get('/profile/completion').catch(() => ({ data: null })),
+        api.get('/onboarding/identity', cfg),
+        api.get('/onboarding/identity/reference-data', cfg),
+        api.get('/profile/completion', cfg).catch(() => ({ data: null })),
       ])
       const data = identityRes.data
       const mapped = mapIdentityResponseToForm(data)
@@ -171,8 +185,17 @@ export default function IdentityBackgroundPage() {
       setForm(mapped)
       setConsentChecked(!!mapped.backgroundConsent?.accepted)
       setCompletionPct(readCompletionPercentage(completionRes))
+      markIdentityEnd('pageLoad', started, {
+        serverIdentityMs: readServerDuration(identityRes),
+        serverReferenceMs: readServerDuration(refRes),
+      })
     } catch (err) {
-      setLoadError(err.response?.data?.message || 'Could not load Identity & Background. Please try again.')
+      markIdentityEnd('pageLoad', started, { error: true })
+      if (isTimeoutError(err)) {
+        setLoadError('Identity & Background is taking too long to load. Check your connection and try again.')
+      } else {
+        setLoadError(err.response?.data?.message || 'Could not load Identity & Background. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -271,21 +294,54 @@ export default function IdentityBackgroundPage() {
 
   const fieldClass = (name) => (fieldErrors[name] ? 'ob-field has-error' : 'ob-field')
 
-  const inputA11y = (name) => ({
+  const focusFirstError = (errors) => {
+    const firstKey = Object.keys(errors || {})[0]
+    if (!firstKey) {
+      formErrorRef.current?.focus?.()
+      return
+    }
+    const sectionId = openSectionForErrors(errors)
+    setOpenSections(new Set([sectionId]))
+    window.setTimeout(() => {
+      const safe = firstKey.replace(/\./g, '-')
+      const byDescribed = document.getElementById(`${safe}-error`)
+      const field = byDescribed?.closest('.ob-field')?.querySelector('input, select, textarea, button')
+        || document.querySelector(`[name="${firstKey}"]`)
+        || document.querySelector(`[name="${firstKey.split('.').pop()}"]`)
+      if (field && typeof field.focus === 'function') {
+        field.focus({ preventScroll: false })
+        field.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      } else {
+        formErrorRef.current?.focus?.()
+      }
+    }, 80)
+  }
+
+  const inputA11y = (name, { required = false } = {}) => ({
     'aria-invalid': fieldErrors[name] ? true : undefined,
+    'aria-required': required || undefined,
     'aria-describedby': fieldErrors[name] ? `${name.replace(/\./g, '-')}-error` : undefined,
   })
 
   const FieldError = ({ name }) => (
     fieldErrors[name]
-      ? <em id={`${name.replace(/\./g, '-')}-error`}>{fieldErrors[name]}</em>
+      ? (
+        <em id={`${name.replace(/\./g, '-')}-error`} className="ob-field-error" role="alert">
+          {fieldErrors[name]}
+        </em>
+      )
       : null
   )
 
   const CountrySelect = ({ name, value, onChange: onSel, required = false, errorKey }) => (
     <label className={fieldClass(errorKey || name)}>
       <span>{required ? 'Country *' : 'Country'}</span>
-      <select name={name} value={value} onChange={onSel} {...inputA11y(errorKey || name)}>
+      <select
+        name={name}
+        value={value}
+        onChange={onSel}
+        {...inputA11y(errorKey || name, { required })}
+      >
         <option value="">Select</option>
         {countries.map((c) => (
           <option key={c.code} value={c.code}>{c.name}</option>
@@ -311,7 +367,7 @@ export default function IdentityBackgroundPage() {
         name={name}
         value={value}
         onChange={onSel}
-        {...inputA11y(errorKey || (section ? `${section}.${name}` : name))}
+        {...inputA11y(errorKey || (section ? `${section}.${name}` : name), { required })}
       >
         <option value="">Select</option>
         {enumOptions(options).map((o) => (
@@ -325,10 +381,12 @@ export default function IdentityBackgroundPage() {
   const submit = async (action) => {
     setFormError('')
     if (!form.backgroundConsent?.accepted) {
+      const errors = { backgroundConsent: 'Consent is required' }
       setFormError('Background screening consent is required before saving.')
-      setFieldErrors({ backgroundConsent: 'Consent is required' })
+      setFieldErrors(errors)
       setOpenSections((prev) => new Set([...prev, 'consent']))
       setConsentModalOpen(true)
+      focusFirstError(errors)
       return
     }
     const errors = validateIdentityForm(form, action, refData)
@@ -336,12 +394,22 @@ export default function IdentityBackgroundPage() {
     if (Object.keys(errors).length) {
       setFormError('Please fix the highlighted fields before continuing.')
       setOpenSections(new Set([openSectionForErrors(errors)]))
+      focusFirstError(errors)
       return
     }
 
     setSaving(true)
+    const started = markIdentityStart(action === 'SAVE_LATER' ? 'saveLater' : 'saveContinue')
     try {
-      await api.put('/onboarding/identity', buildIdentityPayload(form, action))
+      const response = await api.put(
+        '/onboarding/identity',
+        buildIdentityPayload(form, action),
+        identityRequestConfig(),
+      )
+      markIdentityEnd(action === 'SAVE_LATER' ? 'saveLater' : 'saveContinue', started, {
+        serverMs: readServerDuration(response),
+        action,
+      })
       await refreshUser()
       if (editMode) {
         navigate('/profile', { replace: true })
@@ -355,14 +423,23 @@ export default function IdentityBackgroundPage() {
         navigate('/onboarding/personality', { replace: true })
       }
     } catch (err) {
-      const msg = err.response?.data?.message || 'Unable to save. Please try again.'
-      const fields = err.response?.data?.fields
-      if (fields && typeof fields === 'object') setFieldErrors(fields)
-      setFormError(msg)
-      if (String(msg).toLowerCase().includes('consent')) {
-        setOpenSections((prev) => new Set([...prev, 'consent']))
-        setConsentModalOpen(true)
+      markIdentityEnd(action === 'SAVE_LATER' ? 'saveLater' : 'saveContinue', started, {
+        error: true,
+        action,
+      })
+      if (isTimeoutError(err)) {
+        setFormError('Save is taking too long. Your connection may be slow — please try again. The form was not submitted.')
+      } else {
+        const msg = err.response?.data?.message || 'Unable to save. Please try again.'
+        const fields = err.response?.data?.fields
+        if (fields && typeof fields === 'object') setFieldErrors(fields)
+        setFormError(msg)
+        if (String(msg).toLowerCase().includes('consent')) {
+          setOpenSections((prev) => new Set([...prev, 'consent']))
+          setConsentModalOpen(true)
+        }
       }
+      window.setTimeout(() => formErrorRef.current?.focus?.(), 50)
     } finally {
       setSaving(false)
     }
@@ -526,7 +603,7 @@ export default function IdentityBackgroundPage() {
   const collapseAll = () => setOpenSections(new Set())
 
   const sectionVisible = (id, keywords = []) => {
-    const q = searchQuery.trim().toLowerCase()
+    const q = deferredSearchQuery.trim().toLowerCase()
     if (!q) return true
     return [id, ...keywords].some((k) => String(k).toLowerCase().includes(q))
   }
@@ -535,10 +612,10 @@ export default function IdentityBackgroundPage() {
 
   if (loading) {
     return (
-      <div className="ob-state-screen">
+      <div className="ob-state-screen" role="status" aria-live="polite" aria-busy="true">
         <div className="ob-state-card">
           <div className="ob-spinner" aria-hidden="true" />
-          <h2>Loading Identity & Background</h2>
+          <h1>Loading Identity & Background</h1>
           <p>Fetching your registration details…</p>
         </div>
       </div>
@@ -547,9 +624,9 @@ export default function IdentityBackgroundPage() {
 
   if (loadError) {
     return (
-      <div className="ob-state-screen">
+      <div className="ob-state-screen" role="alert">
         <div className="ob-state-card">
-          <h2>Something went wrong</h2>
+          <h1>Something went wrong</h1>
           <p>{loadError}</p>
           <button type="button" className="btn auth-primary-btn" onClick={load}>
             Try again
@@ -590,12 +667,23 @@ export default function IdentityBackgroundPage() {
       onPreview={() => setShowPreview(true)}
       searchEnabled
       searchQuery={searchQuery}
-      onSearch={setSearchQuery}
+      onSearch={(value) => startTransition(() => setSearchQuery(value))}
       searchMatchCount={searchMatchCount}
       expandAll={expandAll}
       collapseAll={collapseAll}
     >
-      {formError && <div className="error ob-form-error" role="alert">{formError}</div>}
+      <div ref={workspaceTopRef} tabIndex={-1} className="sr-only">Identity and background form</div>
+      {formError && (
+        <div
+          ref={formErrorRef}
+          className="error ob-form-error"
+          role="alert"
+          aria-live="assertive"
+          tabIndex={-1}
+        >
+          {formError}
+        </div>
+      )}
 
       <AccordionSection
         id="legal"
@@ -619,8 +707,8 @@ export default function IdentityBackgroundPage() {
             </select>
           </label>
           <label className={fieldClass('firstName')}>
-            <span>First name *</span>
-            <input name="firstName" value={form.firstName} onChange={onChange} autoComplete="given-name" {...inputA11y('firstName')} />
+            <span>First name <span className="ob-required-marker" aria-hidden="true">*</span><span className="sr-only">(required)</span></span>
+            <input name="firstName" value={form.firstName} onChange={onChange} autoComplete="given-name" {...inputA11y('firstName', { required: true })} />
             <FieldError name="firstName" />
           </label>
           <label className={fieldClass('middleName')}>
@@ -629,8 +717,8 @@ export default function IdentityBackgroundPage() {
             <FieldError name="middleName" />
           </label>
           <label className={fieldClass('lastName')}>
-            <span>Last name *</span>
-            <input name="lastName" value={form.lastName} onChange={onChange} autoComplete="family-name" {...inputA11y('lastName')} />
+            <span>Last name <span className="ob-required-marker" aria-hidden="true">*</span><span className="sr-only">(required)</span></span>
+            <input name="lastName" value={form.lastName} onChange={onChange} autoComplete="family-name" {...inputA11y('lastName', { required: true })} />
             <FieldError name="lastName" />
           </label>
           <label className={fieldClass('nameSuffix')}>
@@ -653,7 +741,7 @@ export default function IdentityBackgroundPage() {
 
       <AccordionSection
         id="preferred"
-        title="Preferred Display Name & Audio"
+        title="Preferred Display Name"
         icon={Sparkles}
         iconTone="purple"
         subtitle="How your matches will see your name on Socialpairly."
@@ -686,8 +774,8 @@ export default function IdentityBackgroundPage() {
         hidden={!sectionVisible('dob', ['date of birth', 'age', 'birthday'])}
       >        <div className="ob-grid">
           <label className={fieldClass('dateOfBirth')}>
-            <span>Date of birth *</span>
-            <input type="date" name="dateOfBirth" value={form.dateOfBirth} onChange={onChange} {...inputA11y('dateOfBirth')} />
+            <span>Date of birth <span className="ob-required-marker" aria-hidden="true">*</span><span className="sr-only">(required)</span></span>
+            <input type="date" name="dateOfBirth" value={form.dateOfBirth} onChange={onChange} {...inputA11y('dateOfBirth', { required: true })} />
             <FieldError name="dateOfBirth" />
           </label>
           <div className="ob-age-preview">
@@ -840,8 +928,18 @@ export default function IdentityBackgroundPage() {
             <FieldError name="currentResidence.stateRegion" />
           </label>
           <label className={fieldClass('currentResidence.postalCode')}>
-            <span>Postal code *</span>
-            <input name="postalCode" value={form.currentResidence.postalCode} onChange={onSectionChange('currentResidence')} autoComplete="postal-code" {...inputA11y('currentResidence.postalCode')} />
+            <span>Zip code <span className="ob-required-marker" aria-hidden="true">*</span><span className="sr-only">(required)</span></span>
+            <input
+              name="postalCode"
+              value={form.currentResidence.postalCode}
+              onChange={(e) => patchSection('currentResidence', { postalCode: formatZipInput(e.target.value) })}
+              autoComplete="postal-code"
+              inputMode="numeric"
+              maxLength={10}
+              placeholder="12345 or 12345-6789"
+              aria-label="Zip code"
+              {...inputA11y('currentResidence.postalCode', { required: true })}
+            />
             <FieldError name="currentResidence.postalCode" />
           </label>
           <CountrySelect
@@ -891,13 +989,15 @@ export default function IdentityBackgroundPage() {
             section="currentResidence"
           />
           <label className="ob-field">
-            <span>Event travel radius (km)</span>
+            <span>Event travel radius (Miles)</span>
             <input
-              name="eventTravelRadiusKm"
+              name="eventTravelRadiusMiles"
               type="number"
               min="0"
-              value={form.currentResidence.eventTravelRadiusKm}
+              value={form.currentResidence.eventTravelRadiusMiles}
               onChange={onSectionChange('currentResidence')}
+              placeholder="e.g. 25"
+              aria-label="Event travel radius in miles"
             />
           </label>
         </div>
@@ -948,8 +1048,17 @@ export default function IdentityBackgroundPage() {
                 <input value={row.stateRegion} onChange={(e) => updatePreviousAddress(idx, 'stateRegion', e.target.value)} />
               </label>
               <label className="ob-field">
-                <span>Postal code</span>
-                <input value={row.postalCode} onChange={(e) => updatePreviousAddress(idx, 'postalCode', e.target.value)} {...inputA11y(`previousAddresses.${idx}.postalCode`)} />
+                <span>Zip code</span>
+                <input
+                  value={row.postalCode}
+                  onChange={(e) => updatePreviousAddress(idx, 'postalCode', formatZipInput(e.target.value))}
+                  autoComplete="postal-code"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="12345 or 12345-6789"
+                  aria-label={`Previous address ${idx + 1} zip code`}
+                  {...inputA11y(`previousAddresses.${idx}.postalCode`)}
+                />
                 <FieldError name={`previousAddresses.${idx}.postalCode`} />
               </label>
               <label className="ob-field">
@@ -1648,15 +1757,33 @@ export default function IdentityBackgroundPage() {
           </label>
           <label className="ob-field">
             <span>DL front {vs?.dlFrontDocumentId ? '(Uploaded)' : ''}</span>
-            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => onDocUpload(e, 'DL_FRONT')} disabled={verifyBusy} />
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              aria-label="Upload driver license front image"
+              onChange={(e) => onDocUpload(e, 'DL_FRONT')}
+              disabled={verifyBusy}
+            />
           </label>
           <label className="ob-field">
             <span>DL back {vs?.dlBackDocumentId ? '(Uploaded)' : ''}</span>
-            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => onDocUpload(e, 'DL_BACK')} disabled={verifyBusy} />
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              aria-label="Upload driver license back image"
+              onChange={(e) => onDocUpload(e, 'DL_BACK')}
+              disabled={verifyBusy}
+            />
           </label>
           <label className="ob-field">
             <span>Selfie</span>
-            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => onDocUpload(e, 'SELFIE')} disabled={verifyBusy} />
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              aria-label="Upload selfie for face match"
+              onChange={(e) => onDocUpload(e, 'SELFIE')}
+              disabled={verifyBusy}
+            />
           </label>
         </div>
         <p className="ob-hint">
@@ -1691,9 +1818,14 @@ export default function IdentityBackgroundPage() {
               readOnly
               onClick={openConsentModal}
               onChange={() => {}}
+              aria-required="true"
               aria-checked={consentChecked || !!form.backgroundConsent?.accepted}
+              aria-invalid={fieldErrors.backgroundConsent ? true : undefined}
+              aria-describedby={fieldErrors.backgroundConsent ? 'backgroundConsent-error' : undefined}
             />
             {' '}I have read and agree to the background screening disclosure.
+            <span className="ob-required-marker" aria-hidden="true"> *</span>
+            <span className="sr-only">(required)</span>
           </span>
           <FieldError name="backgroundConsent" />
         </label>

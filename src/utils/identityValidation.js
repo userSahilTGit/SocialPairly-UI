@@ -110,7 +110,7 @@ export const EMPTY_IDENTITY_FORM = {
     moveInMonth: '',
     moveInYear: '',
     willingToRelocate: '',
-    eventTravelRadiusKm: '',
+    eventTravelRadiusMiles: '',
     preferredFutureLocations: [],
   },
   previousAddresses: [],
@@ -342,6 +342,8 @@ export function residenceDurationLabel(moveInMonth, moveInYear) {
 function resolvePostalRegex(form, countryCode, refData) {
   const code = trimValue(countryCode).toUpperCase()
   if (!code) return trimValue(form?._countryPostalRegex)
+  // Phase 1 US: canonical ZIP = 5 digits or ZIP+4
+  if (code === 'US') return US_ZIP_REGEX.source
   const fromList = (refData?.countries || []).find((c) => c.code === code)
   if (fromList?.postalRegex) return fromList.postalRegex
   if (trimValue(form?._countryPostalRegex) && form?.currentResidence?.countryCode === code) {
@@ -350,15 +352,32 @@ function resolvePostalRegex(form, countryCode, refData) {
   return ''
 }
 
+/** US ZIP: 12345 or 12345-6789 */
+export const US_ZIP_REGEX = /^[0-9]{5}(-[0-9]{4})?$/
+
+/** Keep only valid ZIP typing (max 5 or 5+4). */
+export function formatZipInput(value) {
+  const digits = String(value ?? '').replace(/\D/g, '').slice(0, 9)
+  if (digits.length <= 5) return digits
+  return `${digits.slice(0, 5)}-${digits.slice(5)}`
+}
+
 function validatePostal(postalCode, countryCode, form, refData, key, errors) {
   const postal = trimValue(postalCode)
   const code = trimValue(countryCode).toUpperCase()
-  if (!postal || !code) return
+  if (!postal) return
+  if (code === 'US' || (!code && postal)) {
+    if (!US_ZIP_REGEX.test(postal)) {
+      errors[key] = 'Zip code must be 5 digits or 5 digits-4 digits (e.g. 12345 or 12345-6789)'
+    }
+    return
+  }
+  if (!code) return
   const regex = resolvePostalRegex(form, code, refData)
   if (!regex) return
   try {
     if (!new RegExp(regex).test(postal)) {
-      errors[key] = `Invalid postal code for ${code}`
+      errors[key] = `Invalid zip code for ${code}`
     }
   } catch {
     // ignore invalid regex from reference data
@@ -422,7 +441,7 @@ export function mapIdentityResponseToForm(data) {
       moveInMonth: numOrEmpty(cr.moveInMonth),
       moveInYear: numOrEmpty(cr.moveInYear),
       willingToRelocate: strOrEmpty(cr.willingToRelocate),
-      eventTravelRadiusKm: numOrEmpty(cr.eventTravelRadiusKm),
+      eventTravelRadiusMiles: numOrEmpty(cr.eventTravelRadiusMiles ?? cr.eventTravelRadiusKm),
       preferredFutureLocations: Array.isArray(cr.preferredFutureLocations)
         ? [...cr.preferredFutureLocations]
         : [],
@@ -615,7 +634,7 @@ export function buildIdentityPayload(form, action) {
       moveInMonth: toNullableInt(cr.moveInMonth),
       moveInYear: toNullableInt(cr.moveInYear),
       willingToRelocate: toNullableString(cr.willingToRelocate),
-      eventTravelRadiusKm: toNullableInt(cr.eventTravelRadiusKm),
+      eventTravelRadiusMiles: toNullableInt(cr.eventTravelRadiusMiles),
       preferredFutureLocations: (cr.preferredFutureLocations || [])
         .map((l) => trimValue(l))
         .filter(Boolean),
@@ -803,7 +822,7 @@ export function validateIdentityForm(form, action, refData) {
     if (!trimValue(cr.line1)) errors['currentResidence.line1'] = 'Address line 1 is required'
     if (!trimValue(cr.city)) errors['currentResidence.city'] = 'City is required'
     if (!trimValue(cr.stateRegion)) errors['currentResidence.stateRegion'] = 'State / region is required'
-    if (!trimValue(cr.postalCode)) errors['currentResidence.postalCode'] = 'Postal code is required'
+    if (!trimValue(cr.postalCode)) errors['currentResidence.postalCode'] = 'Zip code is required'
     if (!trimValue(cr.countryCode)) errors['currentResidence.countryCode'] = 'Country is required'
 
     if (!trimValue(form.relationship?.maritalStatus)) {

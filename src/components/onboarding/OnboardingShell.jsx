@@ -128,12 +128,12 @@ export default function OnboardingShell({
             <span>256-Bit Encrypted & Private</span>
           </div>
           {onPreview && (
-            <button type="button" className="ob-preview-btn" onClick={onPreview}>
-              <Eye className="w-4 h-4" />
+            <button type="button" className="ob-preview-btn" onClick={onPreview} aria-haspopup="dialog">
+              <Eye className="w-4 h-4" aria-hidden="true" />
               <span>Public Preview</span>
             </button>
           )}
-          <button type="button" className="ob-cancel-link" onClick={onSaveLater} disabled={saving}>
+          <button type="button" className="ob-cancel-link" onClick={onSaveLater} disabled={saving} aria-busy={saving || undefined}>
             {saveLaterLabel}
           </button>
           <button
@@ -141,8 +141,9 @@ export default function OnboardingShell({
             className="ob-save-btn"
             onClick={onContinue}
             disabled={continueDisabled || saving}
+            aria-busy={saving || undefined}
           >
-            <CheckCircle2 className="w-4 h-4" />
+            <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
             <span>{saving ? 'Saving…' : 'Save Changes'}</span>
           </button>
         </div>
@@ -271,16 +272,21 @@ export default function OnboardingShell({
               {searchEnabled && (
                 <div className="ob-search-row">
                   <div className="ob-search">
-                    <Search className="w-4 h-4" />
+                    <Search className="w-4 h-4" aria-hidden="true" />
+                    <label className="sr-only" htmlFor="ob-section-search">Search identity sections</label>
                     <input
+                      id="ob-section-search"
                       type="search"
                       value={searchQuery}
                       onChange={(e) => onSearch?.(e.target.value)}
                       placeholder="Search sections (e.g. Legal Name, Languages, Verification, Career)..."
+                      aria-describedby={searchQuery.trim() && searchMatchCount != null ? 'ob-search-count' : undefined}
                     />
                   </div>
                   {searchQuery.trim() && searchMatchCount != null && (
-                    <span className="ob-search-count">{searchMatchCount} matching section(s)</span>
+                    <span id="ob-search-count" className="ob-search-count" role="status" aria-live="polite">
+                      {searchMatchCount} matching section(s)
+                    </span>
                   )}
                 </div>
               )}
@@ -294,18 +300,19 @@ export default function OnboardingShell({
               </div>
             </div>
 
-            <footer className="ob-footer">
+            <footer className="ob-footer" aria-label="Identity form actions">
               <button type="button" className="ob-back-btn" onClick={onBack} disabled={saving}>
-                <ChevronLeft className="w-4 h-4" /> Back
+                <ChevronLeft className="w-4 h-4" aria-hidden="true" /> Back
               </button>
               <button
                 type="button"
                 className="ob-continue-btn"
                 onClick={onContinue}
                 disabled={continueDisabled || saving}
+                aria-busy={saving || undefined}
               >
                 <span>{saving ? 'Saving…' : continueLabel}</span>
-                {!saving && <ArrowRight className="w-4 h-4" />}
+                {!saving && <ArrowRight className="w-4 h-4" aria-hidden="true" />}
               </button>
             </footer>
           </div>

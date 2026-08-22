@@ -37,8 +37,8 @@ describe('getMediaUrl', () => {
   })
 
   it('prefixes relative paths with API_URL and prefers mediaUrl over url', () => {
-    expect(getMediaUrl('/files/a.png')).toBe('http://localhost:9010/files/a.png')
-    expect(getMediaUrl({ url: '/files/b.png' })).toBe('http://localhost:9010/files/b.png')
+    expect(getMediaUrl('/files/a.png')).toBe('http://localhost:8080/files/a.png')
+    expect(getMediaUrl({ url: '/files/b.png' })).toBe('http://localhost:8080/files/b.png')
     expect(getMediaUrl({ mediaUrl: '/api/media/1/stream', url: '/files/ignored.png' }))
       .toBe('/api/media/1/stream')
   })
