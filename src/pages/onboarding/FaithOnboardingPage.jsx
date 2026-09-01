@@ -140,11 +140,16 @@ export default function FaithOnboardingPage() {
   const isOpen = (id) => openSections.has(id)
   const expandAll = () => setOpenSections(new Set(ALL_SECTIONS))
   const collapseAll = () => setOpenSections(new Set())
-  const sectionVisible = (id, keywords = []) => {
+  const sectionMatchesSearch = (id, keywords = []) => {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return true
-    return [id, ...keywords].some((k) => String(k).toLowerCase().includes(q))
+    if ([id, ...keywords].some((k) => String(k).toLowerCase().includes(q))) return true
+    if (id === 'myFaith' && religionOptions.some((r) => r.toLowerCase().includes(q))) return true
+    if (id === 'preferredFaith' && preferredReligionOptions.some((r) => r.toLowerCase().includes(q))) return true
+    return false
   }
+  // Keep accordion sections visible while searching so religion selects stay usable (#1563).
+  const sectionVisible = () => true
 
   if (loading) {
     return (
@@ -191,7 +196,7 @@ export default function FaithOnboardingPage() {
       searchEnabled
       searchQuery={searchQuery}
       onSearch={setSearchQuery}
-      searchMatchCount={ALL_SECTIONS.filter((id) => sectionVisible(id, [id])).length}
+      searchMatchCount={ALL_SECTIONS.filter((id) => sectionMatchesSearch(id, [id])).length}
       expandAll={expandAll}
       collapseAll={collapseAll}
     >
