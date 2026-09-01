@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   BadgeCheck, Briefcase, Calendar, Check, Eye, Globe2, Info,
   MapPin, PhoneCall, ShieldAlert, ShieldCheck, Sparkles, UserCheck, Users,
-  Home, Landmark, HeartHandshake, Wallet, Scale, FileCheck2, Baby,
+  Home, Landmark, HeartHandshake, Wallet, Scale, Baby,
 } from 'lucide-react'
 import * as faceapi from 'face-api.js'
 import api from '../../api/axios'
@@ -12,7 +12,6 @@ import { loadFaceApiModels, matchProfileToIDDocument } from '../../utils/faceRec
 import { readCompletionPercentage } from '../../utils/profileCompletion'
 import OnboardingShell from '../../components/onboarding/OnboardingShell'
 import AccordionSection from '../../components/onboarding/AccordionSection'
-import ConsentTermsModal from '../../components/onboarding/ConsentTermsModal'
 import {
   BEST_TIMES,
   CONTACT_METHODS,
@@ -34,6 +33,11 @@ import {
   validateIdentityForm,
   formatZipInput,
   US_ZIP_REGEX,
+  sanitizePhoneInput,
+  resolveAdditionalNationalities,
+  formatAdditionalNationalitiesText,
+  currentCalendarYear,
+  PROFICIENCY_LEVELS,
 } from '../../utils/identityValidation'
 import {
   identityRequestConfig,
@@ -68,7 +72,6 @@ const SECTION_FOR_ERROR = {
   'currentResidence.countryCode': 'address',
   'relationship.maritalStatus': 'relationship',
   'nationality.additionalNationalities': 'nationality',
-  backgroundConsent: 'consent',
   ssn: 'verification',
 }
 
@@ -90,7 +93,6 @@ function openSectionForErrors(errors) {
     if (key.startsWith('financial')) return 'financial'
     if (key.startsWith('safety')) return 'safety'
     if (key.startsWith('civil')) return 'civil'
-    if (key === 'backgroundConsent' || key.startsWith('consent')) return 'consent'
     if (key === 'ssn' || key.startsWith('verification')) return 'verification'
   }
   return 'legal'
@@ -122,7 +124,7 @@ export default function IdentityBackgroundPage() {
   const ALL_SECTIONS = [
     'legal', 'preferred', 'dob', 'gender', 'contact', 'address', 'previousAddresses',
     'nationality', 'immigration', 'relationship', 'family', 'education', 'career',
-    'financial', 'safety', 'civil', 'verification', 'consent',
+    'financial', 'safety', 'civil', 'verification',
   ]
   const [openSections, setOpenSections] = useState(() => new Set(['legal']))
   const [loading, setLoading] = useState(true)
@@ -131,9 +133,8 @@ export default function IdentityBackgroundPage() {
   const [formError, setFormError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [editMode, setEditMode] = useState(!!user?.identityPage1Complete)
-  const [consentChecked, setConsentChecked] = useState(false)
-  const [consentModalOpen, setConsentModalOpen] = useState(false)
   const [verifyBusy, setVerifyBusy] = useState(false)
+  const [additionalNationalitiesText, setAdditionalNationalitiesText] = useState('')
   const [locationDraft, setLocationDraft] = useState('')
   const [completionPct, setCompletionPct] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -149,7 +150,7 @@ export default function IdentityBackgroundPage() {
   )
 
   const countries = refData?.countries || []
-  const showRelationshipCounts = ['DIVORCED', 'SEPARATED', 'WIDOWED', 'MARRIED'].includes(
+  const showRelationshipCounts = ['DIVORCED', 'SEPARATED', 'WIDOWED'].includes(
     form.relationship.maritalStatus,
   )
   const showSafetyDetails = [
@@ -183,7 +184,12 @@ export default function IdentityBackgroundPage() {
       setRefData(refRes.data || {})
       setEditMode(!!data.identityPage1Complete)
       setForm(mapped)
-      setConsentChecked(!!mapped.backgroundConsent?.accepted)
+      setAdditionalNationalitiesText(
+        formatAdditionalNationalitiesText(
+          mapped.nationality?.additionalNationalities,
+          refRes.data?.countries || [],
+        ),
+      )
       setCompletionPct(readCompletionPercentage(completionRes))
       markIdentityEnd('pageLoad', started, {
         serverIdentityMs: readServerDuration(identityRes),
@@ -378,18 +384,28 @@ export default function IdentityBackgroundPage() {
     </label>
   )
 
+  const onPhoneChange = (field) => (e) => {
+    const value = sanitizePhoneInput(e.target.value)
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const syncAdditionalNationalities = (text) => {
+    const codes = resolveAdditionalNationalities(text, countries)
+    patchSection('nationality', { additionalNationalities: codes })
+  }
+
   const submit = async (action) => {
     setFormError('')
-    if (!form.backgroundConsent?.accepted) {
-      const errors = { backgroundConsent: 'Consent is required' }
-      setFormError('Background screening consent is required before saving.')
-      setFieldErrors(errors)
-      setOpenSections((prev) => new Set([...prev, 'consent']))
-      setConsentModalOpen(true)
-      focusFirstError(errors)
-      return
+    const resolvedNationalities = resolveAdditionalNationalities(additionalNationalitiesText, countries)
+    const formForSubmit = {
+      ...form,
+      nationality: {
+        ...form.nationality,
+        additionalNationalities: resolvedNationalities,
+      },
     }
-    const errors = validateIdentityForm(form, action, refData)
+    setForm(formForSubmit)
+    const errors = validateIdentityForm(formForSubmit, action, refData)
     setFieldErrors(errors)
     if (Object.keys(errors).length) {
       setFormError('Please fix the highlighted fields before continuing.')
@@ -403,7 +419,7 @@ export default function IdentityBackgroundPage() {
     try {
       const response = await api.put(
         '/onboarding/identity',
-        buildIdentityPayload(form, action),
+        buildIdentityPayload(formForSubmit, action),
         identityRequestConfig(),
       )
       markIdentityEnd(action === 'SAVE_LATER' ? 'saveLater' : 'saveContinue', started, {
@@ -434,10 +450,6 @@ export default function IdentityBackgroundPage() {
         const fields = err.response?.data?.fields
         if (fields && typeof fields === 'object') setFieldErrors(fields)
         setFormError(msg)
-        if (String(msg).toLowerCase().includes('consent')) {
-          setOpenSections((prev) => new Set([...prev, 'consent']))
-          setConsentModalOpen(true)
-        }
       }
       window.setTimeout(() => formErrorRef.current?.focus?.(), 50)
     } finally {
@@ -548,43 +560,6 @@ export default function IdentityBackgroundPage() {
       }
     } catch (err) {
       setFormError(err.response?.data?.message || err.message || 'Document upload failed.')
-    } finally {
-      setVerifyBusy(false)
-    }
-  }
-
-  const openConsentModal = (e) => {
-    e?.preventDefault?.()
-    if (form.backgroundConsent?.accepted || consentChecked) return
-    setConsentModalOpen(true)
-  }
-
-  const acceptConsentFromModal = async () => {
-    setVerifyBusy(true)
-    setFormError('')
-    try {
-      const documentVersion = refData?.backgroundConsentDocumentVersion
-      const { data } = await api.post('/onboarding/identity/background-consent', {
-        accepted: true,
-        documentVersion,
-      })
-      setForm((prev) => ({
-        ...prev,
-        backgroundConsent: {
-          accepted: true,
-          documentVersion: data.documentVersion || documentVersion,
-          acceptedAt: data.acceptedAt || null,
-        },
-      }))
-      setConsentChecked(true)
-      setConsentModalOpen(false)
-      setFieldErrors((prev) => {
-        const next = { ...prev }
-        delete next.backgroundConsent
-        return next
-      })
-    } catch (err) {
-      setFormError(err.response?.data?.message || 'Unable to record consent.')
     } finally {
       setVerifyBusy(false)
     }
@@ -835,53 +810,95 @@ export default function IdentityBackgroundPage() {
         open={isOpen('contact')}
         onToggle={toggleSection}
         hidden={!sectionVisible('contact', ['email', 'phone', 'contact'])}
-      >        <div className="ob-grid">
-          <label className="ob-field">
-            <span>Primary email</span>
-            <input value={form.primaryEmail} readOnly disabled />
-            <small className={`ob-badge ${form.emailVerified ? 'ok' : 'warn'}`}>
-              {form.emailVerified ? 'Verified' : 'Unverified'}
-            </small>
-          </label>
-          <label className={fieldClass('secondaryEmail')}>
-            <span>Secondary email</span>
-            <input name="secondaryEmail" value={form.secondaryEmail} onChange={onChange} {...inputA11y('secondaryEmail')} />
-            <FieldError name="secondaryEmail" />
-          </label>
-          <label className={fieldClass('primaryPhone')}>
-            <span>Primary contact number</span>
-            <input name="primaryPhone" value={form.primaryPhone} onChange={onChange} {...inputA11y('primaryPhone')} />
-            <small className={`ob-badge ${form.phoneVerified ? 'ok' : 'warn'}`}>
-              {form.phoneVerified ? 'Verified' : 'Unverified — changing number requires re-verification'}
-            </small>
-            <FieldError name="primaryPhone" />
-          </label>
-          <label className={fieldClass('secondaryPhone')}>
-            <span>Secondary contact number</span>
-            <input name="secondaryPhone" value={form.secondaryPhone} onChange={onChange} {...inputA11y('secondaryPhone')} />
-            <FieldError name="secondaryPhone" />
-          </label>
-          <label className={fieldClass('homePhone')}>
-            <span>Home phone (optional)</span>
-            <input name="homePhone" value={form.homePhone} onChange={onChange} {...inputA11y('homePhone')} />
-            <FieldError name="homePhone" />
-          </label>
-          <label className="ob-field">
-            <span>Preferred contact method</span>
-            <select name="preferredContactMethod" value={form.preferredContactMethod} onChange={onChange}>
-              {CONTACT_METHODS.map((o) => (
-                <option key={o.value || 'none'} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </label>
-          <label className="ob-field">
-            <span>Best time to contact</span>
-            <select name="bestTimeToContact" value={form.bestTimeToContact} onChange={onChange}>
-              {BEST_TIMES.map((o) => (
-                <option key={o.value || 'none'} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </label>
+      >
+        <div className="ob-contact-grid">
+          <div className="ob-contact-row">
+            <label className="ob-contact-field">
+              <span>Primary email</span>
+              <input value={form.primaryEmail} readOnly disabled />
+              <div className="ob-contact-meta">
+                <small className={`ob-badge ${form.emailVerified ? 'ok' : 'warn'}`}>
+                  {form.emailVerified ? 'Verified' : 'Unverified'}
+                </small>
+              </div>
+            </label>
+            <label className={`ob-contact-field ${fieldErrors.secondaryEmail ? 'has-error' : ''}`}>
+              <span>Secondary email</span>
+              <input name="secondaryEmail" value={form.secondaryEmail} onChange={onChange} {...inputA11y('secondaryEmail')} />
+              <div className="ob-contact-meta">
+                <FieldError name="secondaryEmail" />
+              </div>
+            </label>
+          </div>
+          <div className="ob-contact-row">
+            <label className={`ob-contact-field ${fieldErrors.primaryPhone ? 'has-error' : ''}`}>
+              <span>Primary contact number</span>
+              <input
+                name="primaryPhone"
+                value={form.primaryPhone}
+                onChange={onPhoneChange('primaryPhone')}
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="e.g. +(1) 408 123 4567"
+                {...inputA11y('primaryPhone')}
+              />
+              <div className="ob-contact-meta ob-contact-meta--tall">
+                <small className={`ob-badge ${form.phoneVerified ? 'ok' : 'warn'}`}>
+                  {form.phoneVerified ? 'Verified' : 'Unverified — changing number requires re-verification'}
+                </small>
+                <FieldError name="primaryPhone" />
+              </div>
+            </label>
+            <label className={`ob-contact-field ${fieldErrors.secondaryPhone ? 'has-error' : ''}`}>
+              <span>Secondary contact number</span>
+              <input
+                name="secondaryPhone"
+                value={form.secondaryPhone}
+                onChange={onPhoneChange('secondaryPhone')}
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="e.g. +(1) 408 123 4567"
+                {...inputA11y('secondaryPhone')}
+              />
+              <div className="ob-contact-meta ob-contact-meta--tall">
+                <FieldError name="secondaryPhone" />
+              </div>
+            </label>
+          </div>
+          <div className="ob-contact-row">
+            <label className={`ob-contact-field ${fieldErrors.homePhone ? 'has-error' : ''}`}>
+              <span>Home phone (optional)</span>
+              <input
+                name="homePhone"
+                value={form.homePhone}
+                onChange={onPhoneChange('homePhone')}
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="e.g. +(1) 408 123 4567"
+                {...inputA11y('homePhone')}
+              />
+              <FieldError name="homePhone" />
+            </label>
+            <label className="ob-contact-field">
+              <span>Preferred contact method</span>
+              <select name="preferredContactMethod" value={form.preferredContactMethod} onChange={onChange}>
+                {CONTACT_METHODS.map((o) => (
+                  <option key={o.value || 'none'} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="ob-contact-row">
+            <label className="ob-contact-field">
+              <span>Best time to contact</span>
+              <select name="bestTimeToContact" value={form.bestTimeToContact} onChange={onChange}>
+                {BEST_TIMES.map((o) => (
+                  <option key={o.value || 'none'} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+            <div className="ob-contact-field ob-contact-field-spacer" aria-hidden="true" />
+          </div>
         </div>
         <p className="ob-hint">Contact details never appear on public event or member profiles.</p>
       </AccordionSection>
@@ -1169,19 +1186,16 @@ export default function IdentityBackgroundPage() {
         </div>
         <div className="ob-field" style={{ marginTop: 12 }}>
           <span>Additional nationalities</span>
-          <div className="ob-chip-row">
-            {countries.map((c) => (
-              <label key={c.code} className="ob-status-chip" style={{ cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={(form.nationality.additionalNationalities || []).includes(c.code)}
-                  onChange={() => toggleArrayValue('nationality', 'additionalNationalities', c.code)}
-                  style={{ marginRight: 6 }}
-                />
-                {c.name}
-              </label>
-            ))}
-          </div>
+          <input
+            value={additionalNationalitiesText}
+            onChange={(e) => setAdditionalNationalitiesText(e.target.value)}
+            onBlur={() => syncAdditionalNationalities(additionalNationalitiesText)}
+            placeholder="e.g. Canada, Mexico (comma-separated country names)"
+            aria-describedby="nationality-additional-hint"
+          />
+          <p id="nationality-additional-hint" className="ob-hint">
+            Enter valid country names separated by commas. Unknown entries are ignored.
+          </p>
           <FieldError name="nationality.additionalNationalities" />
         </div>
         <div style={{ marginTop: 14 }}>
@@ -1200,7 +1214,18 @@ export default function IdentityBackgroundPage() {
                 </label>
                 <label className="ob-field">
                   <span>Proficiency</span>
-                  <input value={lang.proficiency} onChange={(e) => updateLanguage(idx, 'proficiency', e.target.value)} placeholder="e.g. Fluent" />
+                  <select
+                    value={lang.proficiency || ''}
+                    onChange={(e) => updateLanguage(idx, 'proficiency', e.target.value)}
+                  >
+                    <option value="">Select</option>
+                    {(refData?.proficiencyLevels || PROFICIENCY_LEVELS.map((p) => p.value)).map((level) => (
+                      <option key={level} value={level}>
+                        {PROFICIENCY_LEVELS.find((p) => p.value === level)?.label || humanizeEnum(level)}
+                      </option>
+                    ))}
+                  </select>
+                  <FieldError name={`nationality.languages.${idx}.proficiency`} />
                 </label>
               </div>
               <div className="ob-row-actions">
@@ -1328,36 +1353,50 @@ export default function IdentityBackgroundPage() {
                 <span>Annulments</span>
                 <input type="number" min="0" name="annulmentsCount" value={form.relationship.annulmentsCount} onChange={onSectionChange('relationship')} />
               </label>
-              <label className="ob-field">
+              <label className={fieldClass('relationship.mostRecentDivorceYear')}>
                 <span>Most recent divorce year</span>
-                <input type="number" name="mostRecentDivorceYear" value={form.relationship.mostRecentDivorceYear} onChange={onSectionChange('relationship')} />
+                <input
+                  type="number"
+                  min={1900}
+                  max={currentCalendarYear()}
+                  name="mostRecentDivorceYear"
+                  value={form.relationship.mostRecentDivorceYear}
+                  onChange={onSectionChange('relationship')}
+                  {...inputA11y('relationship.mostRecentDivorceYear')}
+                />
+                <FieldError name="relationship.mostRecentDivorceYear" />
               </label>
-              <label className="ob-field">
-                <span>
-                  <input type="checkbox" name="currentlySeparated" checked={!!form.relationship.currentlySeparated} onChange={onSectionChange('relationship')} />
-                  {' '}Currently separated
-                </span>
+              <label className="ob-field-checkbox">
+                <input type="checkbox" name="currentlySeparated" checked={!!form.relationship.currentlySeparated} onChange={onSectionChange('relationship')} />
+                Currently separated
               </label>
-              <label className="ob-field">
-                <span>
-                  <input type="checkbox" name="divorceFinalized" checked={!!form.relationship.divorceFinalized} onChange={onSectionChange('relationship')} />
-                  {' '}Divorce finalized
-                </span>
+              <label className="ob-field-checkbox">
+                <input type="checkbox" name="divorceFinalized" checked={!!form.relationship.divorceFinalized} onChange={onSectionChange('relationship')} />
+                Divorce finalized
               </label>
             </>
           )}
-          <label className="ob-field">
-            <span>Co-parenting</span>
-            <input name="coParenting" value={form.relationship.coParenting} onChange={onSectionChange('relationship')} />
-          </label>
+          <EnumSelect
+            label="Co-parenting"
+            name="coParenting"
+            value={form.relationship.coParenting}
+            options={refData?.yesNoPrefer}
+            onChange={onSectionChange('relationship')}
+            section="relationship"
+            errorKey="relationship.coParenting"
+          />
           <label className="ob-field">
             <span>Unresolved commitments</span>
             <input name="unresolvedCommitments" value={form.relationship.unresolvedCommitments} onChange={onSectionChange('relationship')} />
           </label>
-          <label className="ob-field">
-            <span>Relationship model preference</span>
-            <input name="relationshipModelPref" value={form.relationship.relationshipModelPref} onChange={onSectionChange('relationship')} />
-          </label>
+          <EnumSelect
+            label="Relationship model preference"
+            name="relationshipModelPref"
+            value={form.relationship.relationshipModelPref}
+            options={refData?.relationshipModelPrefs}
+            onChange={onSectionChange('relationship')}
+            section="relationship"
+          />
         </div>
       </AccordionSection>
 
@@ -1649,15 +1688,22 @@ export default function IdentityBackgroundPage() {
                 <span>Jurisdiction</span>
                 <input name="jurisdiction" value={form.safety.jurisdiction} onChange={onSectionChange('safety')} />
               </label>
-              <label className="ob-field">
+              <label className={fieldClass('safety.approxYear')}>
                 <span>Approx. year</span>
-                <input type="number" name="approxYear" value={form.safety.approxYear} onChange={onSectionChange('safety')} />
+                <input
+                  type="number"
+                  min={1900}
+                  max={currentCalendarYear()}
+                  name="approxYear"
+                  value={form.safety.approxYear}
+                  onChange={onSectionChange('safety')}
+                  {...inputA11y('safety.approxYear')}
+                />
+                <FieldError name="safety.approxYear" />
               </label>
-              <label className="ob-field">
-                <span>
-                  <input type="checkbox" name="caseResolved" checked={!!form.safety.caseResolved} onChange={onSectionChange('safety')} />
-                  {' '}Case resolved
-                </span>
+              <label className="ob-field-checkbox">
+                <input type="checkbox" name="caseResolved" checked={!!form.safety.caseResolved} onChange={onSectionChange('safety')} />
+                Case resolved
               </label>
               <label className="ob-field">
                 <span>Explanation</span>
@@ -1696,15 +1742,22 @@ export default function IdentityBackgroundPage() {
                 <span>Jurisdiction</span>
                 <input name="jurisdiction" value={form.civilJudgment.jurisdiction} onChange={onSectionChange('civilJudgment')} />
               </label>
-              <label className="ob-field">
+              <label className={fieldClass('civilJudgment.approxYear')}>
                 <span>Approx. year</span>
-                <input type="number" name="approxYear" value={form.civilJudgment.approxYear} onChange={onSectionChange('civilJudgment')} />
+                <input
+                  type="number"
+                  min={1900}
+                  max={currentCalendarYear()}
+                  name="approxYear"
+                  value={form.civilJudgment.approxYear}
+                  onChange={onSectionChange('civilJudgment')}
+                  {...inputA11y('civilJudgment.approxYear')}
+                />
+                <FieldError name="civilJudgment.approxYear" />
               </label>
-              <label className="ob-field">
-                <span>
-                  <input type="checkbox" name="resolved" checked={!!form.civilJudgment.resolved} onChange={onSectionChange('civilJudgment')} />
-                  {' '}Resolved
-                </span>
+              <label className="ob-field-checkbox">
+                <input type="checkbox" name="resolved" checked={!!form.civilJudgment.resolved} onChange={onSectionChange('civilJudgment')} />
+                Resolved
               </label>
               <label className="ob-field">
                 <span>Explanation</span>
@@ -1717,7 +1770,7 @@ export default function IdentityBackgroundPage() {
 
       <AccordionSection
         id="verification"
-        title="Identity Verification & Background Consent"
+        title="Identity Verification"
         icon={BadgeCheck}
         iconTone="emerald"
         subtitle="Government ID & safety screening badge for maximum trust."
@@ -1791,60 +1844,6 @@ export default function IdentityBackgroundPage() {
           Selfie is compared to the driver-license photo — upload DL front first.
         </p>
       </AccordionSection>
-
-      <AccordionSection
-        id="consent"
-        title="Background Screening Consent"
-        icon={FileCheck2}
-        iconTone="emerald"
-        subtitle="Required consent before identity details can be saved."
-        badge={{ label: form.backgroundConsent?.accepted ? 'Accepted' : 'Required', tone: form.backgroundConsent?.accepted ? 'emerald' : 'amber' }}
-        open={isOpen('consent')}
-        onToggle={toggleSection}
-        hidden={!sectionVisible('consent', ['consent', 'background', 'screening', 'terms'])}
-      >        <div className="ob-private-banner" role="note">
-          You must accept the background screening terms before saving Identity &amp; Background.
-          Consent document version:{' '}
-          <strong>{refData?.backgroundConsentDocumentVersion || '—'}</strong>.
-          {form.backgroundConsent?.accepted && (
-            <> Accepted{form.backgroundConsent.acceptedAt ? ` on ${form.backgroundConsent.acceptedAt}` : ''}.</>
-          )}
-        </div>
-        <label className={fieldClass('backgroundConsent')} style={{ marginTop: 12 }}>
-          <span>
-            <input
-              type="checkbox"
-              checked={consentChecked || !!form.backgroundConsent?.accepted}
-              readOnly
-              onClick={openConsentModal}
-              onChange={() => {}}
-              aria-required="true"
-              aria-checked={consentChecked || !!form.backgroundConsent?.accepted}
-              aria-invalid={fieldErrors.backgroundConsent ? true : undefined}
-              aria-describedby={fieldErrors.backgroundConsent ? 'backgroundConsent-error' : undefined}
-            />
-            {' '}I have read and agree to the background screening disclosure.
-            <span className="ob-required-marker" aria-hidden="true"> *</span>
-            <span className="sr-only">(required)</span>
-          </span>
-          <FieldError name="backgroundConsent" />
-        </label>
-        {!form.backgroundConsent?.accepted && (
-          <div className="ob-row-actions">
-            <button type="button" className="btn auth-primary-btn" onClick={() => setConsentModalOpen(true)} disabled={verifyBusy}>
-              Review &amp; accept terms
-            </button>
-          </div>
-        )}
-      </AccordionSection>
-
-      <ConsentTermsModal
-        open={consentModalOpen}
-        documentVersion={refData?.backgroundConsentDocumentVersion}
-        busy={verifyBusy}
-        onAgree={acceptConsentFromModal}
-        onCancel={() => setConsentModalOpen(false)}
-      />
 
       {showPreview && (
         <div className="ob-preview-overlay" role="presentation" onClick={() => setShowPreview(false)}>

@@ -297,12 +297,84 @@ export function validateEmail(value, { required = false } = {}) {
   return null
 }
 
+/** Strip letters from phone input while typing (#1551). */
+export function sanitizePhoneInput(value) {
+  return String(value ?? '').replace(/[a-zA-Z]/g, '')
+}
+
 export function validatePhoneOptional(value) {
   const v = trimValue(value)
   if (!v) return null
+  if (/[a-zA-Z]/.test(v)) return 'Phone number cannot contain letters'
   const digits = v.replace(/\D/g, '')
-  if (digits.length < 8 || digits.length > 15) return 'Enter a valid phone (8–15 digits)'
+  if (digits.length === 11 && digits.startsWith('1')) return null
+  if (digits.length === 10) return null
+  return 'Enter a valid 10-digit phone number (e.g. +(1) 408 123 4567)'
+}
+
+const MIN_APPROX_YEAR = 1900
+
+export function currentCalendarYear() {
+  return new Date().getFullYear()
+}
+
+/** Validates disclosure / judgment years (#1558, #1559). */
+export function validateApproxYear(value, { required = false } = {}) {
+  const v = trimValue(value)
+  if (!v) return required ? 'Year is required' : null
+  const year = Number(v)
+  const max = currentCalendarYear()
+  if (!Number.isInteger(year) || year < MIN_APPROX_YEAR || year > max) {
+    return `Year must be between ${MIN_APPROX_YEAR} and ${max}`
+  }
   return null
+}
+
+export const PROFICIENCY_LEVELS = [
+  { value: 'BASIC', label: 'Basic' },
+  { value: 'CONVERSATIONAL', label: 'Conversational' },
+  { value: 'FLUENT', label: 'Fluent' },
+  { value: 'NATIVE', label: 'Native' },
+]
+
+/**
+ * Resolve comma-separated country names/codes to ISO codes (#1552).
+ * Unknown entries are ignored per defect spec.
+ */
+export function resolveAdditionalNationalities(text, countries = []) {
+  const tokens = String(text ?? '')
+    .split(/[,;]+/)
+    .map((t) => trimValue(t))
+    .filter(Boolean)
+  if (!tokens.length) return []
+
+  const byCode = new Map(
+    (countries || []).map((c) => [String(c.code || '').toUpperCase(), c.code]),
+  )
+  const byName = new Map(
+    (countries || []).map((c) => [String(c.name || '').toLowerCase(), c.code]),
+  )
+
+  const resolved = []
+  const seen = new Set()
+  for (const token of tokens) {
+    const upper = token.toUpperCase()
+    let code = byCode.get(upper)
+    if (!code) {
+      code = byName.get(token.toLowerCase())
+    }
+    if (code && !seen.has(code)) {
+      seen.add(code)
+      resolved.push(code)
+    }
+  }
+  return resolved
+}
+
+export function formatAdditionalNationalitiesText(codes, countries = []) {
+  if (!Array.isArray(codes) || !codes.length) return ''
+  const byCode = new Map((countries || []).map((c) => [c.code, c.name]))
+  return codes.map((code) => byCode.get(code) || code).join(', ')
 }
 
 /** Format digits as XXX-XX-XXXX while typing. */
@@ -810,10 +882,6 @@ export function validateIdentityForm(form, action, refData) {
   const p3 = validatePhoneOptional(form.homePhone)
   if (p3) errors.homePhone = p3
 
-  if (!form.backgroundConsent?.accepted) {
-    errors.backgroundConsent = 'Background screening consent is required before saving'
-  }
-
   const ssnErr = validateSsn(form.ssn)
   if (ssnErr) errors.ssn = ssnErr
 
@@ -875,6 +943,32 @@ export function validateIdentityForm(form, action, refData) {
     }
     seen.add(code)
   }
+
+  ;(form.nationality?.languages || []).forEach((lang, i) => {
+    const prof = trimValue(lang.proficiency)
+    if (prof && !PROFICIENCY_LEVELS.some((p) => p.value === prof.toUpperCase())) {
+      errors[`nationality.languages.${i}.proficiency`] = 'Select a valid proficiency level'
+    }
+  })
+
+  const rel = form.relationship || {}
+  const divorceYearErr = validateApproxYear(rel.mostRecentDivorceYear)
+  if (divorceYearErr) errors['relationship.mostRecentDivorceYear'] = divorceYearErr
+
+  if (trimValue(rel.coParenting)) {
+    const cp = rel.coParenting.toUpperCase()
+    if (!['YES', 'NO', 'PREFER_NOT_TO_SAY'].includes(cp)) {
+      errors['relationship.coParenting'] = 'Select a valid co-parenting option'
+    }
+  }
+
+  const safety = form.safety || {}
+  const safetyYearErr = validateApproxYear(safety.approxYear)
+  if (safetyYearErr) errors['safety.approxYear'] = safetyYearErr
+
+  const civil = form.civilJudgment || {}
+  const civilYearErr = validateApproxYear(civil.approxYear)
+  if (civilYearErr) errors['civilJudgment.approxYear'] = civilYearErr
 
   return errors
 }
