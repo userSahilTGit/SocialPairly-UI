@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { GoogleOAuthProvider } from '@react-oauth/google'
-import { IS_PHONE_VERIFICATION_MANDATORY, PHONE_VERIFY_DISMISS_KEY, useAuth } from './context/AuthContext'
+import { IS_PHONE_VERIFICATION_MANDATORY, IS_PHONE_SMS_VERIFICATION_ENABLED, PHONE_VERIFY_DISMISS_KEY, useAuth } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import PhoneVerificationModal from './components/PhoneVerificationModal'
 import { userNeedsPhoneVerification } from './utils/verification'
@@ -36,8 +36,11 @@ export default function App() {
     }
 
     // Fresh login clears dismiss key. Prompt whenever phone is missing or unverified.
+    // Phase 1: SMS is disabled — do not show Phone/SMS modal after email verification.
     const dismissed = sessionStorage.getItem(PHONE_VERIFY_DISMISS_KEY) === '1'
-    const needsPhone = userNeedsPhoneVerification(user)
+    const needsPhone = userNeedsPhoneVerification(user, {
+      smsEnabled: IS_PHONE_SMS_VERIFICATION_ENABLED,
+    })
     const shouldShow = needsPhone && !IS_PHONE_VERIFICATION_MANDATORY && !dismissed
 
     setShowPhoneModal(shouldShow)

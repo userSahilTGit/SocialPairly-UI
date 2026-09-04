@@ -44,12 +44,18 @@ export const BEST_TIMES = [
 
 export const MIN_AGE = 18
 
+export const MAX_PREVIOUS_ADDRESSES = 10
+
 export const EMPTY_PREVIOUS_ADDRESS = {
   id: null,
+  line1: '',
+  line2: '',
+  unit: '',
   city: '',
   stateRegion: '',
   countryCode: '',
   postalCode: '',
+  residenceType: '',
   fromMonth: '',
   fromYear: '',
   toMonth: '',
@@ -65,12 +71,154 @@ export const EMPTY_EDUCATION = {
   institution: '',
   city: '',
   countryCode: '',
+  startMonth: '',
   startYear: '',
+  graduationMonth: '',
   graduationYear: '',
   currentlyStudying: false,
   honors: '',
   showInstitutionPublicly: false,
   verificationDocumentId: null,
+}
+
+/** Digits 0–9 only (blocks e/E/+/-/.). */
+export function formatUnsignedDigits(value, maxLen = 10) {
+  const digits = String(value ?? '').replace(/\D/g, '')
+  return maxLen != null ? digits.slice(0, maxLen) : digits
+}
+
+/** Letters, numbers, and spaces only. */
+export function formatAlphanumericText(value) {
+  return String(value ?? '')
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s{2,}/g, ' ')
+}
+
+/** Prevent scientific-notation / signed keys on numeric fields. */
+export function blockInvalidNumberKeys(e) {
+  if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault()
+}
+
+/** Letters, numbers, spaces, / and - (employment type e.g. OPT/CPT, H1B). */
+export function formatEmploymentTypeText(value) {
+  return String(value ?? '')
+    .replace(/[^\p{L}\p{N}\s/\-]/gu, '')
+    .replace(/\s{2,}/g, ' ')
+}
+
+const CAREER_ALNUM_RE = /^[\p{L}\p{N}][\p{L}\p{N} ]*$/u
+const EMPLOYMENT_TYPE_RE = /^[\p{L}\p{N}][\p{L}\p{N}\s/\-]*$/u
+
+export function validateCareerAlphanumeric(value, label) {
+  const v = String(value ?? '').trim()
+  if (!v) return null
+  if (!CAREER_ALNUM_RE.test(v)) return `${label} may contain letters and numbers only`
+  return null
+}
+
+export function validateEmploymentType(value) {
+  const v = String(value ?? '').trim()
+  if (!v) return null
+  if (!EMPLOYMENT_TYPE_RE.test(v)) return 'Employment type may contain letters, numbers, spaces, / and - only'
+  return null
+}
+
+export const EDUCATION_MIN_YEAR = 1970
+
+/** Letters and spaces only (city). */
+export function formatEducationCity(value) {
+  return String(value ?? '').replace(/[^\p{L}\s]/gu, '').replace(/\s{2,}/g, ' ')
+}
+
+export const MAX_PREFERRED_FUTURE_STATES = 5
+export const MAX_PREFERRED_FUTURE_CITIES = 50
+const PREFERRED_LOCATION_TEXT_RE = /^[\p{L}][\p{L} .'-]*$/u
+
+/** Letters, spaces, and common place-name punctuation (preferred future locations). */
+export function formatPreferredLocationText(value) {
+  return String(value ?? '')
+    .replace(/[^\p{L} .'-]/gu, '')
+    .replace(/\s{2,}/g, ' ')
+}
+
+export function countPreferredFutureCities(locations) {
+  return (locations || []).reduce((n, group) => n + (group.cities?.length || 0), 0)
+}
+
+/** Normalize API/form preferred future locations (supports legacy string arrays). */
+export function normalizePreferredFutureLocations(raw) {
+  if (!Array.isArray(raw)) return []
+  if (raw.every((item) => typeof item === 'string')) {
+    const cities = raw.map((s) => trimValue(s)).filter(Boolean)
+    return cities.length ? [{ state: '', cities }] : []
+  }
+  const result = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const state = trimValue(item.state)
+    const cities = Array.isArray(item.cities)
+      ? item.cities.map((c) => trimValue(c)).filter(Boolean)
+      : []
+    if (state || cities.length) result.push({ state, cities })
+  }
+  return result
+}
+
+export function sanitizePreferredFutureLocationsForPayload(locations) {
+  const merged = new Map()
+  for (const group of normalizePreferredFutureLocations(locations)) {
+    const state = trimValue(group.state)
+    if (!state) continue
+    const key = state.toLowerCase()
+    const existing = merged.get(key) || { state, cities: [] }
+    const seen = new Set(existing.cities.map((c) => c.toLowerCase()))
+    for (const city of group.cities || []) {
+      const trimmed = trimValue(city)
+      if (!trimmed) continue
+      const cityKey = trimmed.toLowerCase()
+      if (!seen.has(cityKey)) {
+        seen.add(cityKey)
+        existing.cities.push(trimmed)
+      }
+    }
+    merged.set(key, existing)
+  }
+  return [...merged.values()].filter((g) => g.cities.length > 0)
+}
+
+export function validatePreferredLocationAdd(state, city, existingLocations) {
+  const st = trimValue(state)
+  const ct = trimValue(city)
+  if (!st) return 'State is required'
+  if (!ct) return 'City is required'
+  if (!PREFERRED_LOCATION_TEXT_RE.test(st)) return 'State may contain letters and spaces only'
+  if (!PREFERRED_LOCATION_TEXT_RE.test(ct)) return 'City may contain letters and spaces only'
+
+  const locations = normalizePreferredFutureLocations(existingLocations)
+  const stateKey = st.toLowerCase()
+  const existingState = locations.find((g) => trimValue(g.state).toLowerCase() === stateKey)
+  const stateCount = locations.filter((g) => trimValue(g.state)).length
+
+  if (!existingState && stateCount >= MAX_PREFERRED_FUTURE_STATES) {
+    return `A maximum of ${MAX_PREFERRED_FUTURE_STATES} states is allowed`
+  }
+  if (countPreferredFutureCities(locations) >= MAX_PREFERRED_FUTURE_CITIES) {
+    return `A maximum of ${MAX_PREFERRED_FUTURE_CITIES} cities is allowed across all states`
+  }
+  if (existingState?.cities?.some((c) => trimValue(c).toLowerCase() === ct.toLowerCase())) {
+    return 'This city is already listed for this state'
+  }
+  return null
+}
+
+/** Letters and spaces only (degree, field, institution, honors). */
+export function formatEducationText(value) {
+  return String(value ?? '').replace(/[^\p{L}\s]/gu, '').replace(/\s{2,}/g, ' ')
+}
+
+/** Digits only, max 4 (education years). */
+export function formatEducationYear(value) {
+  return String(value ?? '').replace(/\D/g, '').slice(0, 4)
 }
 
 export const EMPTY_LANGUAGE = {
@@ -159,6 +307,7 @@ export const EMPTY_IDENTITY_FORM = {
   educations: [],
   career: {
     employmentStatus: '',
+    employmentType: '',
     jobFunction: '',
     industry: '',
     seniority: '',
@@ -211,8 +360,10 @@ export const EMPTY_IDENTITY_FORM = {
     explanation: '',
   },
   incomeRangeSharePreference: 'PRIVATE',
-  ssn: '',
-  verificationSummary: null,
+    ssn: '',
+    idDocumentType: '',
+    idDocumentNumber: '',
+    verificationSummary: null,
   backgroundConsent: null,
   _countryPostalRegex: '',
 }
@@ -322,21 +473,19 @@ export function validateSsn(value, { required = false } = {}) {
   return null
 }
 
+/** Days from the 1st of move-in month/year through today (inclusive of elapsed days). */
 export function residenceDurationLabel(moveInMonth, moveInYear) {
   const month = Number(moveInMonth)
   const year = Number(moveInYear)
   if (!month || !year || month < 1 || month > 12) return ''
   const moveIn = new Date(year, month - 1, 1)
   const now = new Date()
-  const cursor = new Date(now.getFullYear(), now.getMonth(), 1)
-  if (moveIn > cursor) return 'Less than 1 month'
-  const months = (cursor.getFullYear() - year) * 12 + (cursor.getMonth() - (month - 1))
-  if (months < 1) return 'Less than 1 month'
-  const years = Math.floor(months / 12)
-  const rem = months % 12
-  if (years === 0) return `${months} month${months === 1 ? '' : 's'}`
-  if (rem === 0) return `${years} year${years === 1 ? '' : 's'}`
-  return `${years} year${years === 1 ? '' : 's'}, ${rem} month${rem === 1 ? '' : 's'}`
+  const start = new Date(moveIn.getFullYear(), moveIn.getMonth(), moveIn.getDate())
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  if (start > end) return 'Less than 1 day'
+  const days = Math.floor((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
+  if (days < 1) return 'Less than 1 day'
+  return `${days.toLocaleString()} day${days === 1 ? '' : 's'}`
 }
 
 function resolvePostalRegex(form, countryCode, refData) {
@@ -442,17 +591,19 @@ export function mapIdentityResponseToForm(data) {
       moveInYear: numOrEmpty(cr.moveInYear),
       willingToRelocate: strOrEmpty(cr.willingToRelocate),
       eventTravelRadiusMiles: numOrEmpty(cr.eventTravelRadiusMiles ?? cr.eventTravelRadiusKm),
-      preferredFutureLocations: Array.isArray(cr.preferredFutureLocations)
-        ? [...cr.preferredFutureLocations]
-        : [],
+      preferredFutureLocations: normalizePreferredFutureLocations(cr.preferredFutureLocations),
     },
     previousAddresses: Array.isArray(data.previousAddresses)
       ? data.previousAddresses.map((a) => ({
           id: a.id ?? null,
+          line1: strOrEmpty(a.line1),
+          line2: strOrEmpty(a.line2),
+          unit: strOrEmpty(a.unit),
           city: strOrEmpty(a.city),
           stateRegion: strOrEmpty(a.stateRegion),
           countryCode: strOrEmpty(a.countryCode),
           postalCode: strOrEmpty(a.postalCode),
+          residenceType: strOrEmpty(a.residenceType),
           fromMonth: numOrEmpty(a.fromMonth),
           fromYear: numOrEmpty(a.fromYear),
           toMonth: numOrEmpty(a.toMonth),
@@ -520,7 +671,9 @@ export function mapIdentityResponseToForm(data) {
           institution: strOrEmpty(e.institution),
           city: strOrEmpty(e.city),
           countryCode: strOrEmpty(e.countryCode),
+          startMonth: numOrEmpty(e.startMonth),
           startYear: numOrEmpty(e.startYear),
+          graduationMonth: numOrEmpty(e.graduationMonth),
           graduationYear: numOrEmpty(e.graduationYear),
           currentlyStudying: boolOrFalse(e.currentlyStudying),
           honors: strOrEmpty(e.honors),
@@ -530,6 +683,7 @@ export function mapIdentityResponseToForm(data) {
       : [],
     career: {
       employmentStatus: strOrEmpty(car.employmentStatus),
+      employmentType: strOrEmpty(car.employmentType),
       jobFunction: strOrEmpty(car.jobFunction),
       industry: strOrEmpty(car.industry),
       seniority: strOrEmpty(car.seniority),
@@ -583,6 +737,8 @@ export function mapIdentityResponseToForm(data) {
     },
     incomeRangeSharePreference: data.incomeRangeSharePreference || 'PRIVATE',
     ssn: data.verificationSummary?.ssn || '',
+    idDocumentType: data.verificationSummary?.idDocumentType || '',
+    idDocumentNumber: data.verificationSummary?.idDocumentNumber || '',
     verificationSummary: data.verificationSummary || null,
     backgroundConsent: data.backgroundConsent || null,
     _countryPostalRegex: '',
@@ -635,16 +791,18 @@ export function buildIdentityPayload(form, action) {
       moveInYear: toNullableInt(cr.moveInYear),
       willingToRelocate: toNullableString(cr.willingToRelocate),
       eventTravelRadiusMiles: toNullableInt(cr.eventTravelRadiusMiles),
-      preferredFutureLocations: (cr.preferredFutureLocations || [])
-        .map((l) => trimValue(l))
-        .filter(Boolean),
+      preferredFutureLocations: sanitizePreferredFutureLocationsForPayload(cr.preferredFutureLocations),
     },
     previousAddresses: (form.previousAddresses || []).map((a) => ({
       id: a.id ?? null,
+      line1: toNullableString(a.line1),
+      line2: toNullableString(a.line2),
+      unit: toNullableString(a.unit),
       city: toNullableString(a.city),
       stateRegion: toNullableString(a.stateRegion),
       countryCode: toNullableString(a.countryCode),
       postalCode: toNullableString(a.postalCode),
+      residenceType: toNullableString(a.residenceType),
       fromMonth: toNullableInt(a.fromMonth),
       fromYear: toNullableInt(a.fromYear),
       toMonth: toNullableInt(a.toMonth),
@@ -706,8 +864,10 @@ export function buildIdentityPayload(form, action) {
       institution: toNullableString(e.institution),
       city: toNullableString(e.city),
       countryCode: toNullableString(e.countryCode),
+      startMonth: toNullableInt(e.startMonth),
       startYear: toNullableInt(e.startYear),
-      graduationYear: toNullableInt(e.graduationYear),
+      graduationMonth: e.currentlyStudying ? null : toNullableInt(e.graduationMonth),
+      graduationYear: e.currentlyStudying ? null : toNullableInt(e.graduationYear),
       currentlyStudying: !!e.currentlyStudying,
       honors: toNullableString(e.honors),
       showInstitutionPublicly: !!e.showInstitutionPublicly,
@@ -715,6 +875,7 @@ export function buildIdentityPayload(form, action) {
     })),
     career: {
       employmentStatus: toNullableString(car.employmentStatus),
+      employmentType: toNullableString(car.employmentType),
       jobFunction: toNullableString(car.jobFunction),
       industry: toNullableString(car.industry),
       seniority: toNullableString(car.seniority),
@@ -772,6 +933,8 @@ export function buildIdentityPayload(form, action) {
       if (!raw || raw.includes('*')) return null
       return formatSsnInput(raw)
     })(),
+    idDocumentType: toNullableString(form.idDocumentType),
+    idDocumentNumber: toNullableString(form.idDocumentNumber),
   }
 }
 
@@ -810,9 +973,8 @@ export function validateIdentityForm(form, action, refData) {
   const p3 = validatePhoneOptional(form.homePhone)
   if (p3) errors.homePhone = p3
 
-  if (!form.backgroundConsent?.accepted) {
-    errors.backgroundConsent = 'Background screening consent is required before saving'
-  }
+  // Phase 1: background screening is not offered — do not require or surface consent on save.
+  // Phase 2 will re-enable backgroundConsent validation when screening ships.
 
   const ssnErr = validateSsn(form.ssn)
   if (ssnErr) errors.ssn = ssnErr
@@ -851,14 +1013,98 @@ export function validateIdentityForm(form, action, refData) {
       )
     }
   })
+  if ((form.previousAddresses || []).length > MAX_PREVIOUS_ADDRESSES) {
+    errors.previousAddresses = `A maximum of ${MAX_PREVIOUS_ADDRESSES} previous addresses is allowed`
+  }
 
   ;(form.educations || []).forEach((edu, i) => {
-    const start = toNullableInt(edu.startYear)
-    const grad = toNullableInt(edu.graduationYear)
-    if (start != null && grad != null && grad < start) {
-      errors[`educations.${i}.graduationYear`] = 'Graduation year cannot be before start year'
+    const currentYear = new Date().getFullYear()
+    const dobYear = form.dateOfBirth
+      ? new Date(`${form.dateOfBirth}T00:00:00`).getFullYear()
+      : null
+    const dobYearValid = Number.isFinite(dobYear) ? dobYear : null
+
+    const validateEduText = (field, value, label) => {
+      const v = trimValue(value)
+      if (!v) return
+      if (!/^[\p{L}][\p{L} ]*$/u.test(v)) {
+        errors[`educations.${i}.${field}`] = `${label} may contain letters and spaces only`
+      }
+    }
+    validateEduText('degree', edu.degree, 'Degree')
+    validateEduText('fieldOfStudy', edu.fieldOfStudy, 'Field of study')
+    validateEduText('institution', edu.institution, 'Institution')
+    validateEduText('city', edu.city, 'City')
+    validateEduText('honors', edu.honors, 'Honors')
+
+    const validateEduYear = (field, year, label) => {
+      if (year === '' || year == null) return null
+      const y = toNullableInt(year)
+      if (y == null || !/^\d{4}$/.test(String(year).trim())) {
+        errors[`educations.${i}.${field}`] = `${label} must be a 4-digit year`
+        return null
+      }
+      if (y < EDUCATION_MIN_YEAR || y > currentYear) {
+        errors[`educations.${i}.${field}`] = `${label} must be between ${EDUCATION_MIN_YEAR} and ${currentYear}`
+        return null
+      }
+      if (dobYearValid != null && y < dobYearValid) {
+        errors[`educations.${i}.${field}`] = `${label} cannot be earlier than date of birth`
+        return null
+      }
+      return y
+    }
+
+    const start = validateEduYear('startYear', edu.startYear, 'Start year')
+    const currentlyStudying = !!edu.currentlyStudying
+    const grad = currentlyStudying
+      ? null
+      : validateEduYear('graduationYear', edu.graduationYear, 'Graduation year')
+
+    const startMonth = toNullableInt(edu.startMonth)
+    const gradMonth = currentlyStudying ? null : toNullableInt(edu.graduationMonth)
+    if (startMonth != null && (startMonth < 1 || startMonth > 12)) {
+      errors[`educations.${i}.startMonth`] = 'Start month must be between 1 and 12'
+    }
+    if (!currentlyStudying && gradMonth != null && (gradMonth < 1 || gradMonth > 12)) {
+      errors[`educations.${i}.graduationMonth`] = 'Graduation month must be between 1 and 12'
+    }
+
+    if (!currentlyStudying) {
+      const startKey = yearMonthValue(edu.startMonth, edu.startYear)
+      const endKey = yearMonthValue(edu.graduationMonth, edu.graduationYear)
+      if (startKey != null && endKey != null && endKey < startKey) {
+        errors[`educations.${i}.graduationYear`] = 'Graduation date cannot be before start date'
+      } else if (start != null && grad != null && grad < start) {
+        errors[`educations.${i}.graduationYear`] = 'Graduation year cannot be before start year'
+      }
     }
   })
+
+  const career = form.career || {}
+  const careerAlnumErr = (field, label) => {
+    const err = validateCareerAlphanumeric(career[field], label)
+    if (err) errors[`career.${field}`] = err
+  }
+  careerAlnumErr('jobFunction', 'Job function')
+  careerAlnumErr('industry', 'Industry')
+  careerAlnumErr('employerName', 'Employer name')
+  careerAlnumErr('careerAmbitions', 'Career ambitions')
+  const empTypeErr = validateEmploymentType(career.employmentType)
+  if (empTypeErr) errors['career.employmentType'] = empTypeErr
+  if (trimValue(career.yearsInProfession) && !/^\d+$/.test(String(career.yearsInProfession).trim())) {
+    errors['career.yearsInProfession'] = 'Years in profession must be numbers only'
+  }
+
+  const currentYear = new Date().getFullYear()
+  const civilYear = toNullableInt(form.civilJudgment?.approxYear)
+  if (civilYear != null && (civilYear < 1900 || civilYear > currentYear)) {
+    errors['civilJudgment.approxYear'] = `Enter a year between 1900 and ${currentYear}`
+  }
+  const safetyYear = toNullableInt(form.safety?.approxYear)
+  if (safetyYear != null && (safetyYear < 1900 || safetyYear > currentYear)) {
+    errors['safety.approxYear'] = `Enter a year between 1900 and ${currentYear}`
+  }
 
   const primary = trimValue(form.nationality?.primaryNationality).toUpperCase()
   const additional = (form.nationality?.additionalNationalities || [])
@@ -875,6 +1121,57 @@ export function validateIdentityForm(form, action, refData) {
     }
     seen.add(code)
   }
+
+  const preferredLocations = normalizePreferredFutureLocations(cr.preferredFutureLocations)
+  if (preferredLocations.length > MAX_PREFERRED_FUTURE_STATES) {
+    errors['currentResidence.preferredFutureLocations'] =
+      `A maximum of ${MAX_PREFERRED_FUTURE_STATES} states is allowed`
+  }
+  const totalPreferredCities = countPreferredFutureCities(preferredLocations)
+  if (totalPreferredCities > MAX_PREFERRED_FUTURE_CITIES) {
+    errors['currentResidence.preferredFutureLocations'] =
+      `A maximum of ${MAX_PREFERRED_FUTURE_CITIES} cities is allowed across all states`
+  }
+  const seenStates = new Set()
+  preferredLocations.forEach((group, groupIdx) => {
+    const state = trimValue(group.state)
+    const cities = group.cities || []
+    if (!state && cities.length) {
+      errors['currentResidence.preferredFutureLocations'] = 'Each city must be paired with a US state'
+      return
+    }
+    if (!state) return
+    if (!PREFERRED_LOCATION_TEXT_RE.test(state)) {
+      errors['currentResidence.preferredFutureLocations'] = 'State may contain letters and spaces only'
+      return
+    }
+    const stateKey = state.toLowerCase()
+    if (seenStates.has(stateKey)) {
+      errors['currentResidence.preferredFutureLocations'] = 'Duplicate states are not allowed'
+      return
+    }
+    seenStates.add(stateKey)
+    if (!cities.length) {
+      errors['currentResidence.preferredFutureLocations'] = 'Add at least one city for each selected state'
+      return
+    }
+    const seenCities = new Set()
+    cities.forEach((city, cityIdx) => {
+      const trimmed = trimValue(city)
+      if (!trimmed) return
+      if (!PREFERRED_LOCATION_TEXT_RE.test(trimmed)) {
+        errors[`currentResidence.preferredFutureLocations.${groupIdx}.${cityIdx}`] =
+          'City may contain letters and spaces only'
+        return
+      }
+      const cityKey = trimmed.toLowerCase()
+      if (seenCities.has(cityKey)) {
+        errors['currentResidence.preferredFutureLocations'] = 'Duplicate cities are not allowed within the same state'
+        return
+      }
+      seenCities.add(cityKey)
+    })
+  })
 
   return errors
 }
