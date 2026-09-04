@@ -40,6 +40,11 @@ import {
   validateIdentityForm,
   formatZipInput,
   US_ZIP_REGEX,
+  sanitizePhoneInput,
+  resolveAdditionalNationalities,
+  formatAdditionalNationalitiesText,
+  currentCalendarYear,
+  PROFICIENCY_LEVELS,
 } from '../../utils/identityValidation'
 import {
   identityRequestConfig,
@@ -152,7 +157,7 @@ export default function IdentityBackgroundPage() {
   )
 
   const countries = refData?.countries || []
-  const showRelationshipCounts = ['DIVORCED', 'SEPARATED', 'WIDOWED', 'MARRIED'].includes(
+  const showRelationshipCounts = ['DIVORCED', 'SEPARATED', 'WIDOWED'].includes(
     form.relationship.maritalStatus,
   )
   const showSafetyDetails = [
@@ -393,6 +398,16 @@ export default function IdentityBackgroundPage() {
     </label>
   )
 
+  const onPhoneChange = (field) => (e) => {
+    const value = sanitizePhoneInput(e.target.value)
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const syncAdditionalNationalities = (text) => {
+    const codes = resolveAdditionalNationalities(text, countries)
+    patchSection('nationality', { additionalNationalities: codes })
+  }
+
   const submit = async (action) => {
     setFormError('')
     const errors = validateIdentityForm(form, action, refData)
@@ -409,7 +424,7 @@ export default function IdentityBackgroundPage() {
     try {
       const response = await api.put(
         '/onboarding/identity',
-        buildIdentityPayload(form, action),
+        buildIdentityPayload(formForSubmit, action),
         identityRequestConfig(),
       )
       markIdentityEnd(action === 'SAVE_LATER' ? 'saveLater' : 'saveContinue', started, {
@@ -766,53 +781,95 @@ export default function IdentityBackgroundPage() {
         open={isOpen('contact')}
         onToggle={toggleSection}
         hidden={!sectionVisible('contact', ['email', 'phone', 'contact'])}
-      >        <div className="ob-grid">
-          <label className="ob-field">
-            <span>Primary email</span>
-            <input value={form.primaryEmail} readOnly disabled />
-            <small className={`ob-badge ${form.emailVerified ? 'ok' : 'warn'}`}>
-              {form.emailVerified ? 'Verified' : 'Unverified'}
-            </small>
-          </label>
-          <label className={fieldClass('secondaryEmail')}>
-            <span>Secondary email</span>
-            <input name="secondaryEmail" value={form.secondaryEmail} onChange={onChange} {...inputA11y('secondaryEmail')} />
-            <FieldError name="secondaryEmail" />
-          </label>
-          <label className={fieldClass('primaryPhone')}>
-            <span>Primary contact number</span>
-            <input name="primaryPhone" value={form.primaryPhone} onChange={onChange} {...inputA11y('primaryPhone')} />
-            <small className={`ob-badge ${form.phoneVerified ? 'ok' : 'warn'}`}>
-              {form.phoneVerified ? 'Verified' : 'Unverified — changing number requires re-verification'}
-            </small>
-            <FieldError name="primaryPhone" />
-          </label>
-          <label className={fieldClass('secondaryPhone')}>
-            <span>Secondary contact number</span>
-            <input name="secondaryPhone" value={form.secondaryPhone} onChange={onChange} {...inputA11y('secondaryPhone')} />
-            <FieldError name="secondaryPhone" />
-          </label>
-          <label className={fieldClass('homePhone')}>
-            <span>Home phone (optional)</span>
-            <input name="homePhone" value={form.homePhone} onChange={onChange} {...inputA11y('homePhone')} />
-            <FieldError name="homePhone" />
-          </label>
-          <label className="ob-field">
-            <span>Preferred contact method</span>
-            <select name="preferredContactMethod" value={form.preferredContactMethod} onChange={onChange}>
-              {CONTACT_METHODS.map((o) => (
-                <option key={o.value || 'none'} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </label>
-          <label className="ob-field">
-            <span>Best time to contact</span>
-            <select name="bestTimeToContact" value={form.bestTimeToContact} onChange={onChange}>
-              {BEST_TIMES.map((o) => (
-                <option key={o.value || 'none'} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </label>
+      >
+        <div className="ob-contact-grid">
+          <div className="ob-contact-row">
+            <label className="ob-contact-field">
+              <span>Primary email</span>
+              <input value={form.primaryEmail} readOnly disabled />
+              <div className="ob-contact-meta">
+                <small className={`ob-badge ${form.emailVerified ? 'ok' : 'warn'}`}>
+                  {form.emailVerified ? 'Verified' : 'Unverified'}
+                </small>
+              </div>
+            </label>
+            <label className={`ob-contact-field ${fieldErrors.secondaryEmail ? 'has-error' : ''}`}>
+              <span>Secondary email</span>
+              <input name="secondaryEmail" value={form.secondaryEmail} onChange={onChange} {...inputA11y('secondaryEmail')} />
+              <div className="ob-contact-meta">
+                <FieldError name="secondaryEmail" />
+              </div>
+            </label>
+          </div>
+          <div className="ob-contact-row">
+            <label className={`ob-contact-field ${fieldErrors.primaryPhone ? 'has-error' : ''}`}>
+              <span>Primary contact number</span>
+              <input
+                name="primaryPhone"
+                value={form.primaryPhone}
+                onChange={onPhoneChange('primaryPhone')}
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="e.g. +(1) 408 123 4567"
+                {...inputA11y('primaryPhone')}
+              />
+              <div className="ob-contact-meta ob-contact-meta--tall">
+                <small className={`ob-badge ${form.phoneVerified ? 'ok' : 'warn'}`}>
+                  {form.phoneVerified ? 'Verified' : 'Unverified — changing number requires re-verification'}
+                </small>
+                <FieldError name="primaryPhone" />
+              </div>
+            </label>
+            <label className={`ob-contact-field ${fieldErrors.secondaryPhone ? 'has-error' : ''}`}>
+              <span>Secondary contact number</span>
+              <input
+                name="secondaryPhone"
+                value={form.secondaryPhone}
+                onChange={onPhoneChange('secondaryPhone')}
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="e.g. +(1) 408 123 4567"
+                {...inputA11y('secondaryPhone')}
+              />
+              <div className="ob-contact-meta ob-contact-meta--tall">
+                <FieldError name="secondaryPhone" />
+              </div>
+            </label>
+          </div>
+          <div className="ob-contact-row">
+            <label className={`ob-contact-field ${fieldErrors.homePhone ? 'has-error' : ''}`}>
+              <span>Home phone (optional)</span>
+              <input
+                name="homePhone"
+                value={form.homePhone}
+                onChange={onPhoneChange('homePhone')}
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="e.g. +(1) 408 123 4567"
+                {...inputA11y('homePhone')}
+              />
+              <FieldError name="homePhone" />
+            </label>
+            <label className="ob-contact-field">
+              <span>Preferred contact method</span>
+              <select name="preferredContactMethod" value={form.preferredContactMethod} onChange={onChange}>
+                {CONTACT_METHODS.map((o) => (
+                  <option key={o.value || 'none'} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="ob-contact-row">
+            <label className="ob-contact-field">
+              <span>Best time to contact</span>
+              <select name="bestTimeToContact" value={form.bestTimeToContact} onChange={onChange}>
+                {BEST_TIMES.map((o) => (
+                  <option key={o.value || 'none'} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+            <div className="ob-contact-field ob-contact-field-spacer" aria-hidden="true" />
+          </div>
         </div>
         <p className="ob-hint">Contact details never appear on public event or member profiles.</p>
       </AccordionSection>
@@ -1157,19 +1214,16 @@ export default function IdentityBackgroundPage() {
         </div>
         <div className="ob-field" style={{ marginTop: 12 }}>
           <span>Additional nationalities</span>
-          <div className="ob-chip-row">
-            {countries.map((c) => (
-              <label key={c.code} className="ob-status-chip" style={{ cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={(form.nationality.additionalNationalities || []).includes(c.code)}
-                  onChange={() => toggleArrayValue('nationality', 'additionalNationalities', c.code)}
-                  style={{ marginRight: 6 }}
-                />
-                {c.name}
-              </label>
-            ))}
-          </div>
+          <input
+            value={additionalNationalitiesText}
+            onChange={(e) => setAdditionalNationalitiesText(e.target.value)}
+            onBlur={() => syncAdditionalNationalities(additionalNationalitiesText)}
+            placeholder="e.g. Canada, Mexico (comma-separated country names)"
+            aria-describedby="nationality-additional-hint"
+          />
+          <p id="nationality-additional-hint" className="ob-hint">
+            Enter valid country names separated by commas. Unknown entries are ignored.
+          </p>
           <FieldError name="nationality.additionalNationalities" />
         </div>
         <div style={{ marginTop: 14 }}>
@@ -1188,7 +1242,18 @@ export default function IdentityBackgroundPage() {
                 </label>
                 <label className="ob-field">
                   <span>Proficiency</span>
-                  <input value={lang.proficiency} onChange={(e) => updateLanguage(idx, 'proficiency', e.target.value)} placeholder="e.g. Fluent" />
+                  <select
+                    value={lang.proficiency || ''}
+                    onChange={(e) => updateLanguage(idx, 'proficiency', e.target.value)}
+                  >
+                    <option value="">Select</option>
+                    {(refData?.proficiencyLevels || PROFICIENCY_LEVELS.map((p) => p.value)).map((level) => (
+                      <option key={level} value={level}>
+                        {PROFICIENCY_LEVELS.find((p) => p.value === level)?.label || humanizeEnum(level)}
+                      </option>
+                    ))}
+                  </select>
+                  <FieldError name={`nationality.languages.${idx}.proficiency`} />
                 </label>
               </div>
               <div className="ob-row-actions">
@@ -1346,7 +1411,7 @@ export default function IdentityBackgroundPage() {
                   onKeyDown={blockInvalidNumberKeys}
                 />
               </label>
-              <label className="ob-field">
+              <label className={fieldClass('relationship.mostRecentDivorceYear')}>
                 <span>Most recent divorce year</span>
                 <input
                   type="text"
@@ -1370,18 +1435,27 @@ export default function IdentityBackgroundPage() {
               </label>
             </>
           )}
-          <label className="ob-field">
-            <span>Co-parenting</span>
-            <input name="coParenting" value={form.relationship.coParenting} onChange={onSectionChange('relationship')} />
-          </label>
+          <EnumSelect
+            label="Co-parenting"
+            name="coParenting"
+            value={form.relationship.coParenting}
+            options={refData?.yesNoPrefer}
+            onChange={onSectionChange('relationship')}
+            section="relationship"
+            errorKey="relationship.coParenting"
+          />
           <label className="ob-field">
             <span>Unresolved commitments</span>
             <input name="unresolvedCommitments" value={form.relationship.unresolvedCommitments} onChange={onSectionChange('relationship')} />
           </label>
-          <label className="ob-field">
-            <span>Relationship model preference</span>
-            <input name="relationshipModelPref" value={form.relationship.relationshipModelPref} onChange={onSectionChange('relationship')} />
-          </label>
+          <EnumSelect
+            label="Relationship model preference"
+            name="relationshipModelPref"
+            value={form.relationship.relationshipModelPref}
+            options={refData?.relationshipModelPrefs}
+            onChange={onSectionChange('relationship')}
+            section="relationship"
+          />
         </div>
       </AccordionSection>
 
@@ -1803,7 +1877,7 @@ export default function IdentityBackgroundPage() {
                 <span>Jurisdiction</span>
                 <input name="jurisdiction" value={form.safety.jurisdiction} onChange={onSectionChange('safety')} />
               </label>
-              <label className="ob-field">
+              <label className={fieldClass('safety.approxYear')}>
                 <span>Approx. year</span>
                 <input
                   type="text"

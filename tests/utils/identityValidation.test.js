@@ -25,6 +25,11 @@ import {
   MAX_PREFERRED_FUTURE_CITIES,
   EMPTY_IDENTITY_FORM,
   MIN_AGE,
+  sanitizePhoneInput,
+  validateApproxYear,
+  resolveAdditionalNationalities,
+  formatAdditionalNationalitiesText,
+  PROFICIENCY_LEVELS,
 } from '@/utils/identityValidation'
 
 describe('trimValue / humanizeEnum', () => {
@@ -100,11 +105,28 @@ describe('validateEmail / phone / ssn', () => {
     expect(validateEmail('ada@example.com')).toBeNull()
   })
 
-  it('validates optional phone digit length', () => {
+  it('validates optional phone as 10-digit US format (#1551)', () => {
     expect(validatePhoneOptional('')).toBeNull()
-    expect(validatePhoneOptional('123')).toBe('Enter a valid phone (8–15 digits)')
-    expect(validatePhoneOptional('1'.repeat(16))).toBe('Enter a valid phone (8–15 digits)')
-    expect(validatePhoneOptional('+91 98765 43210')).toBeNull()
+    expect(validatePhoneOptional('abc123')).toMatch(/letters/i)
+    expect(validatePhoneOptional('123')).toMatch(/10-digit/i)
+    expect(validatePhoneOptional('1'.repeat(16))).toMatch(/10-digit/i)
+    expect(validatePhoneOptional('+(1) 408 123 4567')).toBeNull()
+    expect(validatePhoneOptional('+91 98765 43210')).toMatch(/10-digit/i)
+    expect(sanitizePhoneInput('abc4081234567')).toBe('4081234567')
+  })
+
+  it('validates approx year range (#1558, #1559)', () => {
+    expect(validateApproxYear('')).toBeNull()
+    expect(validateApproxYear('-5')).toMatch(/between/)
+    expect(validateApproxYear('3000')).toMatch(/between/)
+    expect(validateApproxYear('2020')).toBeNull()
+  })
+
+  it('resolves additional nationality names (#1552)', () => {
+    const countries = [{ code: 'US', name: 'United States' }, { code: 'CA', name: 'Canada' }]
+    expect(resolveAdditionalNationalities('Canada, US', countries)).toEqual(['CA', 'US'])
+    expect(resolveAdditionalNationalities('Narnia, Canada', countries)).toEqual(['CA'])
+    expect(formatAdditionalNationalitiesText(['US', 'CA'], countries)).toBe('United States, Canada')
   })
 
   it('formats and validates SSN', () => {
@@ -320,9 +342,8 @@ describe('preferred future locations', () => {
 })
 
 describe('validateIdentityForm', () => {
-  const consented = (overrides = {}) => ({
+  const baseForm = (overrides = {}) => ({
     ...EMPTY_IDENTITY_FORM,
-    backgroundConsent: { accepted: true },
     ...overrides,
   })
 
@@ -356,7 +377,7 @@ describe('validateIdentityForm', () => {
   })
 
   it('requires address and marital status on CONTINUE', () => {
-    const errors = validateIdentityForm(consented({
+    const errors = validateIdentityForm(baseForm({
       firstName: 'Ada',
       lastName: 'Lovelace',
       dateOfBirth: '1990-01-01',
@@ -370,22 +391,22 @@ describe('validateIdentityForm', () => {
   })
 
   it('validates US zip as 5 digits or ZIP+4 and labels as zip code', () => {
-    const bad = validateIdentityForm(consented({
+    const bad = validateIdentityForm(baseForm({
       currentResidence: { ...EMPTY_IDENTITY_FORM.currentResidence, postalCode: '123456', countryCode: 'US' },
     }), 'SAVE_LATER')
     expect(bad['currentResidence.postalCode']).toMatch(/Zip code must be 5 digits/)
 
-    const zip5 = validateIdentityForm(consented({
+    const zip5 = validateIdentityForm(baseForm({
       currentResidence: { ...EMPTY_IDENTITY_FORM.currentResidence, postalCode: '12345', countryCode: 'US' },
     }), 'SAVE_LATER')
     expect(zip5['currentResidence.postalCode']).toBeUndefined()
 
-    const zip9 = validateIdentityForm(consented({
+    const zip9 = validateIdentityForm(baseForm({
       currentResidence: { ...EMPTY_IDENTITY_FORM.currentResidence, postalCode: '12345-6789', countryCode: 'US' },
     }), 'SAVE_LATER')
     expect(zip9['currentResidence.postalCode']).toBeUndefined()
 
-    const withRef = validateIdentityForm(consented({
+    const withRef = validateIdentityForm(baseForm({
       currentResidence: { ...EMPTY_IDENTITY_FORM.currentResidence, postalCode: 'XXX', countryCode: 'US' },
     }), 'SAVE_LATER', { countries: [{ code: 'US', postalRegex: '^\\d{5}$' }] })
     expect(withRef['currentResidence.postalCode']).toMatch(/Zip code must be 5 digits/)
@@ -398,7 +419,7 @@ describe('validateIdentityForm', () => {
   })
 
   it('validates previous address dates, postal, education years, and nationality dupes', () => {
-    const errors = validateIdentityForm(consented({
+    const errors = validateIdentityForm(baseForm({
       previousAddresses: [
         { fromMonth: 6, fromYear: 2020, toMonth: 1, toYear: 2020, postalCode: 'XXX', countryCode: 'US' },
       ],
@@ -413,23 +434,23 @@ describe('validateIdentityForm', () => {
   })
 
   it('flags duplicate additional nationalities without primary overlap', () => {
-    const errors = validateIdentityForm(consented({
+    const errors = validateIdentityForm(baseForm({
       nationality: { primaryNationality: 'IN', additionalNationalities: ['US', 'us'] },
     }), 'SAVE_LATER')
     expect(errors['nationality.additionalNationalities']).toMatch(/Duplicate nationality/)
   })
 
   it('skips postal check when only country or only postal is present', () => {
-    expect(validateIdentityForm(consented({
+    expect(validateIdentityForm(baseForm({
       currentResidence: { ...EMPTY_IDENTITY_FORM.currentResidence, countryCode: 'US' },
     }), 'SAVE_LATER')['currentResidence.postalCode']).toBeUndefined()
-    expect(validateIdentityForm(consented({
+    expect(validateIdentityForm(baseForm({
       currentResidence: { ...EMPTY_IDENTITY_FORM.currentResidence, postalCode: '12345' },
     }), 'SAVE_LATER')['currentResidence.postalCode']).toBeUndefined()
   })
 
   it('accepts previous addresses and educations when dates are valid', () => {
-    const errors = validateIdentityForm(consented({
+    const errors = validateIdentityForm(baseForm({
       previousAddresses: [
         { fromMonth: 1, fromYear: 2018, toMonth: 6, toYear: 2019, postalCode: '12345', countryCode: 'US' },
         { fromMonth: '', fromYear: 'x', postalCode: '12345' },
@@ -475,7 +496,7 @@ describe('validateIdentityForm', () => {
   })
 
   it('uses form postal regex only when it matches current residence country', () => {
-    const errors = validateIdentityForm(consented({
+    const errors = validateIdentityForm(baseForm({
       _countryPostalRegex: '^\\d{5}$',
       currentResidence: { ...EMPTY_IDENTITY_FORM.currentResidence, postalCode: 'SW1A', countryCode: 'GB' },
       previousAddresses: [{ postalCode: 'ABCDE', countryCode: 'IN' }],
@@ -485,7 +506,7 @@ describe('validateIdentityForm', () => {
   })
 
   it('treats missing nested collections as empty', () => {
-    const errors = validateIdentityForm(consented({
+    const errors = validateIdentityForm(baseForm({
       previousAddresses: undefined,
       educations: undefined,
       nationality: undefined,
@@ -496,7 +517,7 @@ describe('validateIdentityForm', () => {
   })
 
   it('returns no field errors for a valid continue payload', () => {
-    const errors = validateIdentityForm(consented({
+    const errors = validateIdentityForm(baseForm({
       firstName: 'Ada',
       lastName: 'Lovelace',
       dateOfBirth: '1990-01-01',
