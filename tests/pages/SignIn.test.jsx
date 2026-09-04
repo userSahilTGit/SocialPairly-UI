@@ -49,6 +49,7 @@ vi.mock('@/components/AuthPageLayout', () => ({
 
 vi.mock('@/components/AuthBrandAssets', () => ({
   BrandMark: () => <span data-testid="brand-mark">Logo</span>,
+  BrandWordmark: () => <span data-testid="brand-wordmark">Socialpairly</span>,
   GoogleGlyph: () => <span>G</span>,
   AppleGlyph: () => <span>A</span>,
 }))

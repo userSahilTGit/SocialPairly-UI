@@ -6,7 +6,7 @@ import { GoogleLogin } from '@react-oauth/google'
 import { useAuth, PHONE_VERIFY_DISMISS_KEY, IDENTITY_CONTINUE_LATER_KEY } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { postAuthPath } from '../utils/user'
-import { formatPhoneStorage, isValidPhoneNational } from '../utils/phoneFormat'
+import { formatPhoneStorage, formatPhoneNationalInput, getPhoneNationalLength, isValidPhoneNational, phoneNationalValidationMessage } from '../utils/phoneFormat'
 import api from '../api/axios'
 import AuthHeroPanel from '../components/AuthHeroPanel'
 import AuthPageLayout from '../components/AuthPageLayout'
@@ -111,8 +111,8 @@ export default function SignIn() {
       }
     } else if (!phoneIdentifier.trim()) {
       nextFieldErrors.identifier = 'Phone number is required.'
-    } else if (!isValidPhoneNational(phoneIdentifier)) {
-      nextFieldErrors.identifier = 'Enter a valid phone number (8–15 digits).'
+    } else if (!isValidPhoneNational(phoneIdentifier, countryCode)) {
+      nextFieldErrors.identifier = phoneNationalValidationMessage(countryCode)
     }
 
     if (!password) {
@@ -363,7 +363,12 @@ export default function SignIn() {
                           <select
                             className="phone-code"
                             value={countryCode}
-                            onChange={(e) => setCountryCode(e.target.value)}
+                            onChange={(e) => {
+                              const nextCode = e.target.value
+                              setCountryCode(nextCode)
+                              setPhoneIdentifier((prev) => formatPhoneNationalInput(nextCode, prev))
+                              clearIdentifierError()
+                            }}
                             aria-label="Country code"
                             tabIndex={authTab === 'phone' ? 0 : -1}
                           >
@@ -376,12 +381,21 @@ export default function SignIn() {
                             id="signin-phone"
                             className="auth-input"
                             type="tel"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={getPhoneNationalLength(countryCode).max}
                             value={phoneIdentifier}
                             onChange={(e) => {
-                              setPhoneIdentifier(e.target.value.replace(/[^\d\s-]/g, ''))
+                              setPhoneIdentifier(formatPhoneNationalInput(countryCode, e.target.value))
                               clearIdentifierError()
                             }}
-                            placeholder="98765 43210"
+                            placeholder={
+                              countryCode === '+971'
+                                ? '501234567'
+                                : countryCode === '+1'
+                                  ? '2025550123'
+                                  : '9876543210'
+                            }
                             autoComplete="tel-national"
                             required={authTab === 'phone'}
                             tabIndex={authTab === 'phone' ? 0 : -1}

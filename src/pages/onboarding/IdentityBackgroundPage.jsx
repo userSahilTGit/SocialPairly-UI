@@ -5,13 +5,12 @@ import {
   MapPin, PhoneCall, ShieldAlert, ShieldCheck, Sparkles, UserCheck, Users,
   Home, Landmark, HeartHandshake, Wallet, Scale, Baby,
 } from 'lucide-react'
-import * as faceapi from 'face-api.js'
 import api from '../../api/axios'
 import { useAuth, IDENTITY_CONTINUE_LATER_KEY } from '../../context/AuthContext'
-import { loadFaceApiModels, matchProfileToIDDocument } from '../../utils/faceRecognition'
 import { readCompletionPercentage } from '../../utils/profileCompletion'
 import OnboardingShell from '../../components/onboarding/OnboardingShell'
 import AccordionSection from '../../components/onboarding/AccordionSection'
+import PreferredFutureLocations from '../../components/onboarding/PreferredFutureLocations'
 import {
   BEST_TIMES,
   CONTACT_METHODS,
@@ -19,6 +18,7 @@ import {
   EMPTY_IDENTITY_FORM,
   EMPTY_LANGUAGE,
   EMPTY_PREVIOUS_ADDRESS,
+  MAX_PREVIOUS_ADDRESSES,
   GENDER_OPTIONS,
   GENDER_VISIBILITY,
   NAME_PREFIXES,
@@ -26,6 +26,13 @@ import {
   PRONOUN_OPTIONS,
   buildIdentityPayload,
   calcAge,
+  formatEducationCity,
+  formatEducationText,
+  formatEducationYear,
+  formatAlphanumericText,
+  formatEmploymentTypeText,
+  formatUnsignedDigits,
+  blockInvalidNumberKeys,
   formatSsnInput,
   humanizeEnum,
   mapIdentityResponseToForm,
@@ -70,6 +77,7 @@ const SECTION_FOR_ERROR = {
   'currentResidence.stateRegion': 'address',
   'currentResidence.postalCode': 'address',
   'currentResidence.countryCode': 'address',
+  'currentResidence.preferredFutureLocations': 'address',
   'relationship.maritalStatus': 'relationship',
   'nationality.additionalNationalities': 'nationality',
   ssn: 'verification',
@@ -134,8 +142,7 @@ export default function IdentityBackgroundPage() {
   const [fieldErrors, setFieldErrors] = useState({})
   const [editMode, setEditMode] = useState(!!user?.identityPage1Complete)
   const [verifyBusy, setVerifyBusy] = useState(false)
-  const [additionalNationalitiesText, setAdditionalNationalitiesText] = useState('')
-  const [locationDraft, setLocationDraft] = useState('')
+  const [uploadFeedback, setUploadFeedback] = useState({})
   const [completionPct, setCompletionPct] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const deferredSearchQuery = useDeferredValue(searchQuery)
@@ -184,12 +191,6 @@ export default function IdentityBackgroundPage() {
       setRefData(refRes.data || {})
       setEditMode(!!data.identityPage1Complete)
       setForm(mapped)
-      setAdditionalNationalitiesText(
-        formatAdditionalNationalitiesText(
-          mapped.nationality?.additionalNationalities,
-          refRes.data?.countries || [],
-        ),
-      )
       setCompletionPct(readCompletionPercentage(completionRes))
       markIdentityEnd('pageLoad', started, {
         serverIdentityMs: readServerDuration(identityRes),
@@ -228,6 +229,21 @@ export default function IdentityBackgroundPage() {
     patchSection(section, { [name]: type === 'checkbox' ? checked : value })
   }
 
+  const onApproxYearChange = (section) => (e) => {
+    const raw = e.target.value
+    if (raw === '') {
+      patchSection(section, { approxYear: '' })
+      return
+    }
+    // Digits only — block minus / decimals / letters
+    if (!/^\d{0,4}$/.test(raw)) return
+    const year = Number(raw)
+    const maxYear = new Date().getFullYear()
+    if (year < 0) return
+    if (raw.length === 4 && (year < 1900 || year > maxYear)) return
+    patchSection(section, { approxYear: raw })
+  }
+
   const onCountryChange = (e) => {
     const countryCode = e.target.value
     const country = countries.find((c) => c.code === countryCode)
@@ -248,27 +264,20 @@ export default function IdentityBackgroundPage() {
     })
   }
 
-  const addPreferredLocation = () => {
-    const label = locationDraft.trim()
-    if (!label) return
+  const updatePreferredFutureLocations = (locations) => {
     setForm((prev) => ({
       ...prev,
       currentResidence: {
         ...prev.currentResidence,
-        preferredFutureLocations: [...(prev.currentResidence.preferredFutureLocations || []), label],
+        preferredFutureLocations: locations,
       },
     }))
-    setLocationDraft('')
-  }
-
-  const removePreferredLocation = (idx) => {
-    setForm((prev) => ({
-      ...prev,
-      currentResidence: {
-        ...prev.currentResidence,
-        preferredFutureLocations: prev.currentResidence.preferredFutureLocations.filter((_, i) => i !== idx),
-      },
-    }))
+    setFieldErrors((prev) => {
+      if (!prev['currentResidence.preferredFutureLocations']) return prev
+      const next = { ...prev }
+      delete next['currentResidence.preferredFutureLocations']
+      return next
+    })
   }
 
   const updatePreviousAddress = (index, field, value) => {
@@ -282,7 +291,12 @@ export default function IdentityBackgroundPage() {
   const updateEducation = (index, field, value) => {
     setForm((prev) => {
       const rows = [...prev.educations]
-      rows[index] = { ...rows[index], [field]: value }
+      const next = { ...rows[index], [field]: value }
+      if (field === 'currentlyStudying' && value) {
+        next.graduationMonth = ''
+        next.graduationYear = ''
+      }
+      rows[index] = next
       return { ...prev, educations: rows }
     })
   }
@@ -396,16 +410,7 @@ export default function IdentityBackgroundPage() {
 
   const submit = async (action) => {
     setFormError('')
-    const resolvedNationalities = resolveAdditionalNationalities(additionalNationalitiesText, countries)
-    const formForSubmit = {
-      ...form,
-      nationality: {
-        ...form.nationality,
-        additionalNationalities: resolvedNationalities,
-      },
-    }
-    setForm(formForSubmit)
-    const errors = validateIdentityForm(formForSubmit, action, refData)
+    const errors = validateIdentityForm(form, action, refData)
     setFieldErrors(errors)
     if (Object.keys(errors).length) {
       setFormError('Please fix the highlighted fields before continuing.')
@@ -473,91 +478,57 @@ export default function IdentityBackgroundPage() {
     navigate(-1)
   }
 
-  const startVerification = async () => {
-    setVerifyBusy(true)
-    setFormError('')
-    try {
-      const { data } = await api.post('/onboarding/identity/verification/start')
-      setForm((prev) => ({
-        ...prev,
-        verificationSummary: {
-          ...(prev.verificationSummary || {}),
-          ...data,
-          overallStatus: data.overallStatus || data.status || 'IN_PROGRESS',
-        },
-      }))
-    } catch (err) {
-      setFormError(err.response?.data?.message || 'Unable to start verification.')
-    } finally {
-      setVerifyBusy(false)
-    }
-  }
-
   const uploadDocument = async (file, docPurpose) => {
     if (!file) return null
     const body = new FormData()
     body.append('file', file)
     body.append('docPurpose', docPurpose)
-    const { data } = await api.post('/onboarding/identity/documents', body, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    // Let the browser set multipart Content-Type (with boundary).
+    const { data } = await api.post('/onboarding/identity/documents', body)
     return data
   }
 
-  const onDocUpload = async (e, docPurpose) => {
+  const purposeForSide = (side) => {
+    if (form.idDocumentType === 'PASSPORT') return 'PASSPORT'
+    if (form.idDocumentType === 'STATE_ID') return side === 'back' ? 'ID_BACK' : 'ID_FRONT'
+    return side === 'back' ? 'DL_BACK' : 'DL_FRONT'
+  }
+
+  const onDocUpload = async (e, side) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
+    if (!form.idDocumentType) {
+      setFormError('Select a document type (Driver’s License, State ID, or Passport) before uploading.')
+      return
+    }
+    const docPurpose = purposeForSide(side)
     setVerifyBusy(true)
     setFormError('')
     try {
-      if (docPurpose === 'SELFIE') {
-        const dlFrontId = form.verificationSummary?.dlFrontDocumentId
-        if (!dlFrontId) {
-          setFormError('Upload the front of your driver license first, then upload a selfie to match faces.')
-          return
-        }
-        await loadFaceApiModels('/models')
-        const dlRes = await api.get(`/onboarding/identity/documents/${dlFrontId}/stream`, {
-          responseType: 'blob',
-        })
-        const selfieImg = await faceapi.bufferToImage(file)
-        const dlImg = await faceapi.bufferToImage(dlRes.data)
-        const match = await matchProfileToIDDocument(selfieImg, dlImg)
-        if (!match.isMatch) {
-          setFormError(
-            `Selfie does not match the face on your driver license (confidence ${match.confidenceScore}%). Use a clear, well-lit photo of the same person.`,
-          )
-          return
-        }
-        const uploaded = await uploadDocument(file, docPurpose)
-        if (!uploaded?.id) return
-        const { data } = await api.post('/onboarding/identity/verification/selfie', {
-          documentId: uploaded.id,
-          faceMatchConfirmed: true,
-        })
-        setForm((prev) => ({
-          ...prev,
-          verificationSummary: {
-            ...(prev.verificationSummary || {}),
-            ...data,
-          },
-        }))
+      const uploaded = await uploadDocument(file, docPurpose)
+      if (!uploaded?.id) {
+        setFormError('Document upload failed. Please try again.')
         return
       }
-
-      const uploaded = await uploadDocument(file, docPurpose)
-      if ((docPurpose === 'DL_FRONT' || docPurpose === 'DL_BACK') && uploaded?.id) {
-        setForm((prev) => ({
-          ...prev,
-          verificationSummary: {
-            ...(prev.verificationSummary || {}),
-            ...(docPurpose === 'DL_FRONT'
-              ? { dlFrontDocumentId: uploaded.id }
-              : { dlBackDocumentId: uploaded.id }),
-          },
-        }))
-      }
+      setUploadFeedback((prev) => ({
+        ...prev,
+        [uploaded.docPurpose || docPurpose]: { id: uploaded.id, name: file.name },
+      }))
+      setForm((prev) => {
+        const vs = { ...(prev.verificationSummary || {}) }
+        const purpose = uploaded.docPurpose || docPurpose
+        if (purpose === 'DL_FRONT' || purpose === 'ID_FRONT') {
+          vs.dlFrontDocumentId = uploaded.id
+        }
+        if (purpose === 'DL_BACK' || purpose === 'ID_BACK') {
+          vs.dlBackDocumentId = uploaded.id
+        }
+        if (purpose === 'PASSPORT') {
+          vs.passportDocumentId = uploaded.id
+        }
+        return { ...prev, verificationSummary: vs }
+      })
     } catch (err) {
       setFormError(err.response?.data?.message || err.message || 'Document upload failed.')
     } finally {
@@ -621,8 +592,8 @@ export default function IdentityBackgroundPage() {
     { id: 'legal', label: 'Legal Identity', icon: 'lock' },
     { id: 'address', label: 'Contact & Location', status: 'ok' },
     { id: 'nationality', label: 'Languages & Citizenship', status: 'active' },
-    { id: 'career', label: 'Career & Education', status: 'muted' },
-    { id: 'verification', label: 'Identity Verification', icon: 'badge' },
+    { id: 'career', label: 'Career Background', status: 'muted' },
+    { id: 'verification', label: 'Identity Documents', icon: 'badge' },
   ]
   const searchMatchCount = ALL_SECTIONS.filter((id) => sectionVisible(id, [id])).length
 
@@ -665,7 +636,7 @@ export default function IdentityBackgroundPage() {
         title="Legal Identity"
         icon={UserCheck}
         iconTone="indigo"
-        subtitle="Your official full name for background screening and identity trust."
+        subtitle="Your official full name for identity verification and account trust."
         badge={{ label: 'Strictly Confidential', tone: 'amber' }}
         summary={form.firstName && form.lastName ? 'Details Saved' : 'Required'}
         tone="confidential"
@@ -986,11 +957,12 @@ export default function IdentityBackgroundPage() {
             <span>Moved in (year)</span>
             <input
               name="moveInYear"
-              type="number"
-              min="1950"
-              max={new Date().getFullYear()}
+              type="text"
+              inputMode="numeric"
+              maxLength={4}
               value={form.currentResidence.moveInYear}
-              onChange={onSectionChange('currentResidence')}
+              onChange={(e) => patchSection('currentResidence', { moveInYear: formatUnsignedDigits(e.target.value, 4) })}
+              onKeyDown={blockInvalidNumberKeys}
             />
           </label>
           <div className="ob-age-preview">
@@ -1009,38 +981,26 @@ export default function IdentityBackgroundPage() {
             <span>Event travel radius (Miles)</span>
             <input
               name="eventTravelRadiusMiles"
-              type="number"
-              min="0"
+              type="text"
+              inputMode="numeric"
+              maxLength={5}
               value={form.currentResidence.eventTravelRadiusMiles}
-              onChange={onSectionChange('currentResidence')}
+              onChange={(e) => patchSection('currentResidence', {
+                eventTravelRadiusMiles: formatUnsignedDigits(e.target.value, 5),
+              })}
+              onKeyDown={blockInvalidNumberKeys}
               placeholder="e.g. 25"
               aria-label="Event travel radius in miles"
             />
           </label>
         </div>
-        <div className="ob-field" style={{ marginTop: 12 }}>
-          <span>Preferred future locations</span>
-          <div className="ob-chip-row">
-            {(form.currentResidence.preferredFutureLocations || []).map((loc, idx) => (
-              <button key={`${loc}-${idx}`} type="button" className="ob-status-chip" onClick={() => removePreferredLocation(idx)}>
-                {loc} ×
-              </button>
-            ))}
-          </div>
-          <div className="ob-row-actions">
-            <input
-              value={locationDraft}
-              onChange={(e) => setLocationDraft(e.target.value)}
-              placeholder="City or region, then Add"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  addPreferredLocation()
-                }
-              }}
-            />
-            <button type="button" className="btn ob-secondary" onClick={addPreferredLocation}>Add</button>
-          </div>
+        <div className={fieldClass('currentResidence.preferredFutureLocations')} style={{ marginTop: 12 }}>
+          <PreferredFutureLocations
+            locations={form.currentResidence.preferredFutureLocations}
+            countryCode={form.currentResidence.countryCode}
+            onChange={updatePreferredFutureLocations}
+            error={fieldErrors['currentResidence.preferredFutureLocations'] || ''}
+          />
         </div>
       </AccordionSection>
 
@@ -1053,9 +1013,40 @@ export default function IdentityBackgroundPage() {
         open={isOpen('previousAddresses')}
         onToggle={toggleSection}
         hidden={!sectionVisible('previousAddresses', ['previous addresses', 'prior residence'])}
-      >        {(form.previousAddresses || []).map((row, idx) => (
+      >        <p className="ob-hint">
+          Use the same address details as current residence (door number, street, unit, city, etc.).
+          You can add up to {MAX_PREVIOUS_ADDRESSES} previous addresses.
+        </p>
+        {(form.previousAddresses || []).map((row, idx) => (
           <div key={row.id || idx} className="ob-repeat-card">
             <div className="ob-grid">
+              <label className="ob-field">
+                <span>Address line 1</span>
+                <input
+                  value={row.line1}
+                  onChange={(e) => updatePreviousAddress(idx, 'line1', e.target.value)}
+                  placeholder="Door number and street name"
+                  autoComplete="address-line1"
+                  aria-label={`Previous address ${idx + 1} address line 1`}
+                />
+              </label>
+              <label className="ob-field">
+                <span>Address line 2</span>
+                <input
+                  value={row.line2}
+                  onChange={(e) => updatePreviousAddress(idx, 'line2', e.target.value)}
+                  autoComplete="address-line2"
+                  aria-label={`Previous address ${idx + 1} address line 2`}
+                />
+              </label>
+              <label className="ob-field">
+                <span>Unit / apt</span>
+                <input
+                  value={row.unit}
+                  onChange={(e) => updatePreviousAddress(idx, 'unit', e.target.value)}
+                  aria-label={`Previous address ${idx + 1} unit or apartment`}
+                />
+              </label>
               <label className="ob-field">
                 <span>City</span>
                 <input value={row.city} onChange={(e) => updatePreviousAddress(idx, 'city', e.target.value)} />
@@ -1088,6 +1079,19 @@ export default function IdentityBackgroundPage() {
                 </select>
               </label>
               <label className="ob-field">
+                <span>Residence type</span>
+                <select
+                  value={row.residenceType}
+                  onChange={(e) => updatePreviousAddress(idx, 'residenceType', e.target.value)}
+                  aria-label={`Previous address ${idx + 1} residence type`}
+                >
+                  <option value="">Select</option>
+                  {(refData?.residenceTypes || []).map((value) => (
+                    <option key={value} value={value}>{humanizeEnum(value)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="ob-field">
                 <span>From month</span>
                 <select value={String(row.fromMonth ?? '')} onChange={(e) => updatePreviousAddress(idx, 'fromMonth', e.target.value)}>
                   {MONTHS.map((m) => (
@@ -1097,7 +1101,14 @@ export default function IdentityBackgroundPage() {
               </label>
               <label className="ob-field">
                 <span>From year</span>
-                <input type="number" value={row.fromYear} onChange={(e) => updatePreviousAddress(idx, 'fromYear', e.target.value)} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={row.fromYear}
+                  onChange={(e) => updatePreviousAddress(idx, 'fromYear', formatUnsignedDigits(e.target.value, 4))}
+                  onKeyDown={blockInvalidNumberKeys}
+                />
               </label>
               <label className="ob-field">
                 <span>To month</span>
@@ -1109,7 +1120,14 @@ export default function IdentityBackgroundPage() {
               </label>
               <label className="ob-field">
                 <span>To year</span>
-                <input type="number" value={row.toYear} onChange={(e) => updatePreviousAddress(idx, 'toYear', e.target.value)} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={row.toYear}
+                  onChange={(e) => updatePreviousAddress(idx, 'toYear', formatUnsignedDigits(e.target.value, 4))}
+                  onKeyDown={blockInvalidNumberKeys}
+                />
               </label>
               <label className="ob-field">
                 <span>Reason for moving</span>
@@ -1135,14 +1153,24 @@ export default function IdentityBackgroundPage() {
           <button
             type="button"
             className="btn ob-secondary"
-            onClick={() => setForm((prev) => ({
-              ...prev,
-              previousAddresses: [...prev.previousAddresses, { ...EMPTY_PREVIOUS_ADDRESS }],
-            }))}
+            disabled={(form.previousAddresses || []).length >= MAX_PREVIOUS_ADDRESSES}
+            onClick={() => setForm((prev) => {
+              if ((prev.previousAddresses || []).length >= MAX_PREVIOUS_ADDRESSES) return prev
+              return {
+                ...prev,
+                previousAddresses: [...prev.previousAddresses, { ...EMPTY_PREVIOUS_ADDRESS }],
+              }
+            })}
           >
             Add previous address
           </button>
+          <span className="ob-age-preview">
+            {(form.previousAddresses || []).length} / {MAX_PREVIOUS_ADDRESSES}
+          </span>
         </div>
+        {fieldErrors.previousAddresses && (
+          <p className="ob-field-error" role="alert">{fieldErrors.previousAddresses}</p>
+        )}
       </AccordionSection>
 
       <AccordionSection
@@ -1343,36 +1371,67 @@ export default function IdentityBackgroundPage() {
             <>
               <label className="ob-field">
                 <span>Previous marriages</span>
-                <input type="number" min="0" name="previousMarriagesCount" value={form.relationship.previousMarriagesCount} onChange={onSectionChange('relationship')} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={3}
+                  name="previousMarriagesCount"
+                  value={form.relationship.previousMarriagesCount}
+                  onChange={(e) => patchSection('relationship', {
+                    previousMarriagesCount: formatUnsignedDigits(e.target.value, 3),
+                  })}
+                  onKeyDown={blockInvalidNumberKeys}
+                />
               </label>
               <label className="ob-field">
                 <span>Divorces</span>
-                <input type="number" min="0" name="divorcesCount" value={form.relationship.divorcesCount} onChange={onSectionChange('relationship')} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={3}
+                  name="divorcesCount"
+                  value={form.relationship.divorcesCount}
+                  onChange={(e) => patchSection('relationship', {
+                    divorcesCount: formatUnsignedDigits(e.target.value, 3),
+                  })}
+                  onKeyDown={blockInvalidNumberKeys}
+                />
               </label>
               <label className="ob-field">
                 <span>Annulments</span>
-                <input type="number" min="0" name="annulmentsCount" value={form.relationship.annulmentsCount} onChange={onSectionChange('relationship')} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={3}
+                  name="annulmentsCount"
+                  value={form.relationship.annulmentsCount}
+                  onChange={(e) => patchSection('relationship', {
+                    annulmentsCount: formatUnsignedDigits(e.target.value, 3),
+                  })}
+                  onKeyDown={blockInvalidNumberKeys}
+                />
               </label>
               <label className={fieldClass('relationship.mostRecentDivorceYear')}>
                 <span>Most recent divorce year</span>
                 <input
-                  type="number"
-                  min={1900}
-                  max={currentCalendarYear()}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
                   name="mostRecentDivorceYear"
                   value={form.relationship.mostRecentDivorceYear}
-                  onChange={onSectionChange('relationship')}
-                  {...inputA11y('relationship.mostRecentDivorceYear')}
+                  onChange={(e) => patchSection('relationship', {
+                    mostRecentDivorceYear: formatUnsignedDigits(e.target.value, 4),
+                  })}
+                  onKeyDown={blockInvalidNumberKeys}
                 />
-                <FieldError name="relationship.mostRecentDivorceYear" />
               </label>
-              <label className="ob-field-checkbox">
+              <label className="ob-check-field">
                 <input type="checkbox" name="currentlySeparated" checked={!!form.relationship.currentlySeparated} onChange={onSectionChange('relationship')} />
-                Currently separated
+                <span>Currently separated</span>
               </label>
-              <label className="ob-field-checkbox">
+              <label className="ob-check-field">
                 <input type="checkbox" name="divorceFinalized" checked={!!form.relationship.divorceFinalized} onChange={onSectionChange('relationship')} />
-                Divorce finalized
+                <span>Divorce finalized</span>
               </label>
             </>
           )}
@@ -1423,7 +1482,17 @@ export default function IdentityBackgroundPage() {
             <>
               <label className="ob-field">
                 <span>Number of children</span>
-                <input type="number" min="0" name="childrenCount" value={form.family.childrenCount} onChange={onSectionChange('family')} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={3}
+                  name="childrenCount"
+                  value={form.family.childrenCount}
+                  onChange={(e) => patchSection('family', {
+                    childrenCount: formatUnsignedDigits(e.target.value, 3),
+                  })}
+                  onKeyDown={blockInvalidNumberKeys}
+                />
               </label>
               <div className="ob-field">
                 <span>Children age ranges</span>
@@ -1503,21 +1572,41 @@ export default function IdentityBackgroundPage() {
                   ))}
                 </select>
               </label>
-              <label className="ob-field">
+              <label className={fieldClass(`educations.${idx}.degree`)}>
                 <span>Degree</span>
-                <input value={edu.degree} onChange={(e) => updateEducation(idx, 'degree', e.target.value)} />
+                <input
+                  value={edu.degree}
+                  onChange={(e) => updateEducation(idx, 'degree', formatEducationText(e.target.value))}
+                  {...inputA11y(`educations.${idx}.degree`)}
+                />
+                <FieldError name={`educations.${idx}.degree`} />
               </label>
-              <label className="ob-field">
+              <label className={fieldClass(`educations.${idx}.fieldOfStudy`)}>
                 <span>Field of study</span>
-                <input value={edu.fieldOfStudy} onChange={(e) => updateEducation(idx, 'fieldOfStudy', e.target.value)} />
+                <input
+                  value={edu.fieldOfStudy}
+                  onChange={(e) => updateEducation(idx, 'fieldOfStudy', formatEducationText(e.target.value))}
+                  {...inputA11y(`educations.${idx}.fieldOfStudy`)}
+                />
+                <FieldError name={`educations.${idx}.fieldOfStudy`} />
               </label>
-              <label className="ob-field">
+              <label className={fieldClass(`educations.${idx}.institution`)}>
                 <span>Institution</span>
-                <input value={edu.institution} onChange={(e) => updateEducation(idx, 'institution', e.target.value)} />
+                <input
+                  value={edu.institution}
+                  onChange={(e) => updateEducation(idx, 'institution', formatEducationText(e.target.value))}
+                  {...inputA11y(`educations.${idx}.institution`)}
+                />
+                <FieldError name={`educations.${idx}.institution`} />
               </label>
-              <label className="ob-field">
+              <label className={fieldClass(`educations.${idx}.city`)}>
                 <span>City</span>
-                <input value={edu.city} onChange={(e) => updateEducation(idx, 'city', e.target.value)} />
+                <input
+                  value={edu.city}
+                  onChange={(e) => updateEducation(idx, 'city', formatEducationCity(e.target.value))}
+                  {...inputA11y(`educations.${idx}.city`)}
+                />
+                <FieldError name={`educations.${idx}.city`} />
               </label>
               <label className="ob-field">
                 <span>Country</span>
@@ -1528,24 +1617,80 @@ export default function IdentityBackgroundPage() {
                   ))}
                 </select>
               </label>
-              <label className="ob-field">
+              <label className={fieldClass(`educations.${idx}.startMonth`)}>
+                <span>Start month</span>
+                <select
+                  value={String(edu.startMonth ?? '')}
+                  onChange={(e) => updateEducation(idx, 'startMonth', e.target.value)}
+                  {...inputA11y(`educations.${idx}.startMonth`)}
+                >
+                  {MONTHS.map((m) => (
+                    <option key={m.value || 'none'} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+                <FieldError name={`educations.${idx}.startMonth`} />
+              </label>
+              <label className={fieldClass(`educations.${idx}.startYear`)}>
                 <span>Start year</span>
-                <input type="number" value={edu.startYear} onChange={(e) => updateEducation(idx, 'startYear', e.target.value)} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={4}
+                  placeholder="YYYY"
+                  value={edu.startYear}
+                  onChange={(e) => updateEducation(idx, 'startYear', formatEducationYear(e.target.value))}
+                  {...inputA11y(`educations.${idx}.startYear`)}
+                />
+                <FieldError name={`educations.${idx}.startYear`} />
+              </label>
+              <label className={fieldClass(`educations.${idx}.graduationMonth`)}>
+                <span>Graduation month</span>
+                <select
+                  value={edu.currentlyStudying ? '' : String(edu.graduationMonth ?? '')}
+                  onChange={(e) => updateEducation(idx, 'graduationMonth', e.target.value)}
+                  disabled={!!edu.currentlyStudying}
+                  aria-disabled={!!edu.currentlyStudying}
+                  {...inputA11y(`educations.${idx}.graduationMonth`)}
+                >
+                  {MONTHS.map((m) => (
+                    <option key={m.value || 'none'} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+                <FieldError name={`educations.${idx}.graduationMonth`} />
               </label>
               <label className={fieldClass(`educations.${idx}.graduationYear`)}>
                 <span>Graduation year</span>
-                <input type="number" value={edu.graduationYear} onChange={(e) => updateEducation(idx, 'graduationYear', e.target.value)} {...inputA11y(`educations.${idx}.graduationYear`)} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={4}
+                  placeholder="YYYY"
+                  value={edu.currentlyStudying ? '' : edu.graduationYear}
+                  onChange={(e) => updateEducation(idx, 'graduationYear', formatEducationYear(e.target.value))}
+                  disabled={!!edu.currentlyStudying}
+                  aria-disabled={!!edu.currentlyStudying}
+                  {...inputA11y(`educations.${idx}.graduationYear`)}
+                />
                 <FieldError name={`educations.${idx}.graduationYear`} />
               </label>
-              <label className="ob-field">
-                <span>
-                  <input type="checkbox" checked={!!edu.currentlyStudying} onChange={(e) => updateEducation(idx, 'currentlyStudying', e.target.checked)} />
-                  {' '}Currently studying
-                </span>
+              <label className="ob-check-field">
+                <input
+                  type="checkbox"
+                  checked={!!edu.currentlyStudying}
+                  onChange={(e) => updateEducation(idx, 'currentlyStudying', e.target.checked)}
+                />
+                <span>Currently studying</span>
               </label>
-              <label className="ob-field">
+              <label className={fieldClass(`educations.${idx}.honors`)}>
                 <span>Honors</span>
-                <input value={edu.honors} onChange={(e) => updateEducation(idx, 'honors', e.target.value)} />
+                <input
+                  value={edu.honors}
+                  onChange={(e) => updateEducation(idx, 'honors', formatEducationText(e.target.value))}
+                  {...inputA11y(`educations.${idx}.honors`)}
+                />
+                <FieldError name={`educations.${idx}.honors`} />
               </label>
             </div>
             <div className="ob-row-actions">
@@ -1578,7 +1723,7 @@ export default function IdentityBackgroundPage() {
 
       <AccordionSection
         id="career"
-        title="Education & Career Background"
+        title="Career Background"
         icon={Briefcase}
         iconTone="violet"
         subtitle="Your profession, employer type, and career stage."
@@ -1595,37 +1740,81 @@ export default function IdentityBackgroundPage() {
             onChange={onSectionChange('career')}
             section="career"
           />
-          <label className="ob-field">
+          <label className={fieldClass('career.employmentType')}>
+            <span>Employment type</span>
+            <input
+              name="employmentType"
+              value={form.career.employmentType}
+              onChange={(e) => patchSection('career', { employmentType: formatEmploymentTypeText(e.target.value) })}
+              placeholder="e.g. OPT, CPT, Intern, H1B"
+              {...inputA11y('career.employmentType')}
+            />
+            <FieldError name="career.employmentType" />
+          </label>
+          <label className={fieldClass('career.jobFunction')}>
             <span>Job function</span>
-            <input name="jobFunction" value={form.career.jobFunction} onChange={onSectionChange('career')} />
+            <input
+              name="jobFunction"
+              value={form.career.jobFunction}
+              onChange={(e) => patchSection('career', { jobFunction: formatAlphanumericText(e.target.value) })}
+              {...inputA11y('career.jobFunction')}
+            />
+            <FieldError name="career.jobFunction" />
           </label>
-          <label className="ob-field">
+          <label className={fieldClass('career.industry')}>
             <span>Industry</span>
-            <input name="industry" value={form.career.industry} onChange={onSectionChange('career')} />
+            <input
+              name="industry"
+              value={form.career.industry}
+              onChange={(e) => patchSection('career', { industry: formatAlphanumericText(e.target.value) })}
+              {...inputA11y('career.industry')}
+            />
+            <FieldError name="career.industry" />
           </label>
-          <label className="ob-field">
-            <span>Employer name</span>
-            <input name="employerName" value={form.career.employerName} onChange={onSectionChange('career')} />
-          </label>
-          <label className="ob-field">
-            <span>
+          <div className="ob-field-with-check">
+            <label className={fieldClass('career.employerName')}>
+              <span>Employer name</span>
+              <input
+                name="employerName"
+                value={form.career.employerName}
+                onChange={(e) => patchSection('career', { employerName: formatAlphanumericText(e.target.value) })}
+                {...inputA11y('career.employerName')}
+              />
+              <FieldError name="career.employerName" />
+            </label>
+            <label className="ob-check-field">
               <input
                 type="checkbox"
                 name="showEmployerPublicly"
                 checked={!!form.career.showEmployerPublicly}
                 onChange={onSectionChange('career')}
               />
-              {' '}Show employer publicly
-            </span>
-          </label>
-          <p className="ob-hint">Employer is private by default unless you check this box.</p>
-          <label className="ob-field">
+              <span>Show employer publicly</span>
+            </label>
+          </div>
+          <label className={fieldClass('career.yearsInProfession')}>
             <span>Years in profession</span>
-            <input type="number" min="0" name="yearsInProfession" value={form.career.yearsInProfession} onChange={onSectionChange('career')} />
+            <input
+              type="text"
+              inputMode="numeric"
+              name="yearsInProfession"
+              maxLength={3}
+              value={form.career.yearsInProfession}
+              onChange={(e) => patchSection('career', { yearsInProfession: formatUnsignedDigits(e.target.value, 3) })}
+              onKeyDown={blockInvalidNumberKeys}
+              {...inputA11y('career.yearsInProfession')}
+            />
+            <FieldError name="career.yearsInProfession" />
           </label>
-          <label className="ob-field">
+          <label className={fieldClass('career.careerAmbitions')} style={{ gridColumn: '1 / -1' }}>
             <span>Career ambitions</span>
-            <input name="careerAmbitions" value={form.career.careerAmbitions} onChange={onSectionChange('career')} />
+            <input
+              name="careerAmbitions"
+              value={form.career.careerAmbitions}
+              onChange={(e) => patchSection('career', { careerAmbitions: formatAlphanumericText(e.target.value) })}
+              {...inputA11y('career.careerAmbitions')}
+            />
+            <FieldError name="career.careerAmbitions" />
           </label>
         </div>
       </AccordionSection>
@@ -1691,19 +1880,18 @@ export default function IdentityBackgroundPage() {
               <label className={fieldClass('safety.approxYear')}>
                 <span>Approx. year</span>
                 <input
-                  type="number"
-                  min={1900}
-                  max={currentCalendarYear()}
+                  type="text"
+                  inputMode="numeric"
                   name="approxYear"
+                  maxLength={4}
                   value={form.safety.approxYear}
-                  onChange={onSectionChange('safety')}
-                  {...inputA11y('safety.approxYear')}
+                  onChange={onApproxYearChange('safety')}
+                  onKeyDown={blockInvalidNumberKeys}
                 />
-                <FieldError name="safety.approxYear" />
               </label>
-              <label className="ob-field-checkbox">
+              <label className="ob-check-field">
                 <input type="checkbox" name="caseResolved" checked={!!form.safety.caseResolved} onChange={onSectionChange('safety')} />
-                Case resolved
+                <span>Case resolved</span>
               </label>
               <label className="ob-field">
                 <span>Explanation</span>
@@ -1745,19 +1933,21 @@ export default function IdentityBackgroundPage() {
               <label className={fieldClass('civilJudgment.approxYear')}>
                 <span>Approx. year</span>
                 <input
-                  type="number"
-                  min={1900}
-                  max={currentCalendarYear()}
+                  type="text"
+                  inputMode="numeric"
                   name="approxYear"
+                  maxLength={4}
                   value={form.civilJudgment.approxYear}
-                  onChange={onSectionChange('civilJudgment')}
+                  onChange={onApproxYearChange('civilJudgment')}
+                  onKeyDown={blockInvalidNumberKeys}
+                  aria-label="Approximate year of civil judgment"
                   {...inputA11y('civilJudgment.approxYear')}
                 />
                 <FieldError name="civilJudgment.approxYear" />
               </label>
-              <label className="ob-field-checkbox">
+              <label className="ob-check-field">
                 <input type="checkbox" name="resolved" checked={!!form.civilJudgment.resolved} onChange={onSectionChange('civilJudgment')} />
-                Resolved
+                <span>Resolved</span>
               </label>
               <label className="ob-field">
                 <span>Explanation</span>
@@ -1770,30 +1960,63 @@ export default function IdentityBackgroundPage() {
 
       <AccordionSection
         id="verification"
-        title="Identity Verification"
+        title="Identity Documents"
         icon={BadgeCheck}
         iconTone="emerald"
-        subtitle="Government ID & safety screening badge for maximum trust."
-        badge={{ label: vs?.overallStatus === 'VERIFIED' ? 'Verified Badge Active' : 'Verification', tone: 'emerald' }}
-        summary={vs?.overallStatus ? humanizeEnum(vs.overallStatus) : 'Start verification'}
+        subtitle="Choose a government ID type and upload the matching document image(s)."
+        badge={{ label: 'Documents', tone: 'emerald' }}
+        summary={form.idDocumentType
+          ? ({ DRIVER_LICENSE: "Driver's License", STATE_ID: 'State ID', PASSPORT: 'Passport' }[form.idDocumentType] || form.idDocumentType)
+          : 'Select document type'}
         tone="verified"
         open={isOpen('verification')}
         onToggle={toggleSection}
-        hidden={!sectionVisible('verification', ['verification', 'id', 'selfie', 'document', 'ssn'])}
-      >        <div className="ob-chip-row" style={{ marginBottom: 12 }}>
-          <span className="ob-status-chip">Overall: {humanizeEnum(vs?.overallStatus) || 'Not started'}</span>
-          <span className="ob-status-chip">Name: {humanizeEnum(vs?.nameStatus) || '—'}</span>
-          <span className="ob-status-chip">Age: {humanizeEnum(vs?.ageStatus) || '—'}</span>
-          <span className="ob-status-chip">Photo: {humanizeEnum(vs?.photoStatus) || '—'}</span>
-        </div>
-        <div className="ob-row-actions">
-          <button type="button" className="btn auth-primary-btn" onClick={startVerification} disabled={verifyBusy}>
-            {verifyBusy ? 'Working…' : 'Start verification'}
-          </button>
-        </div>
+        hidden={!sectionVisible('verification', ['verification', 'id', 'document', 'ssn', 'passport', 'license', 'dl'])}
+      >
         <div className="ob-grid" style={{ marginTop: 14 }}>
+          <label className="ob-field">
+            <span>Document type</span>
+            <select
+              value={form.idDocumentType || ''}
+              onChange={(e) => {
+                const nextType = e.target.value
+                setForm((prev) => ({
+                  ...prev,
+                  idDocumentType: nextType,
+                  idDocumentNumber: '',
+                }))
+                setUploadFeedback({})
+              }}
+              aria-label="Identity document type"
+            >
+              <option value="">Select</option>
+              <option value="DRIVER_LICENSE">Driver&apos;s License</option>
+              <option value="STATE_ID">State ID</option>
+              <option value="PASSPORT">Passport</option>
+            </select>
+          </label>
+          <label className="ob-field">
+            <span>
+              {form.idDocumentType === 'PASSPORT'
+                ? 'Passport number'
+                : form.idDocumentType === 'STATE_ID'
+                  ? 'State ID number'
+                  : form.idDocumentType === 'DRIVER_LICENSE'
+                    ? "Driver's license number"
+                    : 'Document number'}
+            </span>
+            <input
+              type="text"
+              value={form.idDocumentNumber || ''}
+              onChange={(e) => setForm((prev) => ({ ...prev, idDocumentNumber: e.target.value }))}
+              placeholder={form.idDocumentType ? 'Enter number on the document' : 'Select a document type first'}
+              disabled={!form.idDocumentType}
+              autoComplete="off"
+              aria-label="Identity document number"
+            />
+          </label>
           <label className={fieldClass('ssn')}>
-            <span>Social Security Number (SSN)</span>
+            <span>Social Security Number (SSN) <em className="ob-optional">(optional)</em></span>
             <input
               name="ssn"
               inputMode="numeric"
@@ -1808,40 +2031,73 @@ export default function IdentityBackgroundPage() {
             />
             <FieldError name="ssn" />
           </label>
-          <label className="ob-field">
-            <span>DL front {vs?.dlFrontDocumentId ? '(Uploaded)' : ''}</span>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              aria-label="Upload driver license front image"
-              onChange={(e) => onDocUpload(e, 'DL_FRONT')}
-              disabled={verifyBusy}
-            />
-          </label>
-          <label className="ob-field">
-            <span>DL back {vs?.dlBackDocumentId ? '(Uploaded)' : ''}</span>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              aria-label="Upload driver license back image"
-              onChange={(e) => onDocUpload(e, 'DL_BACK')}
-              disabled={verifyBusy}
-            />
-          </label>
-          <label className="ob-field">
-            <span>Selfie</span>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              aria-label="Upload selfie for face match"
-              onChange={(e) => onDocUpload(e, 'SELFIE')}
-              disabled={verifyBusy}
-            />
-          </label>
         </div>
-        <p className="ob-hint">
-          SSN is stored privately and returned masked. DL images are never shown on public profiles.
-          Selfie is compared to the driver-license photo — upload DL front first.
+
+        {form.idDocumentType === 'PASSPORT' && (
+          <div className="ob-grid" style={{ marginTop: 14 }}>
+            <label className="ob-field">
+              <span>
+                Passport photo page
+                {uploadFeedback.PASSPORT || vs?.passportDocumentId || vs?.dlFrontDocumentId ? ' (Uploaded)' : ''}
+              </span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                aria-label="Upload passport photo page"
+                onChange={(e) => onDocUpload(e, 'front')}
+                disabled={verifyBusy || !form.idDocumentType}
+              />
+              {(uploadFeedback.PASSPORT?.name) && (
+                <span className="ob-hint">{uploadFeedback.PASSPORT.name}</span>
+              )}
+            </label>
+          </div>
+        )}
+
+        {(form.idDocumentType === 'DRIVER_LICENSE' || form.idDocumentType === 'STATE_ID') && (
+          <div className="ob-grid" style={{ marginTop: 14 }}>
+            <label className="ob-field">
+              <span>
+                {form.idDocumentType === 'STATE_ID' ? 'State ID front' : 'DL front'}
+                {(uploadFeedback.ID_FRONT || uploadFeedback.DL_FRONT || vs?.dlFrontDocumentId) ? ' (Uploaded)' : ''}
+              </span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                aria-label={`Upload ${form.idDocumentType === 'STATE_ID' ? 'state ID' : 'driver license'} front image`}
+                onChange={(e) => onDocUpload(e, 'front')}
+                disabled={verifyBusy || !form.idDocumentType}
+              />
+              {(uploadFeedback.ID_FRONT?.name || uploadFeedback.DL_FRONT?.name) && (
+                <span className="ob-hint">{uploadFeedback.ID_FRONT?.name || uploadFeedback.DL_FRONT?.name}</span>
+              )}
+            </label>
+            <label className="ob-field">
+              <span>
+                {form.idDocumentType === 'STATE_ID' ? 'State ID back' : 'DL back'}
+                {(uploadFeedback.ID_BACK || uploadFeedback.DL_BACK || vs?.dlBackDocumentId) ? ' (Uploaded)' : ''}
+              </span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                aria-label={`Upload ${form.idDocumentType === 'STATE_ID' ? 'state ID' : 'driver license'} back image`}
+                onChange={(e) => onDocUpload(e, 'back')}
+                disabled={verifyBusy || !form.idDocumentType}
+              />
+              {(uploadFeedback.ID_BACK?.name || uploadFeedback.DL_BACK?.name) && (
+                <span className="ob-hint">{uploadFeedback.ID_BACK?.name || uploadFeedback.DL_BACK?.name}</span>
+              )}
+            </label>
+          </div>
+        )}
+
+        {verifyBusy && (
+          <p className="ob-hint" style={{ marginTop: 10 }} role="status">Uploading…</p>
+        )}
+
+        <p className="ob-hint" style={{ marginTop: 12 }}>
+          SSN and ID images are stored privately and are never shown on public profiles.
+          Upload JPEG, PNG, or WebP images up to 5MB.
         </p>
       </AccordionSection>
 

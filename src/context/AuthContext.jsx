@@ -9,6 +9,13 @@ import { normalizeUser } from '../utils/user'
  */
 export const IS_PHONE_VERIFICATION_MANDATORY = false
 
+/**
+ * Phase 1: Firebase SMS (Blaze billing) is not enabled.
+ * When false, signup/login must not prompt for Phone/SMS verification after email OTP.
+ * Set true when SMS subscription / Firebase Phone Auth is live.
+ */
+export const IS_PHONE_SMS_VERIFICATION_ENABLED = false
+
 export const PHONE_VERIFY_DISMISS_KEY = 'sp_phone_verify_remind_later'
 export const IDENTITY_CONTINUE_LATER_KEY = 'sp_identity_continue_later'
 

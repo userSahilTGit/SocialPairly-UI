@@ -34,6 +34,11 @@ describe('userNeedsPhoneVerification', () => {
     expect(userNeedsPhoneVerification({ role: 'USER', phoneNumber: '9876543210', phoneVerified: false })).toBe(true)
     expect(userNeedsPhoneVerification({ role: 'USER', phoneNumber: '9876543210', phoneVerified: true })).toBe(false)
   })
+
+  it('returns false when Phase 1 SMS verification is disabled', () => {
+    expect(userNeedsPhoneVerification({ role: 'USER', phoneNumber: '9876543210', phoneVerified: false }, { smsEnabled: false })).toBe(false)
+    expect(userNeedsPhoneVerification({ role: 'USER' }, { smsEnabled: false })).toBe(false)
+  })
 })
 
 describe('splitPhone', () => {

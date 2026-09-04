@@ -2,9 +2,9 @@ import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import { signInWithPhoneNumber } from 'firebase/auth'
-import { formatPhoneE164, formatPhoneStorage } from '../utils/phoneFormat'
+import { formatPhoneE164, formatPhoneStorage, formatPhoneNationalInput, getPhoneNationalLength, isValidPhoneNational, phoneNationalValidationMessage } from '../utils/phoneFormat'
 import { auth } from '../config/firebase'
-import { IS_PHONE_VERIFICATION_MANDATORY, PHONE_VERIFY_DISMISS_KEY, useAuth } from '../context/AuthContext'
+import { IS_PHONE_VERIFICATION_MANDATORY, IS_PHONE_SMS_VERIFICATION_ENABLED, PHONE_VERIFY_DISMISS_KEY, useAuth } from '../context/AuthContext'
 import { postAuthPath } from '../utils/user'
 import api from '../api/axios'
 import AuthHeroPanel from '../components/AuthHeroPanel'
@@ -15,12 +15,22 @@ import {
   resetInvisibleRecaptcha,
 } from '../utils/firebasePhone'
 
-const STEPS = [
+const STEPS_WITH_PHONE = [
   { id: 1, label: 'Account' },
   { id: 2, label: 'Verify Email' },
   { id: 3, label: 'Verify Phone' },
   { id: 4, label: 'Completed' },
 ]
+
+const STEPS_EMAIL_ONLY = [
+  { id: 1, label: 'Account' },
+  { id: 2, label: 'Verify Email' },
+  { id: 3, label: 'Completed' },
+]
+
+const STEPS = IS_PHONE_SMS_VERIFICATION_ENABLED ? STEPS_WITH_PHONE : STEPS_EMAIL_ONLY
+const COMPLETED_STEP = IS_PHONE_SMS_VERIFICATION_ENABLED ? 4 : 3
+const PHONE_STEP = 3
 
 function splitFullName(fullName) {
   const parts = fullName.trim().split(/\s+/).filter(Boolean)
@@ -82,6 +92,10 @@ export default function SignUp() {
       setError('Please accept the required consents to continue.')
       return
     }
+    if (!isValidPhoneNational(form.phoneNumber, countryCode)) {
+      setError(phoneNationalValidationMessage(countryCode))
+      return
+    }
 
     setLoading(true)
     try {
@@ -103,7 +117,11 @@ export default function SignUp() {
         marketingConsent: form.marketingConsent,
       })
       setRegisteredPhone(phoneE164)
-      setMessage('Account created. Check your email for a verification code. Phone verification uses Firebase SMS (optional).')
+      setMessage(
+        IS_PHONE_SMS_VERIFICATION_ENABLED
+          ? 'Account created. Check your email for a verification code. Phone verification uses Firebase SMS (optional).'
+          : 'Account created. Check your email for a verification code.'
+      )
       setStep(2)
     } catch (err) {
       const data = err.response?.data
@@ -128,7 +146,8 @@ export default function SignUp() {
         otp: emailOtp,
       })
       setMessage(res.data?.message || 'Email verified')
-      setStep(3)
+      // Phase 1: email OTP is enough — do not prompt for Phone/SMS.
+      setStep(IS_PHONE_SMS_VERIFICATION_ENABLED ? PHONE_STEP : COMPLETED_STEP)
     } catch (err) {
       if (err.response?.status === 429) {
         setError(err.response?.data?.message || 'Too many attempts. Try again later.')
@@ -177,7 +196,7 @@ export default function SignUp() {
       setMessage(res.data?.message || 'Phone verified')
       await clearPhoneRecaptcha()
       phoneConfirmationRef.current = null
-      setStep(4)
+      setStep(COMPLETED_STEP)
     } catch (err) {
       setError(err.response?.data?.message || err.response?.data?.error || firebasePhoneErrorMessage(err))
     } finally {
@@ -206,7 +225,8 @@ export default function SignUp() {
   const skipEmailStep = () => {
     setError('')
     setMessage('Email verification skipped — you can verify later from your account.')
-    setStep(3)
+    // Phase 1: skipping email also skips Phone/SMS (not offered until Blaze SMS is enabled).
+    setStep(IS_PHONE_SMS_VERIFICATION_ENABLED ? PHONE_STEP : COMPLETED_STEP)
     setPhoneCodeSent(false)
   }
 
@@ -215,11 +235,12 @@ export default function SignUp() {
     setMessage('')
     clearPhoneRecaptcha()
     phoneConfirmationRef.current = null
-    setStep(4)
+    setStep(COMPLETED_STEP)
   }
 
   const goToHome = async () => {
-    sessionStorage.removeItem(PHONE_VERIFY_DISMISS_KEY)
+    // Avoid immediately re-prompting Phone/SMS after email-based signup.
+    sessionStorage.setItem(PHONE_VERIFY_DISMISS_KEY, '1')
     let nextUser = null
     try {
       nextUser = await refreshUser()
@@ -287,7 +308,14 @@ export default function SignUp() {
                   <select
                     className="phone-code"
                     value={countryCode}
-                    onChange={(e) => setCountryCode(e.target.value)}
+                    onChange={(e) => {
+                      const nextCode = e.target.value
+                      setCountryCode(nextCode)
+                      setForm((prev) => ({
+                        ...prev,
+                        phoneNumber: formatPhoneNationalInput(nextCode, prev.phoneNumber),
+                      }))
+                    }}
                     aria-label="Country code"
                   >
                     <option value="+91">+91</option>
@@ -298,16 +326,29 @@ export default function SignUp() {
                   <input
                     className="auth-input"
                     name="phoneNumber"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={getPhoneNationalLength(countryCode).max}
                     value={form.phoneNumber}
                     onChange={(e) => setForm((prev) => ({
                       ...prev,
-                      phoneNumber: e.target.value.replace(/[^\d\s-]/g, ''),
+                      phoneNumber: formatPhoneNationalInput(countryCode, e.target.value),
                     }))}
-                    placeholder="98765 43210"
+                    placeholder={
+                      countryCode === '+971'
+                        ? '501234567'
+                        : countryCode === '+1'
+                          ? '2025550123'
+                          : '9876543210'
+                    }
                     required
+                    aria-invalid={form.phoneNumber && !isValidPhoneNational(form.phoneNumber, countryCode) ? true : undefined}
                   />
                 </div>
-                <p className="field-hint">We&apos;ll text a 4-digit verification code to this number.</p>
+                <p className="field-hint">
+                  Numbers only — {getPhoneNationalLength(countryCode).label} for {countryCode}.
+                </p>
               </div>
               <div className="form-group">
                 <label>Create password</label>
@@ -378,7 +419,11 @@ export default function SignUp() {
               </div>
 
               <button className="btn btn-block auth-primary-btn" type="submit" disabled={loading}>
-                {loading ? 'Sending codes...' : 'Send Verification Codes'}
+                {loading
+                  ? 'Sending...'
+                  : IS_PHONE_SMS_VERIFICATION_ENABLED
+                    ? 'Send Verification Codes'
+                    : 'Send Verification Code'}
               </button>
             </form>
           )}
@@ -422,7 +467,7 @@ export default function SignUp() {
             </form>
           )}
 
-          {step === 3 && (
+          {IS_PHONE_SMS_VERIFICATION_ENABLED && step === PHONE_STEP && (
             <form onSubmit={handleVerifyPhone}>
               <p className="auth-side-sub">
                 Verify <strong>{registeredPhone || formatPhoneE164(countryCode, form.phoneNumber)}</strong> with a Firebase SMS code (optional).
@@ -484,11 +529,15 @@ export default function SignUp() {
             </form>
           )}
 
-          {step === 4 && (
+          {step === COMPLETED_STEP && (
             <div className="signup-complete">
               <CheckCircle2 size={48} color="#4c31df" />
               <h3>You&apos;re all set</h3>
-              <p>Your account is ready. You can verify email or phone anytime from your profile.</p>
+              <p>
+                {IS_PHONE_SMS_VERIFICATION_ENABLED
+                  ? 'Your account is ready. You can verify email or phone anytime from your profile.'
+                  : 'Your account is ready. Email verification is complete — phone SMS verification will be available in a later release.'}
+              </p>
               <button className="btn btn-block auth-primary-btn" type="button" onClick={goToHome}>
                 Go to Home
               </button>

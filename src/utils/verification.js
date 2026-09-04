@@ -17,8 +17,10 @@ export function hasUsablePhoneNumber(user) {
 /**
  * Prompt when the user has no phone, or has an unverified phone.
  * Admins are skipped. Entirely optional when IS_PHONE_VERIFICATION_MANDATORY is false.
+ * Phase 1: when IS_PHONE_SMS_VERIFICATION_ENABLED is false, never prompt (email OTP is enough).
  */
-export function userNeedsPhoneVerification(user) {
+export function userNeedsPhoneVerification(user, { smsEnabled = true } = {}) {
+  if (!smsEnabled) return false
   if (!user) return false
   if (user.role === 'ADMIN') return false
   if (!hasUsablePhoneNumber(user)) return true

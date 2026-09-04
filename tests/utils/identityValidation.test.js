@@ -14,6 +14,15 @@ import {
   buildIdentityPayload,
   validateIdentityForm,
   formatZipInput,
+  formatEducationCity,
+  formatEducationText,
+  formatEducationYear,
+  formatPreferredLocationText,
+  normalizePreferredFutureLocations,
+  validatePreferredLocationAdd,
+  countPreferredFutureCities,
+  MAX_PREFERRED_FUTURE_STATES,
+  MAX_PREFERRED_FUTURE_CITIES,
   EMPTY_IDENTITY_FORM,
   MIN_AGE,
   sanitizePhoneInput,
@@ -142,24 +151,28 @@ describe('residenceDurationLabel', () => {
     expect(residenceDurationLabel(1, 'x')).toBe('')
   })
 
-  it('labels durations', () => {
+  it('labels durations in days', () => {
     const now = new Date()
     const futureYear = now.getFullYear() + 1
-    expect(residenceDurationLabel(now.getMonth() + 1, futureYear)).toBe('Less than 1 month')
-    expect(residenceDurationLabel(now.getMonth() + 1, now.getFullYear())).toBe('Less than 1 month')
+    expect(residenceDurationLabel(now.getMonth() + 1, futureYear)).toBe('Less than 1 day')
 
-    const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    expect(residenceDurationLabel(oneMonthAgo.getMonth() + 1, oneMonthAgo.getFullYear())).toBe('1 month')
-
-    const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1)
-    expect(residenceDurationLabel(twoMonthsAgo.getMonth() + 1, twoMonthsAgo.getFullYear())).toBe('2 months')
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const expectedSameMonth = Math.floor(
+      (new Date(now.getFullYear(), now.getMonth(), now.getDate()) - todayStart) / (24 * 60 * 60 * 1000),
+    )
+    if (expectedSameMonth < 1) {
+      expect(residenceDurationLabel(now.getMonth() + 1, now.getFullYear())).toBe('Less than 1 day')
+    } else {
+      expect(residenceDurationLabel(now.getMonth() + 1, now.getFullYear()))
+        .toBe(`${expectedSameMonth.toLocaleString()} day${expectedSameMonth === 1 ? '' : 's'}`)
+    }
 
     const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1)
-    expect(residenceDurationLabel(oneYearAgo.getMonth() + 1, oneYearAgo.getFullYear())).toBe('1 year')
-
-    const thirteenMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 13, 1)
-    expect(residenceDurationLabel(thirteenMonthsAgo.getMonth() + 1, thirteenMonthsAgo.getFullYear()))
-      .toBe('1 year, 1 month')
+    const days = Math.floor(
+      (new Date(now.getFullYear(), now.getMonth(), now.getDate()) - oneYearAgo) / (24 * 60 * 60 * 1000),
+    )
+    expect(residenceDurationLabel(oneYearAgo.getMonth() + 1, oneYearAgo.getFullYear()))
+      .toBe(`${days.toLocaleString()} days`)
   })
 })
 
@@ -179,7 +192,7 @@ describe('mapIdentityResponseToForm / buildIdentityPayload', () => {
       currentResidence: {
         city: 'London',
         moveInMonth: 3,
-        preferredFutureLocations: ['Paris'],
+        preferredFutureLocations: [{ state: 'Texas', cities: ['Paris'] }],
       },
       previousAddresses: [{ id: 1, city: 'Bath', fromMonth: 1, fromYear: 2010 }],
       nationality: {
@@ -201,7 +214,7 @@ describe('mapIdentityResponseToForm / buildIdentityPayload', () => {
     expect(form.firstName).toBe('Ada')
     expect(form.genderShownToMatches).toBe('MATCHES')
     expect(form.emailVerified).toBe(true)
-    expect(form.currentResidence.preferredFutureLocations).toEqual(['Paris'])
+    expect(form.currentResidence.preferredFutureLocations).toEqual([{ state: 'Texas', cities: ['Paris'] }])
     expect(form.previousAddresses[0].city).toBe('Bath')
     expect(form.nationality.languages[0].languageCode).toBe('en')
     expect(form.educations[0].currentlyStudying).toBe(true)
@@ -235,7 +248,7 @@ describe('mapIdentityResponseToForm / buildIdentityPayload', () => {
       genderShownToMatches: '',
       currentResidence: {
         ...EMPTY_IDENTITY_FORM.currentResidence,
-        preferredFutureLocations: ['  Paris  ', ''],
+        preferredFutureLocations: [{ state: 'Texas', cities: ['  Paris  ', ''] }],
         moveInMonth: '3',
       },
       previousAddresses: [{ id: 1, city: 'Bath' }],
@@ -256,7 +269,7 @@ describe('mapIdentityResponseToForm / buildIdentityPayload', () => {
     expect(payload.firstName).toBe('Ada')
     expect(payload.ssn).toBeNull()
     expect(payload.genderShownToMatches).toBe('MATCHES')
-    expect(payload.currentResidence.preferredFutureLocations).toEqual(['Paris'])
+    expect(payload.currentResidence.preferredFutureLocations).toEqual([{ state: 'Texas', cities: ['Paris'] }])
     expect(payload.currentResidence.moveInMonth).toBe(3)
     expect(payload.educations[0].graduationYear).toBeNull()
     expect(payload.safety.caseResolved).toBeNull()
@@ -290,19 +303,58 @@ describe('mapIdentityResponseToForm / buildIdentityPayload', () => {
   })
 })
 
+describe('preferred future locations', () => {
+  it('strips non-letters from draft input', () => {
+    expect(formatPreferredLocationText('Austin123!')).toBe('Austin')
+  })
+
+  it('normalizes legacy string arrays', () => {
+    expect(normalizePreferredFutureLocations(['Paris', 'Lyon'])).toEqual([
+      { state: '', cities: ['Paris', 'Lyon'] },
+    ])
+  })
+
+  it('blocks invalid add attempts', () => {
+    expect(validatePreferredLocationAdd('Texas', 'Austin123', [])).toMatch(/letters/)
+    expect(validatePreferredLocationAdd('', 'Austin', [])).toMatch(/State is required/)
+  })
+
+  it('enforces city and state limits on add', () => {
+    const locations = Array.from({ length: MAX_PREFERRED_FUTURE_STATES }, (_, i) => ({
+      state: `State${i}`,
+      cities: ['Town'],
+    }))
+    expect(validatePreferredLocationAdd('NewState', 'City', locations)).toMatch(/5 states/)
+    const manyCities = [{ state: 'Texas', cities: Array.from({ length: MAX_PREFERRED_FUTURE_CITIES }, (_, i) => `City${i}`) }]
+    expect(validatePreferredLocationAdd('Texas', 'Extra', manyCities)).toMatch(/50 cities/)
+  })
+
+  it('validates saved preferred future locations', () => {
+    const errors = validateIdentityForm({
+      ...EMPTY_IDENTITY_FORM,
+      currentResidence: {
+        ...EMPTY_IDENTITY_FORM.currentResidence,
+        preferredFutureLocations: [{ state: '', cities: ['Paris'] }],
+      },
+    }, 'SAVE_LATER')
+    expect(errors['currentResidence.preferredFutureLocations']).toMatch(/state/)
+  })
+})
+
 describe('validateIdentityForm', () => {
   const baseForm = (overrides = {}) => ({
     ...EMPTY_IDENTITY_FORM,
     ...overrides,
   })
 
-  it('no longer requires background consent (#1561)', () => {
+  it('does not require background consent in Phase 1', () => {
     const errors = validateIdentityForm(EMPTY_IDENTITY_FORM, 'SAVE_LATER')
     expect(errors.backgroundConsent).toBeUndefined()
   })
 
   it('validates names, dob, email, phones and ssn', () => {
-    const errors = validateIdentityForm(baseForm({
+    const errors = validateIdentityForm({
+      ...EMPTY_IDENTITY_FORM,
       firstName: 'Ada!',
       lastName: 'a'.repeat(61),
       middleName: 'Bad1',
@@ -313,7 +365,7 @@ describe('validateIdentityForm', () => {
       secondaryPhone: '12',
       homePhone: '12',
       ssn: '111',
-    }), 'SAVE_LATER')
+    }, 'SAVE_LATER')
     expect(errors.firstName).toMatch(/invalid/i)
     expect(errors.lastName).toMatch(/too long/i)
     expect(errors.middleName).toBeTruthy()
@@ -409,6 +461,38 @@ describe('validateIdentityForm', () => {
     }), 'SAVE_LATER', { countries: [{ code: 'US', postalRegex: '^\\d{5}$' }] })
     expect(errors['previousAddresses.0']).toBeUndefined()
     expect(errors['educations.0.graduationYear']).toBeUndefined()
+  })
+
+  it('formats education city/text/year and validates education constraints', () => {
+    expect(formatEducationCity('dfgdfgfs 131231212213')).toBe('dfgdfgfs ')
+    expect(formatEducationText('BS-2020!')).toBe('BS')
+    expect(formatEducationYear('-41abc')).toBe('41')
+    expect(formatEducationYear('20145')).toBe('2014')
+
+    const errors = validateIdentityForm(consented({
+      dateOfBirth: '1995-06-01',
+      educations: [{
+        city: 'City9',
+        degree: 'B.S.',
+        institution: 'MIT',
+        startMonth: 6,
+        startYear: '2020',
+        graduationMonth: 1,
+        graduationYear: '2020',
+      }, {
+        startYear: '70',
+        graduationYear: '1969',
+      }, {
+        startYear: '1990',
+        graduationYear: '2010',
+      }],
+    }), 'SAVE_LATER')
+    expect(errors['educations.0.city']).toMatch(/letters/)
+    expect(errors['educations.0.degree']).toMatch(/letters/)
+    expect(errors['educations.0.graduationYear']).toMatch(/before start/)
+    expect(errors['educations.1.startYear']).toMatch(/4-digit/)
+    expect(errors['educations.1.graduationYear']).toMatch(/between|4-digit/)
+    expect(errors['educations.2.startYear']).toMatch(/date of birth/)
   })
 
   it('uses form postal regex only when it matches current residence country', () => {
