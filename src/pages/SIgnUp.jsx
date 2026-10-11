@@ -79,6 +79,17 @@ export default function SignUp() {
     setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
   }
 
+  /** One checkbox covers Terms, Privacy, and identity consent for the API. */
+  const handleTermsPrivacyIdentityChange = (e) => {
+    const checked = e.target.checked
+    setForm((prev) => ({
+      ...prev,
+      termsAccepted: checked,
+      privacyAccepted: checked,
+      identityConsent: checked,
+    }))
+  }
+
   const handleCreateAccount = async (e) => {
     e.preventDefault()
     setError('')
@@ -398,23 +409,20 @@ export default function SignUp() {
               <div className="consent-list">
                 <label className="checkbox">
                   <input type="checkbox" name="is18OrOlder" checked={form.is18OrOlder} onChange={handleChange} />
-                  I confirm I am 18 years or older
+                  I confirm that I am 18 years of age or older
                 </label>
                 <label className="checkbox">
-                  <input type="checkbox" name="termsAccepted" checked={form.termsAccepted} onChange={handleChange} />
-                  I agree to the Terms of Service
-                </label>
-                <label className="checkbox">
-                  <input type="checkbox" name="privacyAccepted" checked={form.privacyAccepted} onChange={handleChange} />
-                  I agree to the Privacy Policy
-                </label>
-                <label className="checkbox">
-                  <input type="checkbox" name="identityConsent" checked={form.identityConsent} onChange={handleChange} />
-                  I consent to identity and safety verification
+                  <input
+                    type="checkbox"
+                    name="termsPrivacyIdentity"
+                    checked={form.termsAccepted && form.privacyAccepted && form.identityConsent}
+                    onChange={handleTermsPrivacyIdentityChange}
+                  />
+                  I agree to the Terms of Service, Privacy Policy, and identity verification
                 </label>
                 <label className="checkbox">
                   <input type="checkbox" name="marketingConsent" checked={form.marketingConsent} onChange={handleChange} />
-                  Send me optional product updates and marketing (optional)
+                  Send me product updates and marketing (optional)
                 </label>
               </div>
 

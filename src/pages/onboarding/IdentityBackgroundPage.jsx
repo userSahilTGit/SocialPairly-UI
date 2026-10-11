@@ -147,6 +147,7 @@ export default function IdentityBackgroundPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const [showPreview, setShowPreview] = useState(false)
+  const [additionalNationalitiesText, setAdditionalNationalitiesText] = useState('')
   const formErrorRef = useRef(null)
   const workspaceTopRef = useRef(null)
 
@@ -191,6 +192,12 @@ export default function IdentityBackgroundPage() {
       setRefData(refRes.data || {})
       setEditMode(!!data.identityPage1Complete)
       setForm(mapped)
+      setAdditionalNationalitiesText(
+        formatAdditionalNationalitiesText(
+          mapped.nationality?.additionalNationalities,
+          refRes.data?.countries || [],
+        ),
+      )
       setCompletionPct(readCompletionPercentage(completionRes))
       markIdentityEnd('pageLoad', started, {
         serverIdentityMs: readServerDuration(identityRes),
@@ -406,11 +413,20 @@ export default function IdentityBackgroundPage() {
   const syncAdditionalNationalities = (text) => {
     const codes = resolveAdditionalNationalities(text, countries)
     patchSection('nationality', { additionalNationalities: codes })
+    return codes
   }
 
   const submit = async (action) => {
     setFormError('')
-    const errors = validateIdentityForm(form, action, refData)
+    const additionalNationalities = syncAdditionalNationalities(additionalNationalitiesText)
+    const formForSubmit = {
+      ...form,
+      nationality: {
+        ...form.nationality,
+        additionalNationalities,
+      },
+    }
+    const errors = validateIdentityForm(formForSubmit, action, refData)
     setFieldErrors(errors)
     if (Object.keys(errors).length) {
       setFormError('Please fix the highlighted fields before continuing.')
