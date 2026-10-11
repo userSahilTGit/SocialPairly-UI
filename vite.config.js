@@ -29,7 +29,8 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:9010',
+        // Local Workflow-manager (BUG-1570 phone country codes, auth, etc.)
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
       },

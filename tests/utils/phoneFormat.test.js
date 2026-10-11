@@ -41,7 +41,18 @@ describe('phoneFormat', () => {
     expect(formatPhoneNationalInput('+91', '98a76-543-21099')).toBe('9876543210')
     expect(formatPhoneNationalInput('+971', '50123456789')).toBe('501234567')
     expect(getPhoneNationalLength('+1')).toEqual({ min: 10, max: 10, label: '10 digits' })
+    expect(phoneNationalValidationMessage('+91')).toMatch(/exactly 10 digits/)
     expect(phoneNationalValidationMessage('+91')).toMatch(/\+91/)
+  })
+
+  it('registers strict national lengths for other dial codes', async () => {
+    const { registerPhoneNationalLengths, getPhoneNationalLength, isValidPhoneNational } = await import('@/utils/phoneFormat')
+    registerPhoneNationalLengths({ '+33': 9, '+86': 11 })
+    expect(getPhoneNationalLength('+33')).toEqual({ min: 9, max: 9, label: '9 digits' })
+    expect(isValidPhoneNational('612345678', '+33')).toBe(true)
+    expect(isValidPhoneNational('61234567', '+33')).toBe(false)
+    expect(isValidPhoneNational('13800138000', '+86')).toBe(true)
+    expect(isValidPhoneNational('1380013800', '+86')).toBe(false)
   })
 
   it('splits storage and E.164 formats', () => {

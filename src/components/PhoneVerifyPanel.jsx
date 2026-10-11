@@ -4,7 +4,8 @@ import { CheckCircle2, ShieldAlert } from 'lucide-react'
 import { auth } from '../config/firebase'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
-import { formatPhoneE164, formatPhoneStorage, splitPhone } from '../utils/phoneFormat'
+import PhoneCountryCodeSelect from './PhoneCountryCodeSelect'
+import { formatPhoneE164, formatPhoneNationalInput, formatPhoneStorage, getPhoneNationalLength, isValidPhoneNational, phoneNationalValidationMessage, splitPhone } from '../utils/phoneFormat'
 import { hasUsablePhoneNumber } from '../utils/verification'
 import {
   firebasePhoneErrorMessage,
@@ -63,8 +64,8 @@ export default function PhoneVerifyPanel({
     e?.preventDefault?.()
     setError('')
     setMessage('')
-    if (national.replace(/\D/g, '').length < 8) {
-      setError('Enter a valid mobile number')
+    if (!isValidPhoneNational(national, countryCode)) {
+      setError(phoneNationalValidationMessage(countryCode))
       return
     }
     setLoading(true)
@@ -174,32 +175,37 @@ export default function PhoneVerifyPanel({
           <div className="form-group">
             <label>Mobile number</label>
             <div className="phone-field">
-              <select
-                className="phone-code"
+              <PhoneCountryCodeSelect
                 value={countryCode}
-                onChange={(e) => setCountryCode(e.target.value)}
-                aria-label="Country code"
-              >
-                <option value="+91">+91</option>
-                <option value="+1">+1</option>
-                <option value="+44">+44</option>
-                <option value="+971">+971</option>
-              </select>
+                onChange={({ dialCode }) => {
+                  setCountryCode(dialCode)
+                  setNational((prev) => formatPhoneNationalInput(dialCode, prev))
+                }}
+              />
               <input
                 className="auth-input"
                 type="tel"
                 inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={getPhoneNationalLength(countryCode).max}
                 value={national}
-                onChange={(e) => setNational(e.target.value.replace(/[^\d\s-]/g, ''))}
-                placeholder="98765 43210"
+                onChange={(e) => setNational(formatPhoneNationalInput(countryCode, e.target.value))}
+                placeholder={
+                  countryCode === '+971'
+                    ? '501234567'
+                    : countryCode === '+1'
+                      ? '2025550123'
+                      : '9876543210'
+                }
                 required
               />
             </div>
+            <p className="field-hint">Numbers only — {getPhoneNationalLength(countryCode).label} for {countryCode}.</p>
           </div>
           <button
             type="submit"
             className="btn btn-block auth-primary-btn"
-            disabled={loading || national.replace(/\D/g, '').length < 8}
+            disabled={loading || !isValidPhoneNational(national, countryCode)}
           >
             {loading ? 'Sending...' : 'Send verification code'}
           </button>

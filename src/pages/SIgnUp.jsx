@@ -9,6 +9,7 @@ import { postAuthPath } from '../utils/user'
 import api from '../api/axios'
 import AuthHeroPanel from '../components/AuthHeroPanel'
 import AuthPageLayout from '../components/AuthPageLayout'
+import PhoneCountryCodeSelect from '../components/PhoneCountryCodeSelect'
 import {
   firebasePhoneErrorMessage,
   getInvisibleRecaptcha,
@@ -316,24 +317,16 @@ export default function SignUp() {
               <div className="form-group">
                 <label>Mobile number</label>
                 <div className="phone-field">
-                  <select
-                    className="phone-code"
+                  <PhoneCountryCodeSelect
                     value={countryCode}
-                    onChange={(e) => {
-                      const nextCode = e.target.value
-                      setCountryCode(nextCode)
+                    onChange={({ dialCode }) => {
+                      setCountryCode(dialCode)
                       setForm((prev) => ({
                         ...prev,
-                        phoneNumber: formatPhoneNationalInput(nextCode, prev.phoneNumber),
+                        phoneNumber: formatPhoneNationalInput(dialCode, prev.phoneNumber),
                       }))
                     }}
-                    aria-label="Country code"
-                  >
-                    <option value="+91">+91</option>
-                    <option value="+1">+1</option>
-                    <option value="+44">+44</option>
-                    <option value="+971">+971</option>
-                  </select>
+                  />
                   <input
                     className="auth-input"
                     name="phoneNumber"

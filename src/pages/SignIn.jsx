@@ -10,6 +10,7 @@ import { formatPhoneStorage, formatPhoneNationalInput, getPhoneNationalLength, i
 import api from '../api/axios'
 import AuthHeroPanel from '../components/AuthHeroPanel'
 import AuthPageLayout from '../components/AuthPageLayout'
+import PhoneCountryCodeSelect from '../components/PhoneCountryCodeSelect'
 import { AppleGlyph, GoogleGlyph } from '../components/AuthBrandAssets'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -360,23 +361,15 @@ export default function SignIn() {
                         aria-hidden={authTab !== 'phone'}
                       >
                         <div className="phone-field auth-identifier-control">
-                          <select
-                            className="phone-code"
+                          <PhoneCountryCodeSelect
                             value={countryCode}
-                            onChange={(e) => {
-                              const nextCode = e.target.value
-                              setCountryCode(nextCode)
-                              setPhoneIdentifier((prev) => formatPhoneNationalInput(nextCode, prev))
+                            onChange={({ dialCode }) => {
+                              setCountryCode(dialCode)
+                              setPhoneIdentifier((prev) => formatPhoneNationalInput(dialCode, prev))
                               clearIdentifierError()
                             }}
-                            aria-label="Country code"
                             tabIndex={authTab === 'phone' ? 0 : -1}
-                          >
-                            <option value="+91">🇮🇳 +91</option>
-                            <option value="+1">🇺🇸 +1</option>
-                            <option value="+44">🇬🇧 +44</option>
-                            <option value="+971">🇦🇪 +971</option>
-                          </select>
+                          />
                           <input
                             id="signin-phone"
                             className="auth-input"

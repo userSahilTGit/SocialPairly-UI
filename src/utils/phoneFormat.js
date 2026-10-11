@@ -1,3 +1,44 @@
+/** Dial codes sorted longest-first for E.164 parsing (updated from backend list). */
+let knownDialCodes = ['+971', '+91', '+44', '+1']
+
+/**
+ * Expected national (subscriber) digit length by dialing code.
+ * Lengths are without the country calling code. Strict: min === max when known.
+ */
+export const PHONE_NATIONAL_LENGTH = {
+  '+1': { min: 10, max: 10, label: '10 digits' },
+  '+91': { min: 10, max: 10, label: '10 digits' },
+  '+44': { min: 10, max: 10, label: '10 digits' },
+  '+971': { min: 9, max: 9, label: '9 digits' },
+}
+
+const DEFAULT_NATIONAL_LENGTH = { min: 8, max: 15, label: '8–15 digits' }
+
+export function registerKnownDialCodes(codes) {
+  const next = Array.from(new Set(
+    (codes || [])
+      .map((c) => normalizeCountryCode(c))
+      .filter((c) => c && c !== '+'),
+  )).sort((a, b) => b.length - a.length || a.localeCompare(b))
+  if (next.length) knownDialCodes = next
+}
+
+/** Register strict national lengths from backend: { '+91': 10, '+971': 9, ... }. */
+export function registerPhoneNationalLengths(lengthByDialCode) {
+  if (!lengthByDialCode || typeof lengthByDialCode !== 'object') return
+  Object.entries(lengthByDialCode).forEach(([dial, length]) => {
+    const cc = normalizeCountryCode(dial)
+    const n = Number(length)
+    if (!cc || !Number.isFinite(n) || n < 4 || n > 15) return
+    PHONE_NATIONAL_LENGTH[cc] = {
+      min: n,
+      max: n,
+      label: `${n} digit${n === 1 ? '' : 's'}`,
+    }
+  })
+  registerKnownDialCodes(Object.keys(PHONE_NATIONAL_LENGTH))
+}
+
 function normalizeCountryCode(countryCode) {
   let cc = String(countryCode || '+91').trim()
   if (!cc.startsWith('+')) cc = `+${cc.replace(/\D/g, '')}`
@@ -13,19 +54,6 @@ function normalizeNational(nationalNumber) {
   return national
 }
 
-/**
- * Expected national (subscriber) digit length by dialing code.
- * Lengths are without the country calling code.
- */
-export const PHONE_NATIONAL_LENGTH = {
-  '+1': { min: 10, max: 10, label: '10 digits' }, // US / Canada
-  '+91': { min: 10, max: 10, label: '10 digits' }, // India
-  '+44': { min: 10, max: 10, label: '10 digits' }, // UK (national significant number)
-  '+971': { min: 9, max: 9, label: '9 digits' }, // UAE
-}
-
-const DEFAULT_NATIONAL_LENGTH = { min: 8, max: 15, label: '8–15 digits' }
-
 export function getPhoneNationalLength(countryCode) {
   const cc = normalizeCountryCode(countryCode)
   return PHONE_NATIONAL_LENGTH[cc] || DEFAULT_NATIONAL_LENGTH
@@ -39,7 +67,7 @@ export function formatPhoneNationalInput(countryCode, rawValue) {
 
 export function phoneNationalValidationMessage(countryCode) {
   const { label } = getPhoneNationalLength(countryCode)
-  return `Enter a valid phone number (${label} for ${normalizeCountryCode(countryCode)}).`
+  return `Enter a valid phone number (exactly ${label} for ${normalizeCountryCode(countryCode)}).`
 }
 
 /** DB storage format: CountryCode-PhoneNumber (e.g. +91-9876543210). */
@@ -58,7 +86,7 @@ export function formatPhoneE164(countryCode, nationalNumber) {
 
 /**
  * Validate national number for a country code.
- * Pass countryCode for dialing-code-specific length (e.g. +1 / +91 → 10, +971 → 9).
+ * Uses strict exact length when the dial code is registered (India-style).
  */
 export function isValidPhoneNational(nationalNumber, countryCode) {
   const digits = normalizeNational(nationalNumber)
@@ -78,14 +106,20 @@ export function splitPhone(stored) {
     return { countryCode: cc, national }
   }
 
-  const codes = ['+971', '+91', '+44', '+1']
-  for (const code of codes) {
+  for (const code of knownDialCodes) {
     if (raw.startsWith(code)) {
       return { countryCode: code, national: normalizeNational(raw.slice(code.length)) }
     }
   }
   if (raw.startsWith('+')) {
-    return { countryCode: '+91', national: normalizeNational(raw.replace(/^\+91/, '')) }
+    const digits = raw.slice(1).replace(/\D/g, '')
+    for (let len = Math.min(4, digits.length); len >= 1; len -= 1) {
+      const candidate = `+${digits.slice(0, len)}`
+      if (knownDialCodes.includes(candidate)) {
+        return { countryCode: candidate, national: normalizeNational(digits.slice(len)) }
+      }
+    }
+    return { countryCode: '+91', national: normalizeNational(digits) }
   }
   return { countryCode: '+91', national: normalizeNational(raw) }
 }
