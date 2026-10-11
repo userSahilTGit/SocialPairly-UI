@@ -4,6 +4,8 @@ import { GoogleOAuthProvider } from '@react-oauth/google'
 import { IS_PHONE_VERIFICATION_MANDATORY, IS_PHONE_SMS_VERIFICATION_ENABLED, PHONE_VERIFY_DISMISS_KEY, useAuth } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import PhoneVerificationModal from './components/PhoneVerificationModal'
+import SessionTimeoutDialog from './components/SessionTimeoutDialog'
+import RouteSeo from './components/RouteSeo'
 import { userNeedsPhoneVerification } from './utils/verification'
 import SignIn from './pages/SignIn'
 import SignUp from './pages/SIgnUp'
@@ -52,6 +54,7 @@ export default function App() {
 
   return (
     <GoogleOAuthProvider clientId="1043168194153-i82qfvqg1jsk804qaa7ipkkov67b8pt4.apps.googleusercontent.com">
+      <RouteSeo />
       <Routes>
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
@@ -171,6 +174,7 @@ export default function App() {
         onClose={() => setShowPhoneModal(false)}
         onVerified={() => setShowPhoneModal(false)}
       />
+      <SessionTimeoutDialog />
     </GoogleOAuthProvider>
   )
 }
