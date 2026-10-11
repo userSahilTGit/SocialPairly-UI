@@ -6,6 +6,7 @@ import { GoogleLogin } from '@react-oauth/google'
 import { useAuth, PHONE_VERIFY_DISMISS_KEY, IDENTITY_CONTINUE_LATER_KEY } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { postAuthPath } from '../utils/user'
+import { clearIdleLogoutNotice, hasIdleLogoutNotice } from '../utils/sessionTimeout'
 import { formatPhoneStorage, formatPhoneNationalInput, getPhoneNationalLength, isValidPhoneNational, phoneNationalValidationMessage } from '../utils/phoneFormat'
 import api from '../api/axios'
 import AuthHeroPanel from '../components/AuthHeroPanel'
@@ -41,6 +42,7 @@ export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
   const [error, setError] = useState('')
+  const [idleSignOutNotice] = useState(hasIdleLogoutNotice)
   const [fieldErrors, setFieldErrors] = useState({ identifier: '', password: '' })
   const [loading, setLoading] = useState(false)
   /** Sync guard so rapid double-clicks cannot start two submits before React re-renders. */
@@ -59,6 +61,10 @@ export default function SignIn() {
   const [forgotLoading, setForgotLoading] = useState(false)
   const forgotDialogRef = useRef(null)
   const forgotCloseRef = useRef(null)
+
+  useEffect(() => {
+    if (idleSignOutNotice) clearIdleLogoutNotice()
+  }, [idleSignOutNotice])
 
   useEffect(() => {
     if (!forgotOpen) return undefined
@@ -284,6 +290,12 @@ export default function SignIn() {
                   </div>
                   <Link to="/signup" className="auth-mode-switch">Sign Up</Link>
                 </div>
+
+                {idleSignOutNotice && !error && (
+                  <div className="session-expired-notice" role="status">
+                    You were signed out after a period of inactivity. Please sign in again.
+                  </div>
+                )}
 
                 {error && (
                   <div className="error" role="alert" aria-live="polite" id="signin-error">
