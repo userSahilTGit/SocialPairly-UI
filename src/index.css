@@ -3655,6 +3655,14 @@ label.checkbox input {
 }
 .ob-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
+/* Family: keep age-range chips tight under Has children / count (no empty grid cell gap). */
+.ob-family-follow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 0.85rem;
+}
+
 /* Contact details: paired rows with equal meta height so badges don't stagger columns (#1550) */
 .ob-contact-grid {
   display: flex;
