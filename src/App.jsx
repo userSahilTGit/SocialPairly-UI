@@ -18,6 +18,7 @@ import AdminDashboard from './pages/AdminDashboard'
 import AdminQuestions from './pages/AdminQuestions'
 import ProfileMediaPage from './pages/ProfileMediaPage'
 import AdminMediaModeration from './pages/AdminMediaModeration'
+import AdminIdentityDocuments from './pages/AdminIdentityDocuments'
 import AdminPlans from './pages/AdminPlans'
 import AdminFinance from './pages/AdminFinance'
 import AdminEvents from './pages/AdminEvents'
@@ -145,6 +146,15 @@ export default function App() {
           element={
             <ProtectedRoute adminOnly={true}>
               <AdminMediaModeration />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/identity-documents"
+          element={
+            <ProtectedRoute adminOnly={true}>
+              <AdminIdentityDocuments />
             </ProtectedRoute>
           }
         />

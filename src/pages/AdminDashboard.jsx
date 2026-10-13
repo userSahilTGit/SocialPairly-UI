@@ -86,9 +86,14 @@ export default function AdminDashboard() {
                             <h1>Admin Dashboard</h1>
                             <p>Monitor user growth, profile completion, and subscription activity at a glance.</p>
                         </div>
-                        <Link to="/admin/plans" className="btn-dashboard-action">
-                            Manage Subscription Plans
-                        </Link>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                            <Link to="/admin/identity-documents" className="btn-dashboard-action">
+                                Identity Documents
+                            </Link>
+                            <Link to="/admin/plans" className="btn-dashboard-action">
+                                Manage Subscription Plans
+                            </Link>
+                        </div>
                     </div>
 
                     <div className="stats-grid">

@@ -151,6 +151,9 @@ export default function Navbar() {
                             <NavLink to="/admin/media" className={({ isActive }) => isActive ? 'nav-active' : ''}>
                                 🛡️ Moderation Center
                             </NavLink>
+                            <NavLink to="/admin/identity-documents" className={({ isActive }) => isActive ? 'nav-active' : ''}>
+                                Identity Docs
+                            </NavLink>
                             <NavLink to="/admin/plans">Plan & Subscriptions</NavLink>
                             <NavLink to="/admin/events">Events & Groups</NavLink>
                             <NavLink to="/admin/finance">Finance</NavLink>

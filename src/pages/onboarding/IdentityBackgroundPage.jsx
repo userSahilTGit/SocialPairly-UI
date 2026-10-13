@@ -551,14 +551,13 @@ export default function IdentityBackgroundPage() {
       setForm((prev) => {
         const vs = { ...(prev.verificationSummary || {}) }
         const purpose = uploaded.docPurpose || docPurpose
-        if (purpose === 'DL_FRONT' || purpose === 'ID_FRONT') {
+        // Primary ID image FK (DL/State front or Passport) → compliance.dl_front_blob_id
+        if (purpose === 'DL_FRONT' || purpose === 'ID_FRONT' || purpose === 'PASSPORT') {
           vs.dlFrontDocumentId = uploaded.id
+          if (purpose === 'PASSPORT') vs.passportDocumentId = uploaded.id
         }
         if (purpose === 'DL_BACK' || purpose === 'ID_BACK') {
           vs.dlBackDocumentId = uploaded.id
-        }
-        if (purpose === 'PASSPORT') {
-          vs.passportDocumentId = uploaded.id
         }
         return { ...prev, verificationSummary: vs }
       })
@@ -2209,7 +2208,8 @@ export default function IdentityBackgroundPage() {
         )}
 
         <p className="ob-hint" style={{ marginTop: 12 }}>
-          SSN and ID images are stored privately and are never shown on public profiles.
+          SSN and ID images are stored privately as encrypted database blobs and are never shown on public profiles.
+          Background screening / selfie verification is Phase 2 and is not required here.
           Upload JPEG, PNG, or WebP images up to 5MB.
         </p>
       </AccordionSection>
