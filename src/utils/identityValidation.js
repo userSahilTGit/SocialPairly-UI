@@ -45,6 +45,12 @@ export const BEST_TIMES = [
 export const MIN_AGE = 18
 
 export const MAX_PREVIOUS_ADDRESSES = 10
+/** Max event travel radius in miles (ADO #1547). */
+export const MAX_EVENT_TRAVEL_RADIUS_MILES = 100
+/** Max children count — own + adopted combined (ADO #1555). */
+export const MAX_CHILDREN_COUNT = 10
+/** Max number of pets. */
+export const MAX_PETS_COUNT = 5
 
 export const EMPTY_PREVIOUS_ADDRESS = {
   id: null,
@@ -376,6 +382,15 @@ export function trimValue(v) {
 export function humanizeEnum(value) {
   if (value == null || value === '') return ''
   return String(value).replace(/_/g, ' ')
+}
+
+/** Child age chips: 0_2 → 0-2, 18_PLUS → 18+ (not "0 2" / "18 PLUS"). */
+export function formatChildAgeRangeLabel(value) {
+  if (value == null || value === '') return ''
+  const code = String(value).trim().toUpperCase()
+  if (code === '18_PLUS' || code === '18PLUS') return '18+'
+  if (/^\d+_\d+$/.test(code)) return code.replace('_', '-')
+  return humanizeEnum(value)
 }
 
 function strOrEmpty(v) {
@@ -732,7 +747,13 @@ export function mapIdentityResponseToForm(data) {
       fosterPref: strOrEmpty(fam.fosterPref),
       elderCare: strOrEmpty(fam.elderCare),
       otherDependents: strOrEmpty(fam.otherDependents),
-      petsInfo: strOrEmpty(fam.petsInfo),
+      petsInfo: (() => {
+        const raw = fam.petsInfo
+        if (raw == null || raw === '') return ''
+        const digits = String(raw).replace(/\D/g, '')
+        if (!digits) return ''
+        return String(Math.min(Number(digits), MAX_PETS_COUNT))
+      })(),
     },
     educations: Array.isArray(data.educations)
       ? data.educations.map((e) => ({
@@ -1066,6 +1087,23 @@ export function validateIdentityForm(form, action, refData) {
 
   if (trimValue(cr.postalCode) || trimValue(cr.countryCode)) {
     validatePostal(cr.postalCode, cr.countryCode, form, refData, 'currentResidence.postalCode', errors)
+  }
+
+  const travelRadius = toNullableInt(cr.eventTravelRadiusMiles)
+  if (travelRadius != null && (travelRadius < 0 || travelRadius > MAX_EVENT_TRAVEL_RADIUS_MILES)) {
+    errors['currentResidence.eventTravelRadiusMiles'] =
+      `Event travel radius must be between 0 and ${MAX_EVENT_TRAVEL_RADIUS_MILES} miles`
+  }
+
+  const childrenCount = toNullableInt(form.family?.childrenCount)
+  if (childrenCount != null && (childrenCount < 0 || childrenCount > MAX_CHILDREN_COUNT)) {
+    errors['family.childrenCount'] =
+      `Number of children (own and adopted combined) cannot exceed ${MAX_CHILDREN_COUNT}`
+  }
+
+  const petsCount = toNullableInt(form.family?.petsInfo)
+  if (petsCount != null && (petsCount < 0 || petsCount > MAX_PETS_COUNT)) {
+    errors['family.petsInfo'] = `Number of pets cannot exceed ${MAX_PETS_COUNT}`
   }
 
   ;(form.previousAddresses || []).forEach((addr, i) => {

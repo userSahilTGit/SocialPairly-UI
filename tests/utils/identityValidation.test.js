@@ -23,6 +23,10 @@ import {
   countPreferredFutureCities,
   MAX_PREFERRED_FUTURE_STATES,
   MAX_PREFERRED_FUTURE_CITIES,
+  MAX_EVENT_TRAVEL_RADIUS_MILES,
+  MAX_CHILDREN_COUNT,
+  MAX_PETS_COUNT,
+  formatChildAgeRangeLabel,
   EMPTY_IDENTITY_FORM,
   MIN_AGE,
   sanitizePhoneInput,
@@ -31,6 +35,15 @@ import {
   formatAdditionalNationalitiesText,
   PROFICIENCY_LEVELS,
 } from '@/utils/identityValidation'
+
+describe('formatChildAgeRangeLabel', () => {
+  it('formats age ranges with hyphens and 18+', () => {
+    expect(formatChildAgeRangeLabel('0_2')).toBe('0-2')
+    expect(formatChildAgeRangeLabel('3_5')).toBe('3-5')
+    expect(formatChildAgeRangeLabel('10_12')).toBe('10-12')
+    expect(formatChildAgeRangeLabel('18_PLUS')).toBe('18+')
+  })
+})
 
 describe('trimValue / humanizeEnum', () => {
   it('trims and stringifies', () => {
@@ -469,7 +482,7 @@ describe('validateIdentityForm', () => {
     expect(formatEducationYear('-41abc')).toBe('41')
     expect(formatEducationYear('20145')).toBe('2014')
 
-    const errors = validateIdentityForm(consented({
+    const errors = validateIdentityForm(baseForm({
       dateOfBirth: '1995-06-01',
       educations: [{
         city: 'City9',
@@ -532,5 +545,63 @@ describe('validateIdentityForm', () => {
       },
     }), 'CONTINUE')
     expect(errors).toEqual({})
+  })
+
+  it('rejects event travel radius above 100 miles (ADO 1547)', () => {
+    const over = validateIdentityForm(baseForm({
+      currentResidence: {
+        ...EMPTY_IDENTITY_FORM.currentResidence,
+        eventTravelRadiusMiles: String(MAX_EVENT_TRAVEL_RADIUS_MILES + 1),
+      },
+    }), 'SAVE_LATER')
+    expect(over['currentResidence.eventTravelRadiusMiles']).toMatch(/100/)
+
+    const ok = validateIdentityForm(baseForm({
+      currentResidence: {
+        ...EMPTY_IDENTITY_FORM.currentResidence,
+        eventTravelRadiusMiles: String(MAX_EVENT_TRAVEL_RADIUS_MILES),
+      },
+    }), 'SAVE_LATER')
+    expect(ok['currentResidence.eventTravelRadiusMiles']).toBeUndefined()
+  })
+
+  it('rejects children count above 10 own+adopted combined (ADO 1555)', () => {
+    const over = validateIdentityForm(baseForm({
+      family: {
+        ...EMPTY_IDENTITY_FORM.family,
+        hasChildren: 'YES',
+        childrenCount: String(MAX_CHILDREN_COUNT + 1),
+      },
+    }), 'SAVE_LATER')
+    expect(over['family.childrenCount']).toMatch(/10/)
+
+    const ok = validateIdentityForm(baseForm({
+      family: {
+        ...EMPTY_IDENTITY_FORM.family,
+        hasChildren: 'YES',
+        childrenCount: String(MAX_CHILDREN_COUNT),
+      },
+    }), 'SAVE_LATER')
+    expect(ok['family.childrenCount']).toBeUndefined()
+  })
+
+  it('rejects pets count above max', () => {
+    const over = validateIdentityForm(baseForm({
+      family: {
+        ...EMPTY_IDENTITY_FORM.family,
+        petsInfo: String(MAX_PETS_COUNT + 1),
+      },
+    }), 'SAVE_LATER')
+    expect(over['family.petsInfo']).toMatch(/5/)
+  })
+
+  it('allows pets count at max', () => {
+    const ok = validateIdentityForm(baseForm({
+      family: {
+        ...EMPTY_IDENTITY_FORM.family,
+        petsInfo: String(MAX_PETS_COUNT),
+      },
+    }), 'SAVE_LATER')
+    expect(ok['family.petsInfo']).toBeUndefined()
   })
 })

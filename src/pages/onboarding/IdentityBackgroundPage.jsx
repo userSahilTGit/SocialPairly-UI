@@ -19,6 +19,10 @@ import {
   EMPTY_LANGUAGE,
   EMPTY_PREVIOUS_ADDRESS,
   MAX_PREVIOUS_ADDRESSES,
+  MAX_EVENT_TRAVEL_RADIUS_MILES,
+  MAX_CHILDREN_COUNT,
+  MAX_PETS_COUNT,
+  formatChildAgeRangeLabel,
   GENDER_OPTIONS,
   GENDER_VISIBILITY,
   NAME_PREFIXES,
@@ -229,6 +233,19 @@ export default function IdentityBackgroundPage() {
       ...prev,
       [section]: { ...prev[section], ...patch },
     }))
+  }
+
+  const setFieldError = (name, message) => {
+    setFieldErrors((prev) => {
+      if (!message) {
+        if (!prev[name]) return prev
+        const next = { ...prev }
+        delete next[name]
+        return next
+      }
+      if (prev[name] === message) return prev
+      return { ...prev, [name]: message }
+    })
   }
 
   const onSectionChange = (section) => (e) => {
@@ -993,21 +1010,32 @@ export default function IdentityBackgroundPage() {
             onChange={onSectionChange('currentResidence')}
             section="currentResidence"
           />
-          <label className="ob-field">
+          <label className={fieldClass('currentResidence.eventTravelRadiusMiles')}>
             <span>Event travel radius (Miles)</span>
             <input
               name="eventTravelRadiusMiles"
               type="text"
               inputMode="numeric"
-              maxLength={5}
+              maxLength={3}
               value={form.currentResidence.eventTravelRadiusMiles}
-              onChange={(e) => patchSection('currentResidence', {
-                eventTravelRadiusMiles: formatUnsignedDigits(e.target.value, 5),
-              })}
+              onChange={(e) => {
+                const digits = formatUnsignedDigits(e.target.value, 3)
+                patchSection('currentResidence', { eventTravelRadiusMiles: digits })
+                const n = digits === '' ? null : Number(digits)
+                setFieldError(
+                  'currentResidence.eventTravelRadiusMiles',
+                  n != null && (n < 0 || n > MAX_EVENT_TRAVEL_RADIUS_MILES)
+                    ? `Event travel radius must be between 0 and ${MAX_EVENT_TRAVEL_RADIUS_MILES} miles`
+                    : '',
+                )
+              }}
               onKeyDown={blockInvalidNumberKeys}
               placeholder="e.g. 25"
               aria-label="Event travel radius in miles"
             />
+            {fieldErrors['currentResidence.eventTravelRadiusMiles'] && (
+              <span className="ob-field-error">{fieldErrors['currentResidence.eventTravelRadiusMiles']}</span>
+            )}
           </label>
         </div>
         <div className={fieldClass('currentResidence.preferredFutureLocations')} style={{ marginTop: 12 }}>
@@ -1484,7 +1512,8 @@ export default function IdentityBackgroundPage() {
         open={isOpen('family')}
         onToggle={toggleSection}
         hidden={!sectionVisible('family', ['family', 'children', 'kids'])}
-      >        <p className="ob-hint">Do not enter children’s names. Age ranges only.</p>
+      >
+        <p className="ob-hint">Do not enter children’s names. Age ranges only.</p>
         <div className="ob-grid">
           <EnumSelect
             label="Has children"
@@ -1495,37 +1524,67 @@ export default function IdentityBackgroundPage() {
             section="family"
           />
           {showFamilyChildren && (
-            <>
-              <label className="ob-field">
-                <span>Number of children</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={3}
-                  name="childrenCount"
-                  value={form.family.childrenCount}
-                  onChange={(e) => patchSection('family', {
-                    childrenCount: formatUnsignedDigits(e.target.value, 3),
-                  })}
-                  onKeyDown={blockInvalidNumberKeys}
-                />
-              </label>
-              <div className="ob-field">
-                <span>Children age ranges</span>
-                <div className="ob-chip-row">
-                  {(refData?.childAgeRanges || []).map((code) => (
-                    <label key={code} className="ob-status-chip" style={{ cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={(form.family.childAgeRanges || []).includes(code)}
-                        onChange={() => toggleArrayValue('family', 'childAgeRanges', code)}
-                        style={{ marginRight: 6 }}
-                      />
-                      {humanizeEnum(code)}
-                    </label>
-                  ))}
-                </div>
+            <label className={fieldClass('family.childrenCount')}>
+              <span>Number of children</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={2}
+                name="childrenCount"
+                value={form.family.childrenCount}
+                onChange={(e) => {
+                  const digits = formatUnsignedDigits(e.target.value, 2)
+                  patchSection('family', { childrenCount: digits })
+                  const n = digits === '' ? null : Number(digits)
+                  setFieldError(
+                    'family.childrenCount',
+                    n != null && (n < 0 || n > MAX_CHILDREN_COUNT)
+                      ? `Number of children (own and adopted combined) cannot exceed ${MAX_CHILDREN_COUNT}`
+                      : '',
+                  )
+                }}
+                onPaste={(e) => {
+                  e.preventDefault()
+                  const pasted = e.clipboardData?.getData('text') || ''
+                  const digits = formatUnsignedDigits(pasted, 2)
+                  patchSection('family', { childrenCount: digits })
+                  const n = digits === '' ? null : Number(digits)
+                  setFieldError(
+                    'family.childrenCount',
+                    n != null && (n < 0 || n > MAX_CHILDREN_COUNT)
+                      ? `Number of children (own and adopted combined) cannot exceed ${MAX_CHILDREN_COUNT}`
+                      : '',
+                  )
+                }}
+                onKeyDown={blockInvalidNumberKeys}
+                aria-label="Number of children own and adopted combined"
+              />
+              {fieldErrors['family.childrenCount'] && (
+                <span className="ob-field-error">{fieldErrors['family.childrenCount']}</span>
+              )}
+            </label>
+          )}
+        </div>
+        {showFamilyChildren && (
+          <div className="ob-family-follow">
+            <div className="ob-field">
+              <span>Children age ranges</span>
+              <div className="ob-chip-row">
+                {(refData?.childAgeRanges || []).map((code) => (
+                  <label key={code} className="ob-status-chip" style={{ cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={(form.family.childAgeRanges || []).includes(code)}
+                      onChange={() => toggleArrayValue('family', 'childAgeRanges', code)}
+                      style={{ marginRight: 6 }}
+                    />
+                    {formatChildAgeRangeLabel(code)}
+                  </label>
+                ))}
               </div>
+            </div>
+            <div className="ob-grid">
               <EnumSelect
                 label="Children live with you"
                 name="childrenLiveWithUser"
@@ -1538,8 +1597,10 @@ export default function IdentityBackgroundPage() {
                 <span>Custody arrangement</span>
                 <input name="custodyArrangement" value={form.family.custodyArrangement} onChange={onSectionChange('family')} />
               </label>
-            </>
-          )}
+            </div>
+          </div>
+        )}
+        <div className="ob-grid" style={{ marginTop: showFamilyChildren ? '0.85rem' : 0 }}>
           <EnumSelect
             label="Want children in future"
             name="futureChildrenPref"
@@ -1560,9 +1621,45 @@ export default function IdentityBackgroundPage() {
             <span>Other dependents</span>
             <input name="otherDependents" value={form.family.otherDependents} onChange={onSectionChange('family')} />
           </label>
-          <label className="ob-field">
-            <span>Pets</span>
-            <input name="petsInfo" value={form.family.petsInfo} onChange={onSectionChange('family')} />
+          <label className={fieldClass('family.petsInfo')}>
+            <span>Number of pets</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={2}
+              name="petsInfo"
+              value={form.family.petsInfo}
+              onChange={(e) => {
+                const digits = formatUnsignedDigits(e.target.value, 2)
+                patchSection('family', { petsInfo: digits })
+                const n = digits === '' ? null : Number(digits)
+                setFieldError(
+                  'family.petsInfo',
+                  n != null && (n < 0 || n > MAX_PETS_COUNT)
+                    ? `Number of pets cannot exceed ${MAX_PETS_COUNT}`
+                    : '',
+                )
+              }}
+              onPaste={(e) => {
+                e.preventDefault()
+                const pasted = e.clipboardData?.getData('text') || ''
+                const digits = formatUnsignedDigits(pasted, 2)
+                patchSection('family', { petsInfo: digits })
+                const n = digits === '' ? null : Number(digits)
+                setFieldError(
+                  'family.petsInfo',
+                  n != null && (n < 0 || n > MAX_PETS_COUNT)
+                    ? `Number of pets cannot exceed ${MAX_PETS_COUNT}`
+                    : '',
+                )
+              }}
+              onKeyDown={blockInvalidNumberKeys}
+              aria-label="Number of pets"
+            />
+            {fieldErrors['family.petsInfo'] && (
+              <span className="ob-field-error">{fieldErrors['family.petsInfo']}</span>
+            )}
           </label>
         </div>
       </AccordionSection>
