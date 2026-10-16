@@ -56,7 +56,7 @@ vi.mock('@/components/AuthBrandAssets', () => ({
 
 function renderSignIn() {
   return render(
-    <MemoryRouter>
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <SignIn />
     </MemoryRouter>,
   )

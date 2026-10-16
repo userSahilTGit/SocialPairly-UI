@@ -16,7 +16,7 @@ vi.mock('react-router-dom', async () => {
 
 function renderStep(stepId) {
   return render(
-    <MemoryRouter initialEntries={[`/onboarding/coming-soon/${stepId}`]}>
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={[`/onboarding/coming-soon/${stepId}`]}>
       <Routes>
         <Route path="/onboarding/coming-soon/:stepId" element={<ComingSoonPage />} />
       </Routes>
