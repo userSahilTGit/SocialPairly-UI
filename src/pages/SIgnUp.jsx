@@ -15,6 +15,7 @@ import {
   getInvisibleRecaptcha,
   resetInvisibleRecaptcha,
 } from '../utils/firebasePhone'
+import { splitFullName } from '../utils/splitFullName'
 
 const STEPS_WITH_PHONE = [
   { id: 1, label: 'Account' },
@@ -32,13 +33,6 @@ const STEPS_EMAIL_ONLY = [
 const STEPS = IS_PHONE_SMS_VERIFICATION_ENABLED ? STEPS_WITH_PHONE : STEPS_EMAIL_ONLY
 const COMPLETED_STEP = IS_PHONE_SMS_VERIFICATION_ENABLED ? 4 : 3
 const PHONE_STEP = 3
-
-function splitFullName(fullName) {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return { firstName: '', lastName: '' }
-  if (parts.length === 1) return { firstName: parts[0], lastName: parts[0] }
-  return { firstName: parts[0], lastName: parts.slice(1).join(' ') }
-}
 
 export default function SignUp() {
   const { register, refreshUser } = useAuth()
@@ -111,11 +105,12 @@ export default function SignUp() {
 
     setLoading(true)
     try {
-      const { firstName, lastName } = splitFullName(form.fullName)
+      const { firstName, middleName, lastName } = splitFullName(form.fullName)
       const phoneStored = formatPhoneStorage(countryCode, form.phoneNumber)
       const phoneE164 = formatPhoneE164(countryCode, form.phoneNumber)
       await register({
         firstName,
+        middleName: middleName || null,
         lastName,
         email: form.email.trim(),
         phoneNumber: phoneStored,

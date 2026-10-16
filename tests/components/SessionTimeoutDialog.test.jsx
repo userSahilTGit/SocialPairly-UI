@@ -20,7 +20,7 @@ const WARNING_MS = 60 * 1000
 
 function renderDialog() {
   return render(
-    <MemoryRouter initialEntries={['/']}>
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={['/']}>
       <Routes>
         <Route path="/" element={<div>home</div>} />
         <Route path="/signin" element={<div>signin page</div>} />

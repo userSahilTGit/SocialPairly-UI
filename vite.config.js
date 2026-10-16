@@ -88,6 +88,10 @@ export default defineConfig({
       protocol: 'ws',
       clientPort: Number(process.env.VITE_HMR_CLIENT_PORT || 3002),
     },
+    watch: {
+      // Vitest HTML coverage must not trigger HMR page-reload spam in the UI console.
+      ignored: ['**/coverage/**', '**/node_modules/**'],
+    },
     proxy: {
       '/api': {
         // Local Workflow-manager (BUG-1570 phone country codes, auth, etc.)

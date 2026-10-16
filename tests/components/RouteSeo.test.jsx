@@ -5,7 +5,7 @@ import RouteSeo from '@/components/RouteSeo'
 
 function renderAt(path) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={[path]}>
       <RouteSeo />
     </MemoryRouter>,
   )
