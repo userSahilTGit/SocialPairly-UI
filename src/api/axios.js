@@ -72,19 +72,24 @@ api.interceptors.request.use((config) => {
     return config
 })
 
-// Auto-logout on 401 or 403 (invalid/expired/revoked token or insufficient permissions)
+// Auto-logout on 401 or 403 (invalid/expired/revoked token or insufficient permissions).
+// Do not treat failed sign-in / Google / Apple attempts as an existing session to revoke —
+// that produced noisy secondary 403s on /auth/logout.
 api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response && (error.response.status === 401 || error.response.status === 403)) {
             const url = String(error.config?.url || '')
             const isLogoutCall = url.includes('/auth/logout')
-            clearClientAuthStorage()
-            if (!isLogoutCall) {
-                revokeServerSession()
-            }
-            if (window.location.pathname !== '/signin') {
-                window.location.href = '/signin'
+            const isAuthAttempt = /\/auth\/(login|google|apple|register)\b/.test(url)
+            if (!isAuthAttempt) {
+                clearClientAuthStorage()
+                if (!isLogoutCall) {
+                    revokeServerSession()
+                }
+                if (window.location.pathname !== '/signin') {
+                    window.location.href = '/signin'
+                }
             }
         }
         return Promise.reject(sanitizeAxiosError(error))

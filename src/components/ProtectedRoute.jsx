@@ -10,6 +10,7 @@ function isIdentityGateExempt(pathname) {
     || pathname.startsWith('/onboarding/coming-soon')
     || pathname.startsWith('/profile/media')
     || pathname.startsWith('/subscriptions')
+    || pathname.startsWith('/contact')
   )
 }
 

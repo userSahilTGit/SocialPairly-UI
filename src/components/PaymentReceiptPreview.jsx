@@ -54,7 +54,7 @@ const PaymentReceiptPreview = forwardRef(function PaymentReceiptPreview({ receip
 
   const merchantLabel = receipt.merchantName || 'SocialPairly'
   const receiptLabel = receipt.receiptNumber ? `Receipt #${receipt.receiptNumber}` : 'Payment Receipt'
-  const supportEmail = receipt.supportEmail || 'sahil.t@socialpairly.com'
+  const supportEmail = receipt.supportEmail || 'customercare@socialpairly.com'
 
   return (
     <div className="payment-receipt-preview" ref={ref}>

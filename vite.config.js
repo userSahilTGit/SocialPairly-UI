@@ -68,7 +68,10 @@ function seoPlugin() {
 export default defineConfig({
   plugins: [react(), tailwindcss(), seoPlugin()],
   server: {
-    port: 3001,
+    // Keep in sync with GCP OAuth "Authorized JavaScript origins" (no wildcards).
+    // Override with --port 3091 only after adding that origin in Google Cloud Console.
+    port: Number(process.env.VITE_DEV_PORT || process.env.PORT || 3000),
+    strictPort: false,
     // Allow access via nip.io / LAN IP (not only localhost)
     host: true,
     allowedHosts: [
@@ -77,17 +80,20 @@ export default defineConfig({
       '3.151.77.90',
       '3.151.77.90.nip.io',
       '.nip.io',
+      'www.socialpairly.com',
+      'socialpairly.com',
+      '.socialpairly.com',
     ],
-    // When the page is opened as http://3.151.77.90.nip.io, HMR must not
-    // try to open ws://localhost:3000 (blocked by Local Network Access checks).
-    // For nip.io access, start with:
+    // Local default: HMR uses the same host/port as the Vite server (e.g. :3010).
+    // For nip.io / tunneled access only, override with:
     //   set VITE_HMR_HOST=3.151.77.90.nip.io&& set VITE_HMR_CLIENT_PORT=3002&& npm run dev
-    // (or put those in the shell that tunnels/proxies the UI).
-    hmr: {
-      host: process.env.VITE_HMR_HOST || 'localhost',
-      protocol: 'ws',
-      clientPort: Number(process.env.VITE_HMR_CLIENT_PORT || 3002),
-    },
+    hmr: process.env.VITE_HMR_HOST
+      ? {
+          host: process.env.VITE_HMR_HOST,
+          protocol: 'ws',
+          clientPort: Number(process.env.VITE_HMR_CLIENT_PORT || process.env.PORT || 3002),
+        }
+      : undefined,
     watch: {
       // Vitest HTML coverage must not trigger HMR page-reload spam in the UI console.
       ignored: ['**/coverage/**', '**/node_modules/**'],

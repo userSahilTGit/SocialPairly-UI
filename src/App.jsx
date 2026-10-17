@@ -7,8 +7,10 @@ import PhoneVerificationModal from './components/PhoneVerificationModal'
 import SessionTimeoutDialog from './components/SessionTimeoutDialog'
 import RouteSeo from './components/RouteSeo'
 import { userNeedsPhoneVerification } from './utils/verification'
+import { GOOGLE_CLIENT_ID } from './config/oauth'
 import SignIn from './pages/SignIn'
 import SignUp from './pages/SIgnUp'
+import ContactSupport from './pages/ContactSupport'
 import Home from './pages/Home'
 import Profile from './pages/Profile'
 import Notifications from './pages/Notifications'
@@ -54,11 +56,16 @@ export default function App() {
   }
 
   return (
-    <GoogleOAuthProvider clientId="1043168194153-i82qfvqg1jsk804qaa7ipkkov67b8pt4.apps.googleusercontent.com">
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <RouteSeo />
       <Routes>
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
+        <Route path="/contact" element={
+          <ProtectedRoute>
+            <ContactSupport />
+          </ProtectedRoute>
+        } />
 
         <Route path="/onboarding/identity" element={
           <ProtectedRoute>

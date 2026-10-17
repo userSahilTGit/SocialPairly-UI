@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Mail, Smartphone, Lock as LockIcon, ArrowRight, Shield } from 'lucide-react'
 import { GoogleLogin } from '@react-oauth/google'
+import { isSupportedGoogleOrigin } from '../config/oauth'
 import { useAuth, PHONE_VERIFY_DISMISS_KEY, IDENTITY_CONTINUE_LATER_KEY } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { postAuthPath } from '../utils/user'
@@ -168,6 +169,16 @@ export default function SignIn() {
     setError('')
     setLoading(true)
     try {
+      if (!isSupportedGoogleOrigin()) {
+        setError(
+          'This site origin is not configured for Google Sign-In. Add the current URL origin in Google Cloud Console → Authorized JavaScript origins (e.g. http://3.151.77.90 or https://www.socialpairly.com).',
+        )
+        return
+      }
+      if (!credentialResponse?.credential) {
+        setError('Google did not return a credential. Check GCP origins match this exact URL.')
+        return
+      }
       const response = await api.post('/auth/google', {
         idToken: credentialResponse.credential,
         rememberMe,
@@ -516,7 +527,7 @@ export default function SignIn() {
                     className="oauth-btn oauth-apple"
                     disabled
                     aria-disabled="true"
-                    title="Apple Sign-In coming soon"
+                    title="Apple Sign-In is configured for www.socialpairly.com — full token validation arrives next"
                   >
                     <AppleGlyph size={18} />
                     <span>Apple</span>

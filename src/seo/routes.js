@@ -29,6 +29,14 @@ export const PUBLIC_ROUTES = [
     changefreq: 'monthly',
     priority: '0.9',
   },
+  {
+    path: '/contact',
+    title: 'Contact Customer Care',
+    description:
+      'Contact SocialPairly customer care about account, billing, safety, matching or any other issue. We reply at customercare@socialpairly.com.',
+    changefreq: 'monthly',
+    priority: '0.7',
+  },
 ]
 
 /** Signed-in areas: titled for the browser tab but kept out of search results. */

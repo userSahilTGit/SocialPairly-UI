@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import { signInWithPhoneNumber } from 'firebase/auth'
@@ -33,12 +33,22 @@ const STEPS_EMAIL_ONLY = [
 const STEPS = IS_PHONE_SMS_VERIFICATION_ENABLED ? STEPS_WITH_PHONE : STEPS_EMAIL_ONLY
 const COMPLETED_STEP = IS_PHONE_SMS_VERIFICATION_ENABLED ? 4 : 3
 const PHONE_STEP = 3
+const EMAIL_OTP_TTL_MS = 10 * 60 * 1000
+
+function formatOtpCountdown(totalSeconds) {
+  const safe = Math.max(0, totalSeconds)
+  const mins = Math.floor(safe / 60)
+  const secs = safe % 60
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
 
 export default function SignUp() {
   const { register, refreshUser } = useAuth()
   const navigate = useNavigate()
 
   const [step, setStep] = useState(1)
+  const [emailOtpExpiresAt, setEmailOtpExpiresAt] = useState(null)
+  const [emailOtpSecondsLeft, setEmailOtpSecondsLeft] = useState(null)
   const [countryCode, setCountryCode] = useState('+91')
   const [form, setForm] = useState({
     fullName: '',
@@ -68,6 +78,23 @@ export default function SignUp() {
     () => form.is18OrOlder && form.termsAccepted && form.privacyAccepted && form.identityConsent,
     [form]
   )
+
+  const startEmailOtpTimer = () => {
+    setEmailOtpExpiresAt(Date.now() + EMAIL_OTP_TTL_MS)
+  }
+
+  useEffect(() => {
+    if (step !== 2 || !emailOtpExpiresAt) {
+      setEmailOtpSecondsLeft(null)
+      return undefined
+    }
+    const tick = () => {
+      setEmailOtpSecondsLeft(Math.max(0, Math.floor((emailOtpExpiresAt - Date.now()) / 1000)))
+    }
+    tick()
+    const id = window.setInterval(tick, 1000)
+    return () => window.clearInterval(id)
+  }, [step, emailOtpExpiresAt])
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -129,6 +156,7 @@ export default function SignUp() {
           ? 'Account created. Check your email for a verification code. Phone verification uses Firebase SMS (optional).'
           : 'Account created. Check your email for a verification code.'
       )
+      startEmailOtpTimer()
       setStep(2)
     } catch (err) {
       const data = err.response?.data
@@ -218,6 +246,8 @@ export default function SignUp() {
     try {
       const res = await api.post('/auth/resend-verification', { identifier })
       setMessage(res.data?.message || 'Code resent')
+      startEmailOtpTimer()
+      setEmailOtp('')
     } catch (err) {
       if (err.response?.status === 429) {
         setError(err.response?.data?.message || 'Too many attempts. Try again later.')
@@ -427,6 +457,17 @@ export default function SignUp() {
           {step === 2 && (
             <form onSubmit={handleVerifyEmail}>
               <p className="auth-side-sub">Enter the 4-digit code sent to <strong>{form.email}</strong>.</p>
+              {emailOtpSecondsLeft != null && (
+                <p
+                  className={`auth-side-sub${emailOtpSecondsLeft === 0 ? ' auth-otp-expired' : ''}`}
+                  role="timer"
+                  aria-live="polite"
+                >
+                  {emailOtpSecondsLeft > 0
+                    ? `Code expires in ${formatOtpCountdown(emailOtpSecondsLeft)}`
+                    : 'Code expired. Request a new one.'}
+                </p>
+              )}
               <div className="form-group">
                 <label>Email verification code</label>
                 <input className="auth-input"
@@ -438,7 +479,11 @@ export default function SignUp() {
                   required
                 />
               </div>
-              <button className="btn btn-block auth-primary-btn" type="submit" disabled={loading || emailOtp.length !== 4}>
+              <button
+                className="btn btn-block auth-primary-btn"
+                type="submit"
+                disabled={loading || emailOtp.length !== 4 || emailOtpSecondsLeft === 0}
+              >
                 {loading ? 'Verifying...' : 'Verify Email'}
               </button>
               <button

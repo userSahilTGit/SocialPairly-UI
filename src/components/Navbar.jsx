@@ -188,6 +188,9 @@ export default function Navbar() {
                                 <button type="button" onClick={() => { setDropdownOpen(false); navigate('/settings') }}>
                                     Settings
                                 </button>
+                                <button type="button" onClick={() => { setDropdownOpen(false); navigate('/contact') }}>
+                                    Contact Customer Care
+                                </button>
                                 <button type="button" onClick={handleLogout}>
                                     Logout
                                 </button>

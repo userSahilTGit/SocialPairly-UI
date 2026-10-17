@@ -28,7 +28,7 @@ export default function SiteFooter() {
             <a href="#about" onClick={(e) => e.preventDefault()}>About</a>
             <a href="#careers" onClick={(e) => e.preventDefault()}>Careers</a>
             <a href="#press" onClick={(e) => e.preventDefault()}>Press</a>
-            <a href="#contact" onClick={(e) => e.preventDefault()}>Contact</a>
+            <Link to="/contact">Contact</Link>
           </div>
           <div className="site-footer-col">
             <h4>Legal</h4>
@@ -39,7 +39,7 @@ export default function SiteFooter() {
           </div>
           <div className="site-footer-col">
             <h4>Support</h4>
-            <a href="#help" onClick={(e) => e.preventDefault()}>Help Center</a>
+            <Link to="/contact">Help Center</Link>
             <a href="#safety" onClick={(e) => e.preventDefault()}>Safety Tips</a>
             <a href="#community" onClick={(e) => e.preventDefault()}>Community Guidelines</a>
             <Link to="/settings">Settings</Link>
