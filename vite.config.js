@@ -70,7 +70,7 @@ export default defineConfig({
   server: {
     // Keep in sync with GCP OAuth "Authorized JavaScript origins" (no wildcards).
     // Override with --port 3091 only after adding that origin in Google Cloud Console.
-    port: Number(process.env.VITE_DEV_PORT || process.env.PORT || 3000),
+    port: Number(process.env.VITE_DEV_PORT || process.env.PORT || 3001),
     strictPort: false,
     // Allow access via nip.io / LAN IP (not only localhost)
     host: true,
@@ -101,7 +101,7 @@ export default defineConfig({
     proxy: {
       '/api': {
         // Local Workflow-manager (BUG-1570 phone country codes, auth, etc.)
-        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:8080',
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:9010',
         changeOrigin: true,
         secure: false,
       },

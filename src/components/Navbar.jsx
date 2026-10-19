@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Menu, X } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import api from '../api/axios'
 import { BrandMark, LoggedInBrandName } from './AuthBrandAssets'
 import ThemeToggle from './ThemeToggle'
 
@@ -13,11 +11,6 @@ export default function Navbar() {
     const location = useLocation()
     const [menuOpen, setMenuOpen] = useState(false)
     const [dropdownOpen, setDropdownOpen] = useState(false)
-    const [deleteModalOpen, setDeleteModalOpen] = useState(false)
-    const [deletePassword, setDeletePassword] = useState('')
-    const [showDeletePassword, setShowDeletePassword] = useState(false)
-    const [deleteError, setDeleteError] = useState('')
-    const [deleteLoading, setDeleteLoading] = useState(false)
     const dropdownRef = useRef(null)
 
     useEffect(() => {
@@ -65,43 +58,6 @@ export default function Navbar() {
         setDropdownOpen(false)
         await logout()
         navigate('/signin')
-    }
-
-    const openDeleteModal = () => {
-        setDropdownOpen(false)
-        setDeletePassword('')
-        setShowDeletePassword(false)
-        setDeleteError('')
-        setDeleteModalOpen(true)
-    }
-
-    const closeDeleteModal = () => {
-        setDeleteModalOpen(false)
-        setDeletePassword('')
-        setShowDeletePassword(false)
-        setDeleteError('')
-    }
-
-    const handleDeleteAccount = async () => {
-        if (!deletePassword.trim()) {
-            setDeleteError('Password is required')
-            return
-        }
-
-        setDeleteError('')
-        setDeleteLoading(true)
-        try {
-            await api.delete('/users/me', {
-                data: { password: deletePassword },
-            })
-            closeDeleteModal()
-            await logout()
-            navigate('/signin')
-        } catch (err) {
-            setDeleteError(err.response?.data?.message || 'Failed to delete account')
-        } finally {
-            setDeleteLoading(false)
-        }
     }
 
     return (
@@ -180,98 +136,17 @@ export default function Navbar() {
                                 <button type="button" onClick={() => { setDropdownOpen(false); navigate('/profile') }}>
                                     Profile
                                 </button>
-                                {user?.role !== 'ADMIN' && (
-                                    <button type="button" onClick={() => { setDropdownOpen(false); navigate('/onboarding/identity') }}>
-                                        Identity & Background
-                                    </button>
-                                )}
                                 <button type="button" onClick={() => { setDropdownOpen(false); navigate('/settings') }}>
                                     Settings
                                 </button>
-                                <button type="button" onClick={() => { setDropdownOpen(false); navigate('/contact') }}>
-                                    Contact Customer Care
-                                </button>
                                 <button type="button" onClick={handleLogout}>
                                     Logout
-                                </button>
-                                <button
-                                    type="button"
-                                    className="dropdown-danger"
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        openDeleteModal()
-                                    }}
-                                >
-                                    Delete Account
                                 </button>
                             </div>
                         )}
                     </div>
                 </div>
             </nav>
-
-            {deleteModalOpen && createPortal(
-                <div className="plan-modal-overlay" onClick={!deleteLoading ? closeDeleteModal : undefined}>
-                    <div className="delete-confirm-card delete-confirm-card-form" onClick={(e) => e.stopPropagation()}>
-                        <div className="delete-icon-circle">
-                            <span className="warning-symbol">⚠️</span>
-                        </div>
-                        <h2 className="delete-title">Delete Account?</h2>
-                        <p className="delete-description">
-                            This action is permanent and cannot be undone. Enter your password to confirm account deletion.
-                        </p>
-                        {deleteError && <div className="delete-modal-error">{deleteError}</div>}
-                        <div className="delete-form-field">
-                            <label htmlFor="delete-account-password">Password</label>
-                            <div className="password-field">
-                                <input
-                                    id="delete-account-password"
-                                    type={showDeletePassword ? 'text' : 'password'}
-                                    value={deletePassword}
-                                    onChange={(e) => setDeletePassword(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !deleteLoading) {
-                                            handleDeleteAccount()
-                                        }
-                                    }}
-                                    placeholder="Enter your password"
-                                    autoFocus
-                                    disabled={deleteLoading}
-                                />
-                                <button
-                                    type="button"
-                                    className="password-toggle"
-                                    onClick={() => setShowDeletePassword((v) => !v)}
-                                    aria-label={showDeletePassword ? 'Hide password' : 'Show password'}
-                                    disabled={deleteLoading}
-                                >
-                                    {showDeletePassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                </button>
-                            </div>
-                        </div>
-                        <div className="delete-buttons-row">
-                            <button
-                                type="button"
-                                className="btn-delete-cancel"
-                                onClick={closeDeleteModal}
-                                disabled={deleteLoading}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                className="btn-delete-confirm"
-                                disabled={deleteLoading}
-                                onClick={handleDeleteAccount}
-                            >
-                                {deleteLoading ? 'DELETING...' : 'YES, DELETE'}
-                            </button>
-                        </div>
-                    </div>
-                </div>,
-                document.body
-            )}
         </>
     )
 }

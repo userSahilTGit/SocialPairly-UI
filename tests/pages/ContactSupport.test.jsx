@@ -51,7 +51,10 @@ describe('ContactSupport page', () => {
     expect(screen.queryByRole('link', { name: /sign in/i })).not.toBeInTheDocument()
 
     const nameInput = screen.getByLabelText(/your name/i)
-    const emailInput = screen.getByLabelText(/^email$/i)
+    const emailInput = screen.getByLabelText(/^email/i)
+    expect(screen.getByText(/instant help/i)).toBeInTheDocument()
+    expect(screen.getByText(/fast response/i)).toBeInTheDocument()
+    expect(screen.getByText(/safe & encrypted/i)).toBeInTheDocument()
     expect(nameInput).toHaveValue('Ada Lovelace')
     expect(emailInput).toHaveValue('ada@example.com')
     expect(nameInput).toHaveAttribute('readonly')

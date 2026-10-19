@@ -6,7 +6,7 @@
  * which need to be combined with the API base URL.
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:9010';
 
 /**
  * Constructs a full media URL from a media object or path
@@ -16,11 +16,11 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
  * 
  * @example
  * getMediaUrl({ mediaUrl: '/api/media/123/stream' })
- * // Returns: 'http://localhost:8080/api/media/123/stream'
+ * // Returns: 'http://localhost:9010/api/media/123/stream'
  * 
  * @example
  * getMediaUrl('/api/media/123/stream')
- * // Returns: 'http://localhost:8080/api/media/123/stream'
+ * // Returns: 'http://localhost:9010/api/media/123/stream'
  */
 /** Disk-era avatars (`/uploads/...`) often 404; prefer BLOB stream URLs. */
 export const isLegacyDiskPhoto = (path) => {
