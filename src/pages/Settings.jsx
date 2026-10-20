@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronRight, Eye, EyeOff, Headphones, Shield, Trash2, UserRound, X } from 'lucide-react'
+import { ChevronRight, Eye, EyeOff, Headphones, Images, Shield, Trash2, UserRound, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import SiteFooter from '../components/SiteFooter'
@@ -62,10 +62,11 @@ export default function Settings() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
-  const [deletePassword, setDeletePassword] = useState('')
-  const [showDeletePassword, setShowDeletePassword] = useState(false)
+  const [deleteStep, setDeleteStep] = useState('send') // 'send' | 'otp'
+  const [deleteOtp, setDeleteOtp] = useState('')
   const [deleteError, setDeleteError] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteInfo, setDeleteInfo] = useState('')
   const [securityOpen, setSecurityOpen] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -79,22 +80,40 @@ export default function Settings() {
   const [securitySuccess, setSecuritySuccess] = useState('')
 
   const openDeleteModal = () => {
-    setDeletePassword('')
-    setShowDeletePassword(false)
+    setDeleteStep('send')
+    setDeleteOtp('')
     setDeleteError('')
+    setDeleteInfo('')
     setDeleteModalOpen(true)
   }
 
   const closeDeleteModal = () => {
     setDeleteModalOpen(false)
-    setDeletePassword('')
-    setShowDeletePassword(false)
+    setDeleteStep('send')
+    setDeleteOtp('')
     setDeleteError('')
+    setDeleteInfo('')
+  }
+
+  const handleSendDeleteOtp = async () => {
+    setDeleteError('')
+    setDeleteInfo('')
+    setDeleteLoading(true)
+    try {
+      const { data } = await api.post('/users/me/delete/send-otp')
+      setDeleteStep('otp')
+      setDeleteOtp('')
+      setDeleteInfo(data?.message || 'Deletion code sent to your email. It is valid for 5 minutes.')
+    } catch (err) {
+      setDeleteError(err.response?.data?.message || 'Failed to send deletion code')
+    } finally {
+      setDeleteLoading(false)
+    }
   }
 
   const handleDeleteAccount = async () => {
-    if (!deletePassword.trim()) {
-      setDeleteError('Password is required')
+    if (!/^\d{4}$/.test(deleteOtp)) {
+      setDeleteError('Enter the 4-digit code from your email')
       return
     }
 
@@ -102,7 +121,7 @@ export default function Settings() {
     setDeleteLoading(true)
     try {
       await api.delete('/users/me', {
-        data: { password: deletePassword },
+        data: { otp: deleteOtp },
       })
       closeDeleteModal()
       await logout()
@@ -186,6 +205,15 @@ export default function Settings() {
                   iconClass="settings-row-icon--identity"
                   title="Identity & Background"
                   description="Update the identity and background details used for matching."
+                />
+              )}
+              {user?.role !== 'ADMIN' && (
+                <SettingsRow
+                  to="/profile/media"
+                  icon={Images}
+                  iconClass="settings-row-icon--media"
+                  title="Photos & Videos"
+                  description="Upload, order, and caption the photos and videos on your profile."
                 />
               )}
               <SettingsRow
@@ -325,37 +353,34 @@ export default function Settings() {
             </div>
             <h2 className="delete-title">Delete Account?</h2>
             <p className="delete-description">
-              This action is permanent and cannot be undone. Enter your password to confirm account deletion.
+              {deleteStep === 'send'
+                ? `This action is permanent and cannot be undone. We will email a 4-digit code to ${user?.email || 'your email'} that is valid for 5 minutes.`
+                : 'Enter the 4-digit code from your email to permanently delete your account. The code is valid for 5 minutes.'}
             </p>
+            {deleteInfo && <div className="success settings-banner" role="status">{deleteInfo}</div>}
             {deleteError && <div className="delete-modal-error">{deleteError}</div>}
-            <div className="delete-form-field">
-              <label htmlFor="delete-account-password">Password</label>
-              <div className="password-field">
+            {deleteStep === 'otp' && (
+              <div className="delete-form-field">
+                <label htmlFor="delete-account-otp">Deletion code</label>
                 <input
-                  id="delete-account-password"
-                  type={showDeletePassword ? 'text' : 'password'}
-                  value={deletePassword}
-                  onChange={(e) => setDeletePassword(e.target.value)}
+                  id="delete-account-otp"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={deleteOtp}
+                  onChange={(e) => setDeleteOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !deleteLoading) {
+                    if (e.key === 'Enter' && !deleteLoading && deleteOtp.length === 4) {
                       handleDeleteAccount()
                     }
                   }}
-                  placeholder="Enter your password"
+                  placeholder="0000"
+                  maxLength={4}
                   autoFocus
                   disabled={deleteLoading}
                 />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowDeletePassword((v) => !v)}
-                  aria-label={showDeletePassword ? 'Hide password' : 'Show password'}
-                  disabled={deleteLoading}
-                >
-                  {showDeletePassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
               </div>
-            </div>
+            )}
             <div className="delete-buttons-row">
               <button
                 type="button"
@@ -365,15 +390,37 @@ export default function Settings() {
               >
                 Cancel
               </button>
+              {deleteStep === 'send' ? (
+                <button
+                  type="button"
+                  className="btn-delete-confirm"
+                  disabled={deleteLoading}
+                  onClick={handleSendDeleteOtp}
+                >
+                  {deleteLoading ? 'SENDING...' : 'SEND CODE'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-delete-confirm"
+                  disabled={deleteLoading || deleteOtp.length !== 4}
+                  onClick={handleDeleteAccount}
+                >
+                  {deleteLoading ? 'DELETING...' : 'YES, DELETE'}
+                </button>
+              )}
+            </div>
+            {deleteStep === 'otp' && (
               <button
                 type="button"
-                className="btn-delete-confirm"
+                className="link-btn"
+                style={{ marginTop: 12 }}
+                onClick={handleSendDeleteOtp}
                 disabled={deleteLoading}
-                onClick={handleDeleteAccount}
               >
-                {deleteLoading ? 'DELETING...' : 'YES, DELETE'}
+                Resend code
               </button>
-            </div>
+            )}
           </div>
         </div>,
         document.body

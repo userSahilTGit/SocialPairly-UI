@@ -2655,110 +2655,6 @@ label.checkbox input {
 }
 
 /* ============================================
-   Modern Biometric Scanner (Fintech/Cyber Glassmorphism)
-   ============================================ */
-.biometric-scanner-frame {
-  position: relative;
-  width: 320px;
-  height: 320px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 3px solid rgba(99, 102, 241, 0.4);
-  box-shadow: 0 0 30px rgba(99, 102, 241, 0.2);
-  margin: 0 auto;
-}
-
-/* Pulsing Laser Ring */
-.biometric-scanner-frame::after {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(to bottom, transparent, rgba(99, 102, 241, 0.4), transparent);
-  animation: laserScan 2.5s infinite ease-in-out;
-  pointer-events: none;
-}
-
-@keyframes laserScan {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(200%); }
-}
-
-/* Glowing Target Circle */
-.face-guide-ring {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 220px;
-  height: 280px;
-  border: 2px dashed #818cf8;
-  border-radius: 50%;
-  box-shadow: 0 0 15px rgba(129, 140, 248, 0.5);
-  pointer-events: none;
-}
-
-/* Scanner corner brackets for fintech look */
-.scanner-corner {
-  position: absolute;
-  width: 24px;
-  height: 24px;
-  border: 2px solid #818cf8;
-  pointer-events: none;
-}
-
-.scanner-corner.tl { top: 8px; left: 8px; border-right: none; border-bottom: none; border-radius: 4px 0 0 0; }
-.scanner-corner.tr { top: 8px; right: 8px; border-left: none; border-bottom: none; border-radius: 0 4px 0 0; }
-.scanner-corner.bl { bottom: 8px; left: 8px; border-right: none; border-top: none; border-radius: 0 0 0 4px; }
-.scanner-corner.br { bottom: 8px; right: 8px; border-left: none; border-top: none; border-radius: 0 0 4px 0; }
-
-/* Biometric status chip */
-.biometric-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.3);
-  color: #6366f1;
-}
-
-.biometric-status.scanning {
-  animation: pulseGlow 1.5s infinite;
-}
-
-@keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.3); }
-  50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.6); }
-}
-
-/* Glassmorphism panel for verification */
-.biometric-panel {
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 16px;
-  padding: 24px;
-}
-
-/* Dark fintech verification modal background */
-.biometric-modal {
-  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-  color: #fff;
-  border-radius: 20px;
-  padding: 28px;
-  max-width: 480px;
-  width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-}
-
-/* ============================================
    Centered Fixed Overlay
    (used by VideoPromptModal and other modals)
    ============================================ */
@@ -4875,6 +4771,8 @@ button.ob-status-chip { cursor: pointer; }
   padding: 2rem 1rem 3rem;
   font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
   color: #1e293b;
+  /* Full-bleed page bg comes from body/#root (same as subscriptions) */
+  background: transparent !important;
 }
 
 .ms-header {
@@ -4898,8 +4796,9 @@ button.ob-status-chip { cursor: pointer; }
   border-radius: 999px;
   font-size: 0.7rem;
   font-weight: 800;
-  background: #ffe4e6;
-  color: #be123c;
+  background: #f5f3ff;
+  color: #7c3aed;
+  border: 1px solid #ede9fe;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -4936,13 +4835,15 @@ button.ob-status-chip { cursor: pointer; }
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.4rem 0.75rem;
-  border-radius: 999px;
-  background: #f5f3ff;
-  border: 1px solid #ede9fe;
+  padding: 0.55rem 1rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(237, 233, 254, 0.95);
   font-size: 0.75rem;
   font-weight: 700;
-  color: #6d28d9;
+  color: #7c3aed;
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.06);
 }
 
 .ms-cancel-btn {
@@ -4961,51 +4862,94 @@ button.ob-status-chip { cursor: pointer; }
 .ms-cancel-btn:hover { background: #f8fafc; }
 
 .ms-stepper {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 1rem;
-  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
-  margin-bottom: 1.5rem;
-  width: fit-content;
-  max-width: 100%;
+  position: relative;
+  margin: 0 auto 1.75rem;
+  max-width: 42rem;
+  width: 100%;
+  padding: 0.35rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(237, 233, 254, 0.95);
+  box-shadow:
+    0 20px 50px -12px rgba(168, 85, 247, 0.12),
+    0 0 30px 0 rgba(236, 72, 153, 0.06);
+}
+
+.ms-stepper-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ms-step-pill {
+  position: absolute;
+  top: 0.35rem;
+  bottom: 0.35rem;
+  left: 0.35rem;
+  width: calc((100% - 0.7rem) / 3);
+  border-radius: 999px;
+  /* Same pink → purple as Profile “Edit Details” */
+  background: linear-gradient(135deg, #e11d48 0%, #7c3aed 100%);
+  box-shadow: 0 12px 28px rgba(225, 29, 72, 0.28);
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
 }
 
 .ms-step {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-radius: 0.75rem;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.7rem 0.65rem;
+  border-radius: 999px;
   border: 0;
   background: transparent;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  color: #64748b;
+  color: rgba(100, 116, 139, 0.72);
   cursor: pointer;
+  transition: color 0.35s ease, opacity 0.35s ease;
+  white-space: nowrap;
 }
 .ms-step:hover { color: #0f172a; }
 .ms-step.active {
   color: #fff;
-  background: linear-gradient(135deg, #e11d48 0%, #7c3aed 100%);
-  box-shadow: 0 8px 20px rgba(225,29,72,0.25);
+  background: transparent;
+  box-shadow: none;
+}
+.ms-step-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.7;
+  transition: opacity 0.35s ease;
+}
+.ms-step.active .ms-step-label {
+  opacity: 1;
 }
 .ms-step-num {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.4rem;
+  height: 1.4rem;
   border-radius: 999px;
   display: grid;
   place-items: center;
   font-size: 0.65rem;
-  background: #f1f5f9;
-  color: inherit;
+  font-weight: 800;
+  background: #e2e8f0;
+  color: #334155;
+  flex-shrink: 0;
+  opacity: 0.85;
+  transition: background 0.35s ease, color 0.35s ease, opacity 0.35s ease;
 }
-.ms-step.active .ms-step-num { background: rgba(255,255,255,0.2); }
-.ms-step-chevron { width: 1rem; height: 1rem; color: #cbd5e1; flex-shrink: 0; }
+.ms-step.active .ms-step-num {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  opacity: 1;
+}
+.ms-step-chevron { display: none; }
 
 .ms-readiness {
   padding: 1rem;
@@ -5033,19 +4977,81 @@ button.ob-status-chip { cursor: pointer; }
 
 .ms-layout {
   display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(260px, 5fr);
+  grid-template-columns: minmax(0, 7fr) minmax(280px, 5fr);
   gap: 2rem;
   align-items: start;
 }
 
 .ms-main { display: grid; gap: 1.25rem; }
 
+/* Fixed workspace — equal dimensions for steps 1 / 2 / 3 (no layout jump) */
+.ms-panels {
+  position: relative;
+  height: 720px;
+  min-height: 720px;
+  overflow: hidden;
+}
+
+.ms-step-panel {
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow-x: hidden;
+  overflow-y: auto;
+  transition:
+    opacity 0.4s ease,
+    transform 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 0.45s;
+  will-change: opacity, transform;
+}
+
+.ms-step-panel.is-active {
+  position: relative;
+  z-index: 2;
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+  visibility: visible;
+  transition:
+    opacity 0.4s ease,
+    transform 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s;
+}
+
+/* Passed steps slide left + fade; upcoming wait on the right and slide in */
+.ms-step-panel.is-before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0;
+  transform: translateX(-28px);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.ms-step-panel.is-after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0;
+  transform: translateX(28px);
+  pointer-events: none;
+  visibility: hidden;
+}
+
 .ms-card {
-  background: #fff;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-radius: 1.5rem;
   padding: 1.5rem;
-  border: 1px solid #f1f5f9;
-  box-shadow: 0 20px 50px rgba(15,23,42,0.08);
+  border: 1px solid rgba(241, 233, 254, 0.95);
+  box-shadow:
+    0 20px 50px -12px rgba(168, 85, 247, 0.12),
+    0 0 30px 0 rgba(236, 72, 153, 0.06);
 }
 
 @media (min-width: 640px) {
@@ -5157,8 +5163,7 @@ button.ob-status-chip { cursor: pointer; }
 
 .ms-btn-brand,
 .ms-btn-outline,
-.ms-btn-purple,
-.ms-btn-green {
+.ms-btn-purple {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -5173,7 +5178,7 @@ button.ob-status-chip { cursor: pointer; }
   padding: 0.65rem 1.25rem;
   color: #fff;
   background: linear-gradient(135deg, #e11d48 0%, #7c3aed 100%);
-  box-shadow: 0 8px 20px rgba(225,29,72,0.25);
+  box-shadow: 0 12px 28px rgba(225, 29, 72, 0.25);
 }
 .ms-btn-brand.lg { padding: 0.7rem 1.5rem; font-size: 0.875rem; }
 .ms-btn-brand:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -5190,23 +5195,6 @@ button.ob-status-chip { cursor: pointer; }
   color: #fff;
 }
 .ms-btn-purple:hover { background: #6d28d9; }
-.ms-btn-green {
-  padding: 0.5rem 0.9rem;
-  background: #059669;
-  color: #fff;
-  border-radius: 0.75rem;
-  flex-shrink: 0;
-}
-.ms-btn-green:hover { background: #047857; }
-
-.ms-verified-inline {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  color: #059669;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
 
 .ms-slots-block { margin-bottom: 1.25rem; }
 .ms-slots-head {
@@ -5411,25 +5399,6 @@ button.ob-status-chip { cursor: pointer; }
 }
 .ms-footer-left { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
-.ms-verify-banner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1.15rem;
-  border-radius: 1.5rem;
-  border: 1px solid #ffe4e6;
-  background: linear-gradient(135deg, rgba(225,29,72,0.06), rgba(124,58,237,0.06));
-}
-.ms-verify-banner-left {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-.ms-verify-title { font-size: 0.8rem; font-weight: 800; color: #0f172a; }
-.ms-verify-sub { font-size: 0.75rem; color: #64748b; }
-
 .ms-caption-list,
 .ms-canvas-list { display: grid; gap: 0.75rem; margin-bottom: 1rem; }
 
@@ -5556,8 +5525,16 @@ button.ob-status-chip { cursor: pointer; }
 .ms-preview {
   position: sticky;
   top: 5.5rem;
+  width: 100%;
+  max-width: 360px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.ms-preview-shell {
   display: grid;
   gap: 0.75rem;
+  width: 100%;
 }
 .ms-preview-head {
   display: flex;
@@ -5580,16 +5557,17 @@ button.ob-status-chip { cursor: pointer; }
   gap: 0.35rem;
   font-size: 0.7rem;
   font-weight: 700;
-  color: #e11d48;
-  background: #fff1f2;
-  padding: 0.15rem 0.5rem;
-  border-radius: 0.4rem;
+  color: #7c3aed;
+  background: #f5f3ff;
+  border: 1px solid #ede9fe;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
 }
 .ms-live-dot {
   width: 0.45rem;
   height: 0.45rem;
   border-radius: 999px;
-  background: #f43f5e;
+  background: #7c3aed;
   animation: ms-ping 1.2s ease infinite;
 }
 @keyframes ms-ping {
@@ -5600,11 +5578,13 @@ button.ob-status-chip { cursor: pointer; }
 
 .ms-phone {
   background: #0f172a;
-  border-radius: 2.5rem;
-  padding: 0.75rem;
+  border-radius: 2.6rem;
+  padding: 0.7rem;
   border: 4px solid #1e293b;
-  box-shadow: 0 25px 50px -12px rgba(124, 58, 237, 0.25);
-  max-width: 22rem;
+  box-shadow:
+    0 30px 60px -15px rgba(15, 23, 42, 0.4),
+    0 0 40px rgba(168, 85, 247, 0.15);
+  max-width: 360px;
   margin: 0 auto;
   width: 100%;
   position: relative;
@@ -5625,6 +5605,7 @@ button.ob-status-chip { cursor: pointer; }
   border-radius: 2rem;
   overflow: hidden;
   aspect-ratio: 9 / 16;
+  max-height: 580px;
   background: #020617;
   color: #fff;
   display: flex;
@@ -5653,12 +5634,7 @@ button.ob-status-chip { cursor: pointer; }
   z-index: 0;
 }
 .ms-phone-top-grad {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 7rem;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0.3), transparent);
-  z-index: 1;
-  pointer-events: none;
+  display: none;
 }
 .ms-story-bars {
   position: relative;
@@ -5706,16 +5682,11 @@ button.ob-status-chip { cursor: pointer; }
 .ms-phone-info {
   position: relative;
   z-index: 3;
-  padding-top: 4rem;
+  padding-top: 1rem;
   padding-bottom: 0.25rem;
 }
 .ms-phone-bottom-grad {
-  position: absolute;
-  inset: auto 0 0;
-  height: 12rem;
-  background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.5), transparent);
-  z-index: -1;
-  pointer-events: none;
+  display: none;
 }
 .ms-phone-name {
   display: flex;
@@ -5727,6 +5698,11 @@ button.ob-status-chip { cursor: pointer; }
   font-size: 1.35rem;
   font-weight: 900;
   letter-spacing: -0.02em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+.ms-phone-meta,
+.ms-phone-bio {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 .ms-check {
   background: #3b82f6;
@@ -5798,13 +5774,25 @@ button.ob-status-chip { cursor: pointer; }
 
 @media (max-width: 1024px) {
   .ms-layout { grid-template-columns: 1fr; }
-  .ms-preview { position: static; }
+  .ms-preview { position: static; max-width: 360px; }
+  .ms-panels,
+  .ms-panels .ms-step-panel {
+    height: 640px;
+    min-height: 640px;
+  }
 }
 
 @media (max-width: 640px) {
   .ms-page { padding: 1rem 0.85rem 2.5rem; }
   .ms-slots-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .ms-stepper { width: 100%; }
+  .ms-stepper { width: 100%; max-width: 100%; }
+  .ms-step-label { font-size: 0.68rem; }
+  .ms-panels,
+  .ms-panels .ms-step-panel {
+    height: 580px;
+    min-height: 580px;
+  }
+  .ms-phone { max-height: 520px; }
 }
 
 
@@ -6868,6 +6856,12 @@ button.ob-status-chip { cursor: pointer; }
 .ms-page {
   flex: 1 0 auto;
   min-height: 0 !important;
+}
+
+.subscriptions-page,
+.subscriptions-root,
+.sp-profile-page,
+.ms-page {
   background: transparent !important;
 }
 
@@ -7574,6 +7568,10 @@ button.settings-row:hover {
   background: #fde8f3;
   color: #ec4899;
 }
+.settings-row-icon--media {
+  background: #ecfdf5;
+  color: #059669;
+}
 .settings-row-icon--security {
   background: #eef2ff;
   color: #6366f1;
@@ -7803,6 +7801,10 @@ button.settings-row--danger:hover {
 [data-theme="dark"] .settings-row-icon--support {
   background: rgba(236, 72, 153, 0.16);
   color: #f9a8d4;
+}
+[data-theme="dark"] .settings-row-icon--media {
+  background: rgba(5, 150, 105, 0.18);
+  color: #6ee7b7;
 }
 [data-theme="dark"] .settings-row-icon--security {
   background: rgba(99, 102, 241, 0.18);
