@@ -4,16 +4,15 @@ import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 import SiteFooter from '../components/SiteFooter'
-import VerifyPhotoModal from '../components/VerifyPhotoModal'
 import VideoPromptModal from '../components/VideoPromptModal'
 import MediaModal from '../components/MediaModal'
 import { getMediaUrl } from '../utils/mediaUrl'
 import { logClientError } from '../utils/safeLog'
 import {
-  UploadCloud, Film, Image as ImageIcon, X, Check, GripVertical,
+  UploadCloud, Film, Image as ImageIcon, X, GripVertical,
   ChevronLeft, ChevronRight, Play, Pencil, Trash2, Save,
   AlertCircle, Plus, CheckCircle2, Camera, LogOut, Video,
-  Star, Tag, Smartphone, ShieldCheck, CheckCheck, ArrowRight,
+  Star, Tag, Smartphone, ArrowRight,
   LayoutGrid, Heart,
 } from 'lucide-react'
 
@@ -108,7 +107,6 @@ export default function ProfileMediaPage() {
   const [activeMedia, setActiveMedia] = useState(null)
   const fileInputRef = useRef(null)
   const dragItemRef = useRef(null)
-  const [showVerify, setShowVerify] = useState(false)
   const [pendingVideoFile, setPendingVideoFile] = useState(null)
   const [showPromptSelect, setShowPromptSelect] = useState(false)
   const [selectedSlotIndex, setSelectedSlotIndex] = useState(0)
@@ -399,15 +397,28 @@ export default function ProfileMediaPage() {
   const displayName = previewProfile.preferredName || user?.firstName || 'Member'
   const displayAge = previewProfile.age
 
+  const goToStep = (num) => {
+    if (num === activeStep) return
+    setActiveStep(num)
+  }
+
+  const stepPanelClass = (num) => {
+    if (num === activeStep) return 'ms-card ms-step-panel is-active'
+    if (num < activeStep) return 'ms-card ms-step-panel is-before'
+    return 'ms-card ms-step-panel is-after'
+  }
+
   const stepBtn = (num, label) => (
     <button
       type="button"
+      role="tab"
       id={`step-btn-${num}`}
-      onClick={() => setActiveStep(num)}
+      aria-selected={activeStep === num}
+      onClick={() => goToStep(num)}
       className={`ms-step ${activeStep === num ? 'active' : ''}`}
     >
       <span className="ms-step-num">{num}</span>
-      <span>{label}</span>
+      <span className="ms-step-label">{label}</span>
     </button>
   )
 
@@ -422,26 +433,10 @@ export default function ProfileMediaPage() {
     )
   }
 
-  const coverMedia =
-    myMedia.find((m) => m.isCover && m.mediaType === 'PHOTO') ||
-    myMedia.find((m) => m.mediaType === 'PHOTO')
-  const coverPhotoUrl = coverMedia ? getMediaUrl(coverMedia) : null
-
   return (
     <>
       <Navbar />
       <div className="ms-page">
-        {showVerify && (
-          <VerifyPhotoModal
-            onClose={() => setShowVerify(false)}
-            onVerified={() => {
-              refreshUser()
-              setSuccess('Congratulations — your profile is now verified!')
-            }}
-            coverPhotoUrl={coverPhotoUrl}
-          />
-        )}
-
         {showPromptSelect && (
           <VideoPromptModal
             onSelectPrompt={handlePromptSelect}
@@ -498,12 +493,17 @@ export default function ProfileMediaPage() {
           </div>
         </div>
 
-        <div className="ms-stepper">
-          {stepBtn(1, 'Upload & Order')}
-          <ChevronRight className="ms-step-chevron" />
-          {stepBtn(2, 'Prompts & Captions')}
-          <ChevronRight className="ms-step-chevron" />
-          {stepBtn(3, 'Canvas Preview')}
+        <div className="ms-stepper" role="tablist" aria-label="Media studio steps">
+          <div
+            className="ms-step-pill"
+            aria-hidden
+            style={{ transform: `translateX(${(activeStep - 1) * 100}%)` }}
+          />
+          <div className="ms-stepper-grid">
+            {stepBtn(1, 'Upload & Order')}
+            {stepBtn(2, 'Prompts & Captions')}
+            {stepBtn(3, 'Canvas Preview')}
+          </div>
         </div>
 
         <ProfileReadinessBanner />
@@ -511,10 +511,12 @@ export default function ProfileMediaPage() {
         {success && <div className="success">{success}</div>}
 
         <div className="ms-layout">
-          {/* LEFT */}
-          <div className="ms-main">
-            {activeStep === 1 && (
-              <section className="ms-card">
+          {/* LEFT — fixed height panels so steps 1–3 never jump layout */}
+          <div className="ms-main ms-panels">
+            <section
+              className={stepPanelClass(1)}
+              aria-hidden={activeStep !== 1}
+            >
                 <div className="ms-card-top">
                   <div className="ms-card-title-row">
                     <div className="ms-icon-box rose">
@@ -576,20 +578,6 @@ export default function ProfileMediaPage() {
                         >
                           <Plus className="w-4 h-4" /> Select Files
                         </button>
-                        {user?.verified ? (
-                          <span className="ms-verified-inline">
-                            <ShieldCheck className="w-4 h-4" /> Verified
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            className="ms-btn-outline"
-                            onClick={() => setShowVerify(true)}
-                          >
-                            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                            Verify Identity Selfie
-                          </button>
-                        )}
                       </div>
                     </>
                   )}
@@ -701,15 +689,16 @@ export default function ProfileMediaPage() {
                   >
                     Reset All
                   </button>
-                  <button type="button" className="ms-btn-brand lg" onClick={() => setActiveStep(2)}>
+                  <button type="button" className="ms-btn-brand lg" onClick={() => goToStep(2)}>
                     Next: Library & Prompts <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </section>
-            )}
 
-            {activeStep === 2 && (
-              <section className="ms-card">
+            <section
+              className={stepPanelClass(2)}
+              aria-hidden={activeStep !== 2}
+            >
                 <div className="ms-card-title-row">
                   <div className="ms-icon-box purple">
                     <ImageIcon className="w-5 h-5" />
@@ -724,7 +713,7 @@ export default function ProfileMediaPage() {
                   <div className="center">
                     <Film size={48} style={{ opacity: 0.3, marginBottom: 8 }} />
                     <p>No media uploaded yet.</p>
-                    <button type="button" className="ms-btn-brand" style={{ marginTop: 12 }} onClick={() => setActiveStep(1)}>
+                    <button type="button" className="ms-btn-brand" style={{ marginTop: 12 }} onClick={() => goToStep(1)}>
                       Go to Upload
                     </button>
                   </div>
@@ -779,23 +768,24 @@ export default function ProfileMediaPage() {
                 )}
 
                 <div className="ms-footer-bar">
-                  <button type="button" className="ms-btn-outline" onClick={() => setActiveStep(1)}>
+                  <button type="button" className="ms-btn-outline" onClick={() => goToStep(1)}>
                     <ChevronLeft className="w-4 h-4" /> Back
                   </button>
                   <button
                     type="button"
                     className="ms-btn-brand lg"
                     disabled={myMedia.length === 0}
-                    onClick={() => setActiveStep(3)}
+                    onClick={() => goToStep(3)}
                   >
                     Next: Arrange <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
               </section>
-            )}
 
-            {activeStep === 3 && (
-              <section className="ms-card">
+            <section
+              className={stepPanelClass(3)}
+              aria-hidden={activeStep !== 3}
+            >
                 <div className="ms-card-title-row">
                   <div className="ms-icon-box purple">
                     <GripVertical className="w-5 h-5" />
@@ -875,7 +865,7 @@ export default function ProfileMediaPage() {
 
                 <div className="ms-footer-bar">
                   <div className="ms-footer-left">
-                    <button type="button" className="ms-btn-outline" onClick={() => setActiveStep(2)}>
+                    <button type="button" className="ms-btn-outline" onClick={() => goToStep(2)}>
                       <ChevronLeft className="w-4 h-4" /> Back
                     </button>
                     <button type="button" className="ms-btn-outline" onClick={() => fileInputRef.current?.click()}>
@@ -892,28 +882,11 @@ export default function ProfileMediaPage() {
                   </button>
                 </div>
               </section>
-            )}
-
-            {!user?.verified && (
-              <div className="ms-verify-banner">
-                <div className="ms-verify-banner-left">
-                  <div className="ms-icon-box green">
-                    <CheckCheck className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="ms-verify-title">Get 3x More Likes with Verification</div>
-                    <div className="ms-verify-sub">Verified profiles get priority placement in the discovery stack.</div>
-                  </div>
-                </div>
-                <button type="button" className="ms-btn-green" onClick={() => setShowVerify(true)}>
-                  Verify Selfie
-                </button>
-              </div>
-            )}
           </div>
 
-          {/* RIGHT: Phone preview */}
+          {/* RIGHT: Phone preview — fixed width, sticky aligned with panels */}
           <aside className="ms-preview">
+            <div className="ms-preview-shell">
             <div className="ms-preview-head">
               <h3>
                 <Smartphone className="w-4 h-4 text-purple-600" />
@@ -940,7 +913,6 @@ export default function ProfileMediaPage() {
                   </div>
                 )}
 
-                <div className="ms-phone-top-grad" />
                 <div className="ms-story-bars">
                   {(previewMedia.length ? previewMedia : [null]).map((m, idx) => (
                     <div
@@ -965,14 +937,10 @@ export default function ProfileMediaPage() {
                 )}
 
                 <div className="ms-phone-info">
-                  <div className="ms-phone-bottom-grad" />
                   <div className="ms-phone-name">
                     <h4>
                       {displayName}{displayAge != null ? `, ${displayAge}` : ''}
                     </h4>
-                    {user?.verified && (
-                      <span className="ms-check"><Check className="w-3.5 h-3.5" /></span>
-                    )}
                   </div>
                   <div className="ms-phone-meta">
                     {previewProfile.location && <span>{previewProfile.location}</span>}
@@ -1008,6 +976,7 @@ export default function ProfileMediaPage() {
               >
                 <Save className="w-4 h-4" /> Save
               </button>
+            </div>
             </div>
           </aside>
         </div>

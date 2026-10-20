@@ -15,9 +15,12 @@ vi.mock('@/context/AuthContext', () => ({
   }),
 }))
 const apiPut = vi.fn()
+const apiPost = vi.fn()
+const apiDelete = vi.fn()
 vi.mock('@/api/axios', () => ({
   default: {
-    delete: vi.fn(),
+    delete: (...args) => apiDelete(...args),
+    post: (...args) => apiPost(...args),
     put: (...args) => apiPut(...args),
   },
 }))
@@ -33,6 +36,7 @@ describe('Settings page', () => {
 
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /identity & background/i })).toHaveAttribute('href', '/onboarding/identity')
+    expect(screen.getByRole('link', { name: /photos & videos/i })).toHaveAttribute('href', '/profile/media')
     expect(screen.getByText(/manage your account, identity, and support/i)).toBeInTheDocument()
     expect(screen.queryByText(/discovery & pair preferences/i)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /account & security/i })).toBeInTheDocument()
@@ -40,6 +44,33 @@ describe('Settings page', () => {
 
     await user.click(screen.getByRole('button', { name: /delete account/i }))
     expect(screen.getByRole('heading', { name: /delete account\?/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /send code/i })).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^password$/i)).not.toBeInTheDocument()
+  })
+
+  it('deletes the account after verifying the emailed OTP', async () => {
+    const user = userEvent.setup()
+    apiPost.mockResolvedValue({
+      data: { message: 'Deletion code sent to your email. It is valid for 5 minutes.' },
+    })
+    apiDelete.mockResolvedValue({ data: { message: 'Account deleted successfully' } })
+    logout.mockResolvedValue(undefined)
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Settings />
+      </MemoryRouter>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /delete account/i }))
+    await user.click(screen.getByRole('button', { name: /send code/i }))
+    expect(apiPost).toHaveBeenCalledWith('/users/me/delete/send-otp')
+    expect(await screen.findByText(/deletion code sent/i)).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(/deletion code/i), '1234')
+    await user.click(screen.getByRole('button', { name: /yes, delete/i }))
+    expect(apiDelete).toHaveBeenCalledWith('/users/me', { data: { otp: '1234' } })
+    expect(logout).toHaveBeenCalled()
   })
 
   it('updates the password after confirming the new one', async () => {

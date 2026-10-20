@@ -95,11 +95,6 @@ export default function Navbar() {
                     {user?.role !== 'ADMIN' && (
                         <NavLink to="/subscriptions">Subscription</NavLink>
                     )}
-                    {user?.role !== 'ADMIN' && (
-                        <NavLink to="/profile/media" className={({ isActive }) => isActive ? 'nav-active' : ''}>
-                            📸 Photos & Videos
-                        </NavLink>
-                    )}
                     {user?.role === 'ADMIN' && (
                         <>
                             <NavLink to="/admin" end>Dashboard</NavLink>
