@@ -31,7 +31,7 @@ if [[ -f .env ]]; then
   set +a
 fi
 export APP_FRONTEND_URL="${APP_FRONTEND_URL:-http://3.151.77.90}"
-# Stop previous java on 9011 if you use a process manager; adjust to your service name:
+# Stop previous java on 9010 if you use a process manager; adjust to your service name:
 # sudo systemctl restart socialpairly-be
 
 echo "Done. Open http://3.151.77.90/signin and https://www.socialpairly.com/signin"

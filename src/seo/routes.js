@@ -39,7 +39,7 @@ export const PUBLIC_ROUTES = [
   },
 ]
 
-/** Signed-in areas: titled for the browser tab but kept out of search results. */
+/** Signed-in areas: titled for social metadata but kept out of search results. The browser tab always uses SITE_NAME. */
 const PRIVATE_ROUTE_TITLES = [
   { prefix: '/admin/questions', title: 'Manage Questions' },
   { prefix: '/admin/media', title: 'Media Moderation' },

@@ -102,7 +102,7 @@ export default defineConfig({
       '/api': {
         // Local Workflow-manager (BUG-1570 phone country codes, auth, etc.)
         // Use 127.0.0.1 — Node on Windows often fails localhost via IPv6 (ECONNREFUSED AggregateError).
-        target: process.env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:9011',
+        target: process.env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:9010',
         changeOrigin: true,
         secure: false,
       },

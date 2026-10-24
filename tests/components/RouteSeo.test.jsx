@@ -21,10 +21,18 @@ describe('RouteSeo', () => {
 
   it('sets indexable metadata on public pages', () => {
     renderAt('/signup')
-    expect(document.title).toBe('Create Your Free Account | SocialPairly')
+    expect(document.title).toBe('SocialPairly')
     expect(metaContent('meta[name="robots"]')).toMatch(/^index, follow/)
     expect(metaContent('meta[name="description"]')).toMatch(/Join SocialPairly/)
     expect(metaContent('meta[property="og:title"]')).toBe('Create Your Free Account | SocialPairly')
+  })
+
+  it('keeps the browser tab title on the site name when the route changes', () => {
+    renderAt('/signin')
+    expect(document.title).toBe('SocialPairly')
+    renderAt('/subscriptions')
+    expect(document.title).toBe('SocialPairly')
+    expect(metaContent('meta[property="og:title"]')).toBe('Subscriptions | SocialPairly')
   })
 
   it('sets noindex on private pages and drops any canonical link', () => {
@@ -34,7 +42,7 @@ describe('RouteSeo', () => {
     document.head.appendChild(link)
 
     renderAt('/admin/finance')
-    expect(document.title).toBe('Finance | SocialPairly')
+    expect(document.title).toBe('SocialPairly')
     expect(metaContent('meta[name="robots"]')).toBe('noindex, nofollow')
     expect(document.head.querySelector('link[rel="canonical"]')).toBeNull()
   })

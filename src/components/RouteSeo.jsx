@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { DEFAULT_OG_IMAGE, absoluteUrl, resolveRouteMeta } from '../seo/routes'
+import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, resolveRouteMeta } from '../seo/routes'
 
 const SITE_URL = import.meta.env.VITE_SITE_URL || ''
 
@@ -28,7 +28,7 @@ function setCanonical(href) {
   link.setAttribute('href', href)
 }
 
-/** Keeps <title>, description, robots, canonical and Open Graph tags in sync with the current route (defect 1571). */
+/** Keeps description, robots, canonical and Open Graph tags in sync with the current route (defect 1571). The browser tab title stays the site name on every page. */
 export default function RouteSeo() {
   const { pathname } = useLocation()
 
@@ -36,7 +36,7 @@ export default function RouteSeo() {
     const meta = resolveRouteMeta(pathname)
     const canonical = meta.canonicalPath ? absoluteUrl(SITE_URL, meta.canonicalPath) : null
 
-    document.title = meta.title
+    document.title = SITE_NAME
     upsertMeta('name', 'description', meta.description)
     upsertMeta('name', 'robots', meta.indexable ? 'index, follow, max-image-preview:large' : 'noindex, nofollow')
     upsertMeta('property', 'og:title', meta.title)
