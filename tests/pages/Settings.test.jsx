@@ -100,4 +100,52 @@ describe('Settings page', () => {
     })
     expect(await screen.findByText(/password updated successfully/i)).toBeInTheDocument()
   })
+
+  it('changes the password with an emailed verification code', async () => {
+    const user = userEvent.setup()
+    apiPost.mockImplementation((url) => {
+      if (url === '/users/me/password/send-otp') {
+        return Promise.resolve({ data: { message: 'Verification code sent to your email. It is valid for 10 minutes.' } })
+      }
+      if (url === '/users/me/password/verify-otp') {
+        return Promise.resolve({ data: { message: 'Verification code matched. You can now choose a new password.' } })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    apiPut.mockResolvedValue({ data: { message: 'Password updated successfully' } })
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Settings />
+      </MemoryRouter>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /account & security/i }))
+    const sendOtp = screen.getByRole('button', { name: /send otp/i })
+    expect(sendOtp).toBeDisabled()
+
+    await user.click(screen.getByLabelText(/verify password change with an email otp/i))
+    expect(sendOtp).toBeEnabled()
+    await user.click(sendOtp)
+
+    expect(apiPost).toHaveBeenCalledWith('/users/me/password/send-otp')
+    const codeField = await screen.findByPlaceholderText('Enter Verification Code')
+    expect(screen.getByPlaceholderText('New Password')).toBeDisabled()
+
+    await user.type(codeField, '2468')
+    await user.click(screen.getByRole('button', { name: /verify code/i }))
+    expect(apiPost).toHaveBeenCalledWith('/users/me/password/verify-otp', { otp: '2468' })
+    expect(await screen.findByText(/verification code matched/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('New Password')).toBeEnabled()
+
+    await user.type(screen.getByPlaceholderText('New Password'), 'new-pass')
+    await user.type(screen.getByPlaceholderText('Confirm New Password'), 'new-pass')
+    await user.click(screen.getByRole('button', { name: /update security/i }))
+
+    expect(apiPut).toHaveBeenCalledWith('/users/me/password', {
+      otp: '2468',
+      newPassword: 'new-pass',
+      confirmPassword: 'new-pass',
+    })
+  })
 })

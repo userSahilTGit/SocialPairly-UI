@@ -32,27 +32,47 @@ function SettingsRow({ icon: Icon, iconClass, title, titleClass, description, to
   )
 }
 
-function PasswordInput({ id, label, value, shown, onChange, onToggle, autoComplete, placeholder }) {
+function PasswordInput({
+  id,
+  label,
+  value,
+  shown,
+  onChange,
+  onToggle,
+  autoComplete,
+  placeholder,
+  inputMode,
+  maxLength,
+  mask = true,
+  disabled = false,
+}) {
+  const revealed = !mask || shown
   return (
     <div className="security-field">
       <label className="security-sr" htmlFor={id}>{label}</label>
       <div className="password-field">
         <input
           id={id}
-          type={shown ? 'text' : 'password'}
+          type={revealed ? 'text' : 'password'}
           value={value}
           onChange={onChange}
           autoComplete={autoComplete}
           placeholder={placeholder}
+          inputMode={inputMode}
+          maxLength={maxLength}
+          disabled={disabled}
         />
-        <button
-          type="button"
-          className="password-toggle"
-          onClick={onToggle}
-          aria-label={shown ? `Hide ${label}` : `Show ${label}`}
-        >
-          {shown ? <EyeOff size={18} /> : <Eye size={18} />}
-        </button>
+        {mask && (
+          <button
+            type="button"
+            className="password-toggle"
+            onClick={onToggle}
+            disabled={disabled}
+            aria-label={shown ? `Hide ${label}` : `Show ${label}`}
+          >
+            {shown ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -78,6 +98,13 @@ export default function Settings() {
   const [securityFieldErrors, setSecurityFieldErrors] = useState({})
   const [securityLoading, setSecurityLoading] = useState(false)
   const [securitySuccess, setSecuritySuccess] = useState('')
+  const [useEmailOtp, setUseEmailOtp] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
+  const [verificationCode, setVerificationCode] = useState('')
+  const [otpSending, setOtpSending] = useState(false)
+  const [otpVerifying, setOtpVerifying] = useState(false)
+  const [codeVerified, setCodeVerified] = useState(false)
+  const [securityInfo, setSecurityInfo] = useState('')
 
   const openDeleteModal = () => {
     setDeleteStep('send')
@@ -133,8 +160,7 @@ export default function Settings() {
     }
   }
 
-  const closeSecurityModal = () => {
-    setSecurityOpen(false)
+  const resetSecurityForm = () => {
     setCurrentPassword('')
     setNewPassword('')
     setConfirmPassword('')
@@ -143,36 +169,110 @@ export default function Settings() {
     setShowConfirm(false)
     setSecurityError('')
     setSecurityFieldErrors({})
+    setUseEmailOtp(false)
+    setOtpSent(false)
+    setVerificationCode('')
+    setCodeVerified(false)
+    setOtpVerifying(false)
+    setSecurityInfo('')
+  }
+
+  const closeSecurityModal = () => {
+    setSecurityOpen(false)
+    resetSecurityForm()
   }
 
   const openSecurityModal = () => {
     setSecuritySuccess('')
+    resetSecurityForm()
+    setSecurityOpen(true)
+  }
+
+  const toggleEmailOtp = () => {
+    setUseEmailOtp((enabled) => {
+      if (enabled) {
+        setOtpSent(false)
+        setVerificationCode('')
+        setCodeVerified(false)
+        setSecurityInfo('')
+      }
+      return !enabled
+    })
     setSecurityError('')
     setSecurityFieldErrors({})
-    setSecurityOpen(true)
+  }
+
+  const handleSendPasswordOtp = async () => {
+    setSecurityError('')
+    setSecurityInfo('')
+    setSecurityFieldErrors({})
+    setOtpSending(true)
+    try {
+      const { data } = await api.post('/users/me/password/send-otp')
+      setOtpSent(true)
+      setCodeVerified(false)
+      setVerificationCode('')
+      setCurrentPassword('')
+      setSecurityInfo(data?.message || 'Verification code sent to your email. It is valid for 10 minutes.')
+    } catch (err) {
+      setSecurityError(err.response?.data?.message || 'Failed to send verification code')
+    } finally {
+      setOtpSending(false)
+    }
+  }
+
+  const handleVerifyPasswordOtp = async () => {
+    if (!/^\d{4}$/.test(verificationCode)) {
+      setSecurityFieldErrors((prev) => ({
+        ...prev,
+        currentPassword: 'Enter the 4-digit verification code from your email',
+      }))
+      return
+    }
+    setSecurityError('')
+    setSecurityFieldErrors({})
+    setOtpVerifying(true)
+    try {
+      const { data } = await api.post('/users/me/password/verify-otp', { otp: verificationCode })
+      setCodeVerified(true)
+      setSecurityInfo(data?.message || 'Verification code matched. You can now choose a new password.')
+    } catch (err) {
+      setCodeVerified(false)
+      setSecurityError(err.response?.data?.message || 'Verification code does not match')
+    } finally {
+      setOtpVerifying(false)
+    }
   }
 
   const handleUpdateSecurity = async (event) => {
     event.preventDefault()
     setSecurityError('')
+    const verifyingWithOtp = useEmailOtp && codeVerified
     const next = {}
-    if (!currentPassword) next.currentPassword = 'Current password is required'
-    if (newPassword.length < 6) next.newPassword = 'New password must be at least 6 characters'
-    if (newPassword && currentPassword && newPassword === currentPassword) {
-      next.newPassword = 'New password must be different from your current password'
+    if (useEmailOtp && !otpSent) {
+      next.currentPassword = 'Send a verification code to your email first'
+    } else if (useEmailOtp && !codeVerified) {
+      next.currentPassword = 'Match the verification code before choosing a new password'
+    } else if (!useEmailOtp && !currentPassword) {
+      next.currentPassword = 'Current password is required'
     }
-    if (!confirmPassword) next.confirmPassword = 'Confirm your new password'
-    else if (newPassword !== confirmPassword) next.confirmPassword = 'Passwords do not match'
+    if (!useEmailOtp || codeVerified) {
+      if (newPassword.length < 6) next.newPassword = 'New password must be at least 6 characters'
+      if (!verifyingWithOtp && newPassword && currentPassword && newPassword === currentPassword) {
+        next.newPassword = 'New password must be different from your current password'
+      }
+      if (!confirmPassword) next.confirmPassword = 'Confirm your new password'
+      else if (newPassword !== confirmPassword) next.confirmPassword = 'Passwords do not match'
+    }
     setSecurityFieldErrors(next)
     if (Object.keys(next).length > 0) return
 
     setSecurityLoading(true)
     try {
-      const { data } = await api.put('/users/me/password', {
-        currentPassword,
-        newPassword,
-        confirmPassword,
-      })
+      const payload = verifyingWithOtp
+        ? { otp: verificationCode, newPassword, confirmPassword }
+        : { currentPassword, newPassword, confirmPassword }
+      const { data } = await api.put('/users/me/password', payload)
       closeSecurityModal()
       setSecuritySuccess(data?.message || 'Password updated successfully')
     } catch (err) {
@@ -221,7 +321,7 @@ export default function Settings() {
                 icon={Shield}
                 iconClass="settings-row-icon--security"
                 title="Account & Security"
-                description="Password, email preferences, and two-factor authentication."
+                description="Password and email verification."
               />
             </div>
           </section>
@@ -261,7 +361,7 @@ export default function Settings() {
       <SiteFooter />
 
       {securityOpen && createPortal(
-        <div className="plan-modal-overlay" onClick={() => { if (!securityLoading) closeSecurityModal() }}>
+        <div className="plan-modal-overlay" onClick={() => { if (!securityLoading && !otpSending && !otpVerifying) closeSecurityModal() }}>
           <div
             className="security-modal"
             role="dialog"
@@ -284,6 +384,7 @@ export default function Settings() {
               </div>
 
               {securityError && <div className="error" role="alert">{securityError}</div>}
+              {securityInfo && <div className="success" role="status">{securityInfo}</div>}
 
               <label className="security-label" htmlFor="security-email">Email Address</label>
               <input id="security-email" className="security-email" value={user?.email || ''} readOnly />
@@ -291,15 +392,37 @@ export default function Settings() {
               <p className="security-label">Change Password</p>
               <PasswordInput
                 id="security-current-password"
-                label="Current password"
-                placeholder="Current Password"
-                autoComplete="current-password"
-                value={currentPassword}
+                label={useEmailOtp && otpSent ? 'Enter verification code' : 'Current password'}
+                placeholder={useEmailOtp && otpSent ? 'Enter Verification Code' : 'Current Password'}
+                autoComplete={useEmailOtp && otpSent ? 'one-time-code' : 'current-password'}
+                value={useEmailOtp && otpSent ? verificationCode : currentPassword}
                 shown={showCurrent}
-                onChange={(event) => setCurrentPassword(event.target.value)}
+                mask={!(useEmailOtp && otpSent)}
+                inputMode={useEmailOtp && otpSent ? 'numeric' : undefined}
+                maxLength={useEmailOtp && otpSent ? 4 : undefined}
+                onChange={(event) => {
+                  if (useEmailOtp && otpSent) {
+                    setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 4))
+                  } else {
+                    setCurrentPassword(event.target.value)
+                  }
+                }}
                 onToggle={() => setShowCurrent((value) => !value)}
+                disabled={useEmailOtp && otpSent && codeVerified}
               />
               {securityFieldErrors.currentPassword && <span className="field-error">{securityFieldErrors.currentPassword}</span>}
+              {useEmailOtp && otpSent && !codeVerified && (
+                <div className="security-otp-actions">
+                  <button
+                    type="button"
+                    className="security-send-otp"
+                    onClick={handleVerifyPasswordOtp}
+                    disabled={otpSending || otpVerifying || securityLoading || verificationCode.length !== 4}
+                  >
+                    {otpVerifying ? 'Checking…' : 'Verify code'}
+                  </button>
+                </div>
+              )}
               <PasswordInput
                 id="security-new-password"
                 label="New password"
@@ -309,6 +432,7 @@ export default function Settings() {
                 shown={showNew}
                 onChange={(event) => setNewPassword(event.target.value)}
                 onToggle={() => setShowNew((value) => !value)}
+                disabled={useEmailOtp && !codeVerified}
               />
               {securityFieldErrors.newPassword && <span className="field-error">{securityFieldErrors.newPassword}</span>}
               <PasswordInput
@@ -320,22 +444,39 @@ export default function Settings() {
                 shown={showConfirm}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 onToggle={() => setShowConfirm((value) => !value)}
+                disabled={useEmailOtp && !codeVerified}
               />
               {securityFieldErrors.confirmPassword && <span className="field-error">{securityFieldErrors.confirmPassword}</span>}
 
               <div className="security-2fa">
                 <div>
-                  <strong>Two-Factor Authentication (2FA)</strong>
-                  <span>Secure sign-in with authenticator code</span>
+                  <strong>Verify with email OTP</strong>
+                  <span>Send a one-time code to your registered email instead of entering your current password.</span>
                 </div>
-                <input type="checkbox" disabled aria-label="Two-factor authentication is not available yet" />
+                <input
+                  type="checkbox"
+                  checked={useEmailOtp}
+                  onChange={toggleEmailOtp}
+                  disabled={securityLoading || otpSending || otpVerifying}
+                  aria-label="Verify password change with an email OTP"
+                />
+              </div>
+              <div className="security-otp-actions">
+                <button
+                  type="button"
+                  className="security-send-otp"
+                  onClick={handleSendPasswordOtp}
+                  disabled={!useEmailOtp || otpSending || otpVerifying || securityLoading}
+                >
+                  {otpSending ? 'Sending…' : otpSent ? 'Resend OTP' : 'Send OTP'}
+                </button>
               </div>
 
               <div className="security-modal-actions">
-                <button type="button" className="security-cancel" onClick={closeSecurityModal} disabled={securityLoading}>
+                <button type="button" className="security-cancel" onClick={closeSecurityModal} disabled={securityLoading || otpSending || otpVerifying}>
                   Cancel
                 </button>
-                <button type="submit" className="btn auth-primary-btn" disabled={securityLoading}>
+                <button type="submit" className="btn auth-primary-btn" disabled={securityLoading || otpSending || otpVerifying}>
                   {securityLoading ? 'Updating…' : 'Update Security'}
                 </button>
               </div>

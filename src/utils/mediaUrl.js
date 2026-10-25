@@ -1,12 +1,17 @@
 /**
  * Media URL Utility
- * 
+ *
  * Handles proper URL construction for media streaming from the backend.
  * The backend provides relative paths like "/api/media/{id}/stream"
  * which need to be combined with the API base URL.
+ *
+ * Same-origin /api paths stay relative so they use the Vite (or nginx) proxy.
+ * Other relative paths use API_ORIGIN from src/config/ports.js.
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:9010';
+import { API_ORIGIN } from '../config/ports.js'
+
+const API_URL = import.meta.env.VITE_API_URL || API_ORIGIN
 
 /**
  * Constructs a full media URL from a media object or path
@@ -16,11 +21,11 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:9010';
  * 
  * @example
  * getMediaUrl({ mediaUrl: '/api/media/123/stream' })
- * // Returns: 'http://localhost:9010/api/media/123/stream'
- * 
+ * // Returns: '/api/media/123/stream'
+ *
  * @example
- * getMediaUrl('/api/media/123/stream')
- * // Returns: 'http://localhost:9010/api/media/123/stream'
+ * getMediaUrl('/files/photo.png')
+ * // Returns: API_ORIGIN + '/files/photo.png'
  */
 /** Disk-era avatars (`/uploads/...`) often 404; prefer BLOB stream URLs. */
 export const isLegacyDiskPhoto = (path) => {

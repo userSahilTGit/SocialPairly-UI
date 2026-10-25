@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { getMediaUrl, isLegacyDiskPhoto, isVideo, createBlobUrl, revokeBlobUrl } from '@/utils/mediaUrl'
 import mediaUrlDefault from '@/utils/mediaUrl'
+import { API_ORIGIN } from '@/config/ports'
 
 describe('isLegacyDiskPhoto', () => {
   it('returns false for empty or non-string', () => {
@@ -37,8 +38,8 @@ describe('getMediaUrl', () => {
   })
 
   it('prefixes relative paths with API_URL and prefers mediaUrl over url', () => {
-    expect(getMediaUrl('/files/a.png')).toBe('http://localhost:9010/files/a.png')
-    expect(getMediaUrl({ url: '/files/b.png' })).toBe('http://localhost:9010/files/b.png')
+    expect(getMediaUrl('/files/a.png')).toBe(`${API_ORIGIN}/files/a.png`)
+    expect(getMediaUrl({ url: '/files/b.png' })).toBe(`${API_ORIGIN}/files/b.png`)
     expect(getMediaUrl({ mediaUrl: '/api/media/1/stream', url: '/files/ignored.png' }))
       .toBe('/api/media/1/stream')
   })

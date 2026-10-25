@@ -1,3 +1,5 @@
+import { formatPhoneStorage, splitPhone } from './phoneFormat'
+
 const NAME_RE = /^[\p{L}][\p{L} .'-]{0,59}$/u
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const SSN_RE = /^\d{3}-\d{2}-\d{4}$/
@@ -246,10 +248,14 @@ export const EMPTY_IDENTITY_FORM = {
   primaryEmail: '',
   emailVerified: false,
   secondaryEmail: '',
-  primaryPhone: '',
-  phoneVerified: false,
-  secondaryPhone: '',
-  homePhone: '',
+    primaryPhone: '',
+    phoneVerified: false,
+    /** Dial code kept so a national-only field still saves as +CC-number. */
+    _primaryPhoneDialCode: '',
+    secondaryPhone: '',
+    _secondaryPhoneDialCode: '',
+    homePhone: '',
+    _homePhoneDialCode: '',
   preferredContactMethod: '',
   bestTimeToContact: '',
   currentResidence: {
@@ -478,6 +484,47 @@ export function validatePhoneOptional(value) {
   return 'Enter a valid 10-digit phone number (e.g. +(1) 408 123 4567)'
 }
 
+/**
+ * Identity contact fields show the national number only.
+ * Storage values such as +91-9836387634 are split so validation sees 10 digits.
+ * Non-phone placeholders (for example oauth tokens) become blank.
+ */
+export function contactPhoneParts(stored) {
+  const raw = strOrEmpty(stored)
+  if (!raw || /[a-zA-Z]/.test(raw)) return { national: '', dialCode: '' }
+  const parts = splitPhone(raw)
+  if (!parts.national) return { national: '', dialCode: '' }
+  return { national: parts.national, dialCode: parts.countryCode || '' }
+}
+
+/** While typing, a pasted +CC-number becomes the national digits and its dial code. */
+export function parseContactPhoneInput(value) {
+  const cleaned = sanitizePhoneInput(value)
+  const trimmed = cleaned.trim()
+  const digits = trimmed.replace(/\D/g, '')
+  if (/^\+\d{1,4}-/.test(trimmed) || (trimmed.startsWith('+') && digits.length >= 8)) {
+    const parts = splitPhone(trimmed)
+    if (parts.national) {
+      return { value: parts.national, dialCode: parts.countryCode || '' }
+    }
+  }
+  return { value: cleaned, dialCode: null }
+}
+
+/** Rebuild CountryCode-PhoneNumber for the API. Blank stays null so the stored number is unchanged. */
+export function contactPhoneForPayload(national, dialCode) {
+  const raw = trimValue(national)
+  if (!raw) return null
+  if (/^\+\d/.test(raw)) {
+    const parts = splitPhone(raw)
+    if (!parts.national) return null
+    return formatPhoneStorage(parts.countryCode, parts.national)
+  }
+  const digits = raw.replace(/\D/g, '')
+  if (!digits) return null
+  return formatPhoneStorage(dialCode || '+91', digits)
+}
+
 const MIN_APPROX_YEAR = 1900
 
 export function currentCalendarYear() {
@@ -635,6 +682,9 @@ export function mapIdentityResponseToForm(data) {
   if (!data) return { ...EMPTY_IDENTITY_FORM, currentResidence: { ...EMPTY_IDENTITY_FORM.currentResidence }, nationality: { ...EMPTY_IDENTITY_FORM.nationality, additionalNationalities: [], languages: [] }, immigration: { ...EMPTY_IDENTITY_FORM.immigration, preferredFutureCountries: [] }, relationship: { ...EMPTY_IDENTITY_FORM.relationship }, family: { ...EMPTY_IDENTITY_FORM.family, childAgeRanges: [] }, career: { ...EMPTY_IDENTITY_FORM.career }, financial: { ...EMPTY_IDENTITY_FORM.financial }, safety: { ...EMPTY_IDENTITY_FORM.safety }, civilJudgment: { ...EMPTY_IDENTITY_FORM.civilJudgment } }
 
   const cr = data.currentResidence || {}
+  const primaryContact = contactPhoneParts(data.primaryPhone)
+  const secondaryContact = contactPhoneParts(data.secondaryPhone)
+  const homeContact = contactPhoneParts(data.homePhone)
   const nat = data.nationality || {}
   const imm = data.immigration || {}
   const rel = data.relationship || {}
@@ -659,10 +709,13 @@ export function mapIdentityResponseToForm(data) {
     primaryEmail: strOrEmpty(data.primaryEmail),
     emailVerified: !!data.emailVerified,
     secondaryEmail: strOrEmpty(data.secondaryEmail),
-    primaryPhone: strOrEmpty(data.primaryPhone),
+    primaryPhone: primaryContact.national,
     phoneVerified: !!data.phoneVerified,
-    secondaryPhone: strOrEmpty(data.secondaryPhone),
-    homePhone: strOrEmpty(data.homePhone),
+    _primaryPhoneDialCode: primaryContact.dialCode,
+    secondaryPhone: secondaryContact.national,
+    _secondaryPhoneDialCode: secondaryContact.dialCode,
+    homePhone: homeContact.national,
+    _homePhoneDialCode: homeContact.dialCode,
     preferredContactMethod: strOrEmpty(data.preferredContactMethod),
     bestTimeToContact: strOrEmpty(data.bestTimeToContact),
     currentResidence: {
@@ -866,9 +919,9 @@ export function buildIdentityPayload(form, action) {
     gender: toNullableString(form.gender),
     genderShownToMatches: form.genderShownToMatches || 'MATCHES',
     secondaryEmail: toNullableString(form.secondaryEmail),
-    primaryPhone: toNullableString(form.primaryPhone),
-    secondaryPhone: toNullableString(form.secondaryPhone),
-    homePhone: toNullableString(form.homePhone),
+    primaryPhone: contactPhoneForPayload(form.primaryPhone, form._primaryPhoneDialCode),
+    secondaryPhone: contactPhoneForPayload(form.secondaryPhone, form._secondaryPhoneDialCode),
+    homePhone: contactPhoneForPayload(form.homePhone, form._homePhoneDialCode),
     preferredContactMethod: toNullableString(form.preferredContactMethod),
     bestTimeToContact: toNullableString(form.bestTimeToContact),
     currentResidence: {
