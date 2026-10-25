@@ -7720,6 +7720,27 @@ button.settings-row--danger:hover {
   flex-shrink: 0;
   accent-color: #ec4899;
 }
+.security-otp-actions {
+  margin-top: 0.75rem;
+}
+.security-send-otp {
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.65rem 1rem;
+  font: inherit;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(90deg, #7c3aed, #ec4899);
+}
+.security-send-otp:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.security-modal .success {
+  margin-top: 0.75rem;
+}
 .security-modal-actions {
   display: flex;
   justify-content: flex-end;

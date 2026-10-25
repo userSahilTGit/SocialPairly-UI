@@ -128,6 +128,29 @@ describe('validateEmail / phone / ssn', () => {
     expect(sanitizePhoneInput('abc4081234567')).toBe('4081234567')
   })
 
+  it('shows stored contact numbers without the country code and saves the dial code back', () => {
+    const form = mapIdentityResponseToForm({
+      primaryPhone: '+91-9836387634',
+      secondaryPhone: '+1-4081234567',
+      homePhone: 'oauth:abc',
+    })
+    expect(form.primaryPhone).toBe('9836387634')
+    expect(form._primaryPhoneDialCode).toBe('+91')
+    expect(form.secondaryPhone).toBe('4081234567')
+    expect(form._secondaryPhoneDialCode).toBe('+1')
+    expect(form.homePhone).toBe('')
+
+    const errors = validateIdentityForm(form, 'SAVE_LATER', {})
+    expect(errors.primaryPhone).toBeUndefined()
+    expect(errors.secondaryPhone).toBeUndefined()
+    expect(errors.homePhone).toBeUndefined()
+
+    const payload = buildIdentityPayload(form, 'SAVE_LATER')
+    expect(payload.primaryPhone).toBe('+91-9836387634')
+    expect(payload.secondaryPhone).toBe('+1-4081234567')
+    expect(payload.homePhone).toBeNull()
+  })
+
   it('validates approx year range (#1558, #1559)', () => {
     expect(validateApproxYear('')).toBeNull()
     expect(validateApproxYear('-5')).toMatch(/between/)

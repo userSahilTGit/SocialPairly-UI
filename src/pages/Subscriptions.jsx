@@ -525,7 +525,7 @@ export default function Subscriptions() {
       const { data } = await api.get('/upgrades/eligible-plans')
       setEligibleUpgradePlans(data || [])
       if (!data || data.length === 0) {
-        setUpgradeModalError('No higher-token plans are available for your current balance.')
+        setUpgradeModalError('No higher plans are available. An upgrade needs more tokens and a higher price than your current plan.')
       }
       setUpgradeModalOpen(true)
     } catch (err) {

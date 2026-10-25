@@ -9,6 +9,7 @@ import {
   buildSitemapXml,
   buildStructuredData,
 } from './src/seo/routes.js'
+import { API_PROXY_TARGET, FRONTEND_PORT } from './src/config/ports.js'
 
 /**
  * SEO assets (defect 1571). Set VITE_SITE_URL (e.g. https://app.socialpairly.com) once DNS is live to get
@@ -64,14 +65,29 @@ function seoPlugin() {
   }
 }
 
+const apiProxy = {
+  '/api': {
+    // Local Workflow-manager (phone country codes, auth, media, payments).
+    // Use 127.0.0.1 — Node on Windows often fails localhost via IPv6 (ECONNREFUSED AggregateError).
+    target: process.env.VITE_API_PROXY_TARGET || API_PROXY_TARGET,
+    changeOrigin: true,
+    secure: false,
+  },
+  '/uploads': {
+    target: process.env.VITE_API_PROXY_TARGET || API_PROXY_TARGET,
+    changeOrigin: true,
+    secure: false,
+  },
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss(), seoPlugin()],
   server: {
-    // Keep in sync with GCP OAuth "Authorized JavaScript origins" (no wildcards).
-    // Override with --port 3091 only after adding that origin in Google Cloud Console.
-    port: Number(process.env.VITE_DEV_PORT || process.env.PORT || 3001),
-    strictPort: false,
+    // Port lives in src/config/ports.js. Add that origin in Google Cloud Console
+    // (Authorized JavaScript origins do not allow wildcards).
+    port: FRONTEND_PORT,
+    strictPort: true,
     // Allow access via nip.io / LAN IP (not only localhost)
     host: true,
     allowedHosts: [
@@ -84,29 +100,26 @@ export default defineConfig({
       'socialpairly.com',
       '.socialpairly.com',
     ],
-    // Local default: HMR uses the same host/port as the Vite server (e.g. :3010).
+    // Local default: HMR uses the same host/port as the Vite server.
     // For nip.io / tunneled access only, override with:
-    //   set VITE_HMR_HOST=3.151.77.90.nip.io&& set VITE_HMR_CLIENT_PORT=3002&& npm run dev
+    //   set VITE_HMR_HOST=3.151.77.90.nip.io&& npm run dev
     hmr: process.env.VITE_HMR_HOST
       ? {
           host: process.env.VITE_HMR_HOST,
           protocol: 'ws',
-          clientPort: Number(process.env.VITE_HMR_CLIENT_PORT || process.env.PORT || 3002),
+          clientPort: Number(process.env.VITE_HMR_CLIENT_PORT || FRONTEND_PORT),
         }
       : undefined,
     watch: {
       // Vitest HTML coverage must not trigger HMR page-reload spam in the UI console.
       ignored: ['**/coverage/**', '**/node_modules/**'],
     },
-    proxy: {
-      '/api': {
-        // Local Workflow-manager (BUG-1570 phone country codes, auth, etc.)
-        // Use 127.0.0.1 — Node on Windows often fails localhost via IPv6 (ECONNREFUSED AggregateError).
-        target: process.env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:9010',
-        changeOrigin: true,
-        secure: false,
-      },
-    },
+    proxy: apiProxy,
+  },
+  preview: {
+    port: FRONTEND_PORT,
+    strictPort: true,
+    proxy: apiProxy,
   },
   resolve: {
     alias: {

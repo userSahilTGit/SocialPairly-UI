@@ -29,6 +29,7 @@ import {
   NAME_SUFFIXES,
   PRONOUN_OPTIONS,
   buildIdentityPayload,
+  parseContactPhoneInput,
   calcAge,
   formatEducationCity,
   formatEducationText,
@@ -44,7 +45,6 @@ import {
   validateIdentityForm,
   formatZipInput,
   US_ZIP_REGEX,
-  sanitizePhoneInput,
   resolveAdditionalNationalities,
   formatAdditionalNationalitiesText,
   currentCalendarYear,
@@ -423,8 +423,17 @@ export default function IdentityBackgroundPage() {
   )
 
   const onPhoneChange = (field) => (e) => {
-    const value = sanitizePhoneInput(e.target.value)
-    setForm((prev) => ({ ...prev, [field]: value }))
+    const parsed = parseContactPhoneInput(e.target.value)
+    const dialKey = field === 'primaryPhone'
+      ? '_primaryPhoneDialCode'
+      : field === 'secondaryPhone'
+        ? '_secondaryPhoneDialCode'
+        : '_homePhoneDialCode'
+    setForm((prev) => ({
+      ...prev,
+      [field]: parsed.value,
+      ...(parsed.dialCode ? { [dialKey]: parsed.dialCode } : {}),
+    }))
   }
 
   const syncAdditionalNationalities = (text) => {
@@ -842,7 +851,7 @@ export default function IdentityBackgroundPage() {
                 onChange={onPhoneChange('primaryPhone')}
                 inputMode="tel"
                 autoComplete="tel"
-                placeholder="e.g. +(1) 408 123 4567"
+                placeholder="10-digit phone number"
                 {...inputA11y('primaryPhone')}
               />
               <div className="ob-contact-meta ob-contact-meta--tall">
@@ -860,7 +869,7 @@ export default function IdentityBackgroundPage() {
                 onChange={onPhoneChange('secondaryPhone')}
                 inputMode="tel"
                 autoComplete="tel"
-                placeholder="e.g. +(1) 408 123 4567"
+                placeholder="10-digit phone number"
                 {...inputA11y('secondaryPhone')}
               />
               <div className="ob-contact-meta ob-contact-meta--tall">
@@ -877,7 +886,7 @@ export default function IdentityBackgroundPage() {
                 onChange={onPhoneChange('homePhone')}
                 inputMode="tel"
                 autoComplete="tel"
-                placeholder="e.g. +(1) 408 123 4567"
+                placeholder="10-digit phone number"
                 {...inputA11y('homePhone')}
               />
               <FieldError name="homePhone" />

@@ -1,5 +1,43 @@
 import { useEffect, useState } from 'react'
 
+function groupedTokenCount(value) {
+  const counts = []
+  for (const match of String(value || '').matchAll(/(\d{1,3}(?:,\d{3})+|\d{4,})/g)) {
+    const raw = match[1]
+    const parsed = Number(raw.replace(/,/g, ''))
+    if (raw.includes(',') || parsed >= 1000) counts.push(parsed)
+  }
+  const usable = counts.filter((count) => Number.isFinite(count) && count > 0)
+  return usable.length ? Math.max(...usable) : 0
+}
+
+function planTokenLabel(plan) {
+  const field = String(plan?.tokensIncluded ?? '').trim()
+  const description = String(plan?.description ?? '')
+  if (/^unlimited$/i.test(field) || /unlimited connection token/i.test(`${field}\n${description}`)) {
+    return 'Unlimited tokens'
+  }
+
+  const shownOnCard = groupedTokenCount(description)
+  if (shownOnCard > 0) return `${shownOnCard.toLocaleString('en-US')} tokens`
+
+  const fieldCount = field.match(/^(\d{1,3}(?:,\d{3})+|\d+)$/)
+  if (fieldCount) {
+    const parsed = Number(fieldCount[1].replace(/,/g, ''))
+    if (parsed > 0) return `${parsed.toLocaleString('en-US')} tokens`
+  }
+  const shownInField = groupedTokenCount(field)
+  if (shownInField > 0) return `${shownInField.toLocaleString('en-US')} tokens`
+  return 'See plan details'
+}
+
+function upgradePlanOptionLabel(plan) {
+  const price = Number.parseFloat(plan.amount)
+  const priceLabel = Number.isFinite(price) ? `$${price.toFixed(2)}` : ''
+  const lengthLabel = plan.durationDays ? `${plan.durationDays} days` : (plan.planType || '')
+  return [plan.planName, priceLabel, lengthLabel, planTokenLabel(plan)].filter(Boolean).join(' — ')
+}
+
 export function UpgradeRequestModal({ open, onClose, onSubmit, plans, loading, error }) {
   const [upgradePlanId, setUpgradePlanId] = useState('')
   const [reason, setReason] = useState('')
@@ -52,7 +90,7 @@ export function UpgradeRequestModal({ open, onClose, onSubmit, plans, loading, e
             ) : (
               plans.map((plan) => (
                 <option key={plan.id} value={plan.id}>
-                  {plan.planName} — ${parseFloat(plan.amount).toFixed(2)} ({plan.tokensIncluded || 0} tokens)
+                  {upgradePlanOptionLabel(plan)}
                 </option>
               ))
             )}
