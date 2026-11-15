@@ -35,6 +35,8 @@ export const isLegacyDiskPhoto = (path) => {
 
 const resolveMediaPath = (path) => {
   if (!path) return '';
+  // Legacy disk avatars almost always 404 after the BLOB migration; skip the request.
+  if (isLegacyDiskPhoto(path)) return '';
   if (
     path.startsWith('blob:')
     || path.startsWith('data:')

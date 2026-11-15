@@ -10,7 +10,7 @@
 }
 
 .admin-dashboard-container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 24px 20px;
 }
@@ -194,6 +194,7 @@
 
 .dashboard-table-wrapper {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .dashboard-table {
@@ -203,18 +204,50 @@
     text-align: left;
 }
 
+.dashboard-users-table {
+    table-layout: fixed;
+    min-width: 980px;
+}
+
 .dashboard-table thead {
     background: #f8fafc;
     border-bottom: 1px solid #e2e8f0;
 }
 
 .dashboard-table th {
-    padding: 14px 16px;
+    padding: 12px 12px;
     font-size: 11px;
     font-weight: 700;
     color: #64748b;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+.dashboard-sort-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.dashboard-sort-btn:hover,
+.dashboard-sort-btn.is-active {
+    color: #7c3aed;
+}
+
+.dashboard-sort-indicator {
+    font-size: 12px;
+    line-height: 1;
+    opacity: 0.75;
 }
 
 .dashboard-table td {
@@ -225,6 +258,53 @@
 
 .dashboard-table tbody tr:hover {
     background: #f8fafc;
+}
+
+.dashboard-users-table th,
+.dashboard-users-table td {
+    padding: 12px 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.dashboard-users-table .col-id {
+    width: 56px;
+}
+
+.dashboard-users-table .col-name {
+    width: 14%;
+}
+
+.dashboard-users-table .col-email {
+    width: 22%;
+}
+
+.dashboard-users-table .col-phone {
+    width: 13%;
+}
+
+.dashboard-users-table .col-role {
+    width: 90px;
+}
+
+.dashboard-users-table .col-profile {
+    width: 110px;
+}
+
+.dashboard-users-table .col-subscription {
+    width: 120px;
+}
+
+.dashboard-users-table .col-joined {
+    width: 120px;
+}
+
+.dashboard-users-table .dashboard-badge {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .dashboard-badge {
