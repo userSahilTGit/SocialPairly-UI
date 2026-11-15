@@ -18,12 +18,30 @@ const CHART_RED = '#dc2626'
 const PIE_COLORS = [CHART_PURPLE, CHART_PINK]
 const ROLE_COLORS = [CHART_VIOLET, CHART_RED]
 
+function formatJoinedDate(dateValue) {
+    if (!dateValue) return '—'
+    const date = new Date(dateValue)
+    if (Number.isNaN(date.getTime())) return '—'
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const year = date.getFullYear()
+    return `${day}-${month}-${year}`
+}
+
+function getJoinedTimestamp(dateValue) {
+    if (!dateValue) return 0
+    const time = new Date(dateValue).getTime()
+    return Number.isNaN(time) ? 0 : time
+}
+
 export default function AdminDashboard() {
     const { isDark } = useTheme()
     const [stats, setStats] = useState(null)
     const [users, setUsers] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
+    // null = API order; 'desc' = newest first; 'asc' = oldest first
+    const [dateSort, setDateSort] = useState(null)
 
     useEffect(() => {
         const load = async () => {
@@ -42,6 +60,27 @@ export default function AdminDashboard() {
         }
         load()
     }, [])
+
+    const sortedUsers = !dateSort
+        ? users
+        : [...users].sort((a, b) => {
+            const diff = getJoinedTimestamp(a.createdAt) - getJoinedTimestamp(b.createdAt)
+            return dateSort === 'asc' ? diff : -diff
+        })
+
+    const toggleDateSort = () => {
+        setDateSort((prev) => {
+            if (prev === null) return 'desc'
+            if (prev === 'desc') return 'asc'
+            return null
+        })
+    }
+
+    const dateSortLabel = dateSort === 'desc'
+        ? 'Newest first'
+        : dateSort === 'asc'
+            ? 'Oldest first'
+            : 'Click to sort'
 
     const chartGrid = isDark ? '#1f293d' : '#e2e8f0'
     const chartTick = isDark ? '#94a3b8' : '#64748b'
@@ -185,42 +224,60 @@ export default function AdminDashboard() {
                     <div className="dashboard-users-card">
                         <h2>All Users ({users.length})</h2>
                         <div className="dashboard-table-wrapper">
-                            <table className="dashboard-table">
+                            <table className="dashboard-table dashboard-users-table">
                                 <thead>
                                     <tr>
-                                        <th>ID</th>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>Phone</th>
-                                        <th>Role</th>
-                                        <th>Profile</th>
-                                        <th>Subscription</th>
+                                        <th className="col-id">ID</th>
+                                        <th className="col-name">Name</th>
+                                        <th className="col-email">Email</th>
+                                        <th className="col-phone">Phone</th>
+                                        <th className="col-role">Role</th>
+                                        <th className="col-profile">Profile</th>
+                                        <th className="col-subscription">Subscription</th>
+                                        <th className="col-joined">
+                                            <button
+                                                type="button"
+                                                className={`dashboard-sort-btn${dateSort ? ' is-active' : ''}`}
+                                                onClick={toggleDateSort}
+                                                title={dateSortLabel}
+                                                aria-label={`Sort by date joined. ${dateSortLabel}`}
+                                            >
+                                                Date Joined
+                                                <span className="dashboard-sort-indicator" aria-hidden="true">
+                                                    {dateSort === 'desc' ? '↓' : dateSort === 'asc' ? '↑' : '↕'}
+                                                </span>
+                                            </button>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {users.map((u) => (
+                                    {sortedUsers.map((u) => {
+                                        const fullName = [u.firstName, u.lastName].filter(Boolean).join(' ')
+                                        return (
                                         <tr key={u.id}>
-                                            <td>{u.id}</td>
-                                            <td>{u.firstName} {u.lastName}</td>
-                                            <td>{u.email}</td>
-                                            <td>{u.phoneNumber}</td>
-                                            <td>
+                                            <td className="col-id">{u.id}</td>
+                                            <td className="col-name" title={fullName}>{fullName}</td>
+                                            <td className="col-email" title={u.email || ''}>{u.email}</td>
+                                            <td className="col-phone" title={u.phoneNumber || ''}>{u.phoneNumber}</td>
+                                            <td className="col-role">
                                                 <span className={`dashboard-badge ${u.role === 'ADMIN' ? 'badge-admin' : 'badge-user'}`}>
                                                     {u.role}
                                                 </span>
                                             </td>
-                                            <td>
+                                            <td className="col-profile">
                                                 <span className={`dashboard-badge ${u.profileCompleted ? 'badge-yes' : 'badge-no'}`}>
                                                     {u.profileCompleted ? 'Complete' : 'Incomplete'}
                                                 </span>
                                             </td>
-                                            <td>
+                                            <td className="col-subscription">
                                                 <span className={`dashboard-badge ${u.subscriptionDetails === 'Subscribed' ? 'badge-subscribed' : 'badge-unsubscribed'}`}>
                                                     {u.subscriptionDetails || 'Unsubscribed'}
                                                 </span>
                                             </td>
+                                            <td className="col-joined">{formatJoinedDate(u.createdAt)}</td>
                                         </tr>
-                                    ))}
+                                        )
+                                    })}
                                 </tbody>
                             </table>
                         </div>

@@ -43,6 +43,12 @@ describe('getMediaUrl', () => {
     expect(getMediaUrl({ mediaUrl: '/api/media/1/stream', url: '/files/ignored.png' }))
       .toBe('/api/media/1/stream')
   })
+
+  it('skips legacy /uploads/ disk paths so missing files are not requested', () => {
+    expect(getMediaUrl('/uploads/a.png')).toBe('')
+    expect(getMediaUrl({ mediaUrl: '/uploads/legacy.jpg' })).toBe('')
+    expect(getMediaUrl(`${API_ORIGIN}/uploads/x.jpg`)).toBe('')
+  })
 })
 
 describe('isVideo', () => {
