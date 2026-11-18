@@ -5,6 +5,7 @@ import { IS_PHONE_VERIFICATION_MANDATORY, IS_PHONE_SMS_VERIFICATION_ENABLED, PHO
 import ProtectedRoute from './components/ProtectedRoute'
 import PhoneVerificationModal from './components/PhoneVerificationModal'
 import SessionTimeoutDialog from './components/SessionTimeoutDialog'
+import SupportContactFab from './components/SupportContactFab'
 import RouteSeo from './components/RouteSeo'
 import { userNeedsPhoneVerification } from './utils/verification'
 import { GOOGLE_CLIENT_ID } from './config/oauth'
@@ -206,6 +207,7 @@ export default function App() {
         onClose={() => setShowPhoneModal(false)}
         onVerified={() => setShowPhoneModal(false)}
       />
+      {user && user.role !== 'ADMIN' && <SupportContactFab />}
       <SessionTimeoutDialog />
     </GoogleOAuthProvider>
   )

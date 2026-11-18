@@ -1,0 +1,244 @@
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
+import api from '../api/axios'
+import {
+  SUPPORT_EMAIL,
+  SUPPORT_EMAIL_MAILTO,
+  SUPPORT_PHONE_DISPLAY,
+  SUPPORT_PHONE_TEL,
+  SUPPORT_WHATSAPP_URL,
+} from '../config/supportContacts'
+import './SupportContactFab.css'
+
+export default function SupportContactFab() {
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [isPremium, setIsPremium] = useState(false)
+  const [premiumResolved, setPremiumResolved] = useState(false)
+  const rootRef = useRef(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data } = await api.get('/subscriptions/current')
+        if (cancelled) return
+        // Free payload is { active: false }. Paid payload is SubscriptionDto (id + status).
+        const premium = !!(
+          data
+          && data.active !== false
+          && data.id != null
+          && (!data.status || String(data.status).toLowerCase() === 'active')
+        )
+        setIsPremium(premium)
+      } catch {
+        if (!cancelled) setIsPremium(false)
+      } finally {
+        if (!cancelled) setPremiumResolved(true)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    if (!open && !showUpgradeModal) return undefined
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+        setShowUpgradeModal(false)
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open, showUpgradeModal])
+
+  useEffect(() => {
+    if (!open) return undefined
+
+    const onPointerDown = (event) => {
+      if (rootRef.current && !rootRef.current.contains(event.target)) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', onPointerDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!showUpgradeModal) return undefined
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [showUpgradeModal])
+
+  const closeMenu = () => setOpen(false)
+
+  const handleTriggerClick = () => {
+    if (!premiumResolved) return
+    if (isPremium) {
+      setShowUpgradeModal(false)
+      setOpen((value) => !value)
+      return
+    }
+    setOpen(false)
+    setShowUpgradeModal(true)
+  }
+
+  const closeUpgradeModal = () => setShowUpgradeModal(false)
+
+  const goSubscribePremium = () => {
+    setShowUpgradeModal(false)
+    navigate('/subscriptions')
+  }
+
+  const continueWithEmailSupport = () => {
+    setShowUpgradeModal(false)
+    navigate({ pathname: '/settings', hash: 'support' })
+  }
+
+  return (
+    <>
+      <div className="support-fab-root" ref={rootRef}>
+        {isPremium && (
+          <div
+            className={`support-fab-menu${open ? ' is-open' : ''}`}
+            role="menu"
+            aria-label="Contact support options"
+            aria-hidden={!open}
+          >
+            <a
+              href={SUPPORT_PHONE_TEL}
+              className="support-fab-channel support-fab-channel--phone"
+              role="menuitem"
+              aria-label={`Call support at +91 ${SUPPORT_PHONE_DISPLAY}`}
+              title={`Call +91 ${SUPPORT_PHONE_DISPLAY}`}
+              onClick={closeMenu}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+              </svg>
+            </a>
+
+            <a
+              href={SUPPORT_WHATSAPP_URL}
+              className="support-fab-channel support-fab-channel--whatsapp"
+              role="menuitem"
+              aria-label={`WhatsApp support at +91 ${SUPPORT_PHONE_DISPLAY}`}
+              title={`WhatsApp +91 ${SUPPORT_PHONE_DISPLAY}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={closeMenu}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12.031 2c-5.516 0-9.969 4.453-9.969 9.969 0 1.758.458 3.475 1.328 4.988L2 22l5.188-1.361a9.927 9.927 0 0 0 4.843 1.26h.004c5.515 0 9.969-4.454 9.969-9.969A9.914 9.914 0 0 0 19.08 4.91 9.912 9.912 0 0 0 12.031 2zm5.818 14.236c-.246.693-1.434 1.326-1.992 1.409-.508.076-1.151.108-1.857-.117-.428-.136-.978-.318-1.682-.622-2.961-1.278-4.895-4.26-5.043-4.457-.147-.197-1.205-1.603-1.205-3.058 0-1.454.762-2.169 1.032-2.465.271-.296.591-.37.788-.37.197 0 .394.002.566.01.182.009.426-.069.666.508.246.591.837 2.046.911 2.194.074.148.123.32.025.517-.099.197-.148.32-.296.493-.148.172-.311.385-.444.517-.148.147-.302.307-.13.603.173.296.766 1.263 1.644 2.046 1.13 1.007 2.082 1.319 2.378 1.467.296.148.468.123.64-.074.173-.197.739-.862.936-1.158.197-.296.394-.246.665-.148.271.099 1.725.813 2.021.961.296.148.493.222.567.345.074.123.074.714-.172 1.407z" />
+              </svg>
+            </a>
+
+            <a
+              href={SUPPORT_EMAIL_MAILTO}
+              className="support-fab-channel support-fab-channel--email"
+              role="menuitem"
+              aria-label={`Email support at ${SUPPORT_EMAIL}`}
+              title={`Email ${SUPPORT_EMAIL}`}
+              onClick={closeMenu}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect width="20" height="16" x="2" y="4" rx="2.5" />
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+              </svg>
+            </a>
+          </div>
+        )}
+
+        <button
+          type="button"
+          className={`support-fab-trigger${open || showUpgradeModal ? ' is-open' : ''}`}
+          aria-label={isPremium ? 'Contact support' : 'Premium support'}
+          aria-haspopup={isPremium ? 'menu' : 'dialog'}
+          aria-expanded={isPremium ? open : showUpgradeModal}
+          onClick={handleTriggerClick}
+        >
+          <svg className="support-fab-icon support-fab-icon--headset" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" />
+            <path d="M18 21a3 3 0 0 1-3 1h-2" />
+          </svg>
+          <svg className="support-fab-icon support-fab-icon--close" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+
+      {showUpgradeModal && createPortal(
+        <div
+          className="support-upgrade-backdrop is-visible"
+          role="presentation"
+          onClick={closeUpgradeModal}
+        >
+          <div
+            className="support-upgrade-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="support-upgrade-title"
+            aria-describedby="support-upgrade-desc"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="support-upgrade-crown" aria-hidden="true">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="#78350F">
+                <path d="M3 18h18v2H3v-2zm16.5-11.5L16 11l-4-6-4 6-3.5-4.5L3 16h18l-1.5-9.5z" />
+              </svg>
+            </div>
+
+            <h2 className="support-upgrade-title" id="support-upgrade-title">
+              Upgrade to Premium
+            </h2>
+            <p className="support-upgrade-desc" id="support-upgrade-desc">
+              Direct <strong>Phone Call</strong> &amp; <strong>WhatsApp</strong> support is exclusive to
+              SocialPairly Premium members. Subscribe for instant 1-on-1 concierge help.
+            </p>
+
+            <div className="support-upgrade-perks">
+              <div className="support-upgrade-perk">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span>Instant priority phone &amp; WhatsApp helpdesk</span>
+              </div>
+              <div className="support-upgrade-perk">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EC4899" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span>Exclusive gold crown badge on your profile</span>
+              </div>
+              <div className="support-upgrade-perk">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#25D366" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span>Priority matchmaking &amp; VIP event invitations</span>
+              </div>
+            </div>
+
+            <button type="button" className="support-upgrade-cta" onClick={goSubscribePremium}>
+              Subscribe for Premium
+            </button>
+            <button type="button" className="support-upgrade-cancel" onClick={continueWithEmailSupport}>
+              Maybe later (continue with email support)
+            </button>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
+  )
+}

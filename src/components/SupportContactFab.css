@@ -1,0 +1,299 @@
+.support-fab-root {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.support-fab-menu {
+  margin-bottom: 12px;
+  padding: 7px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(233, 213, 255, 0.9);
+  box-shadow:
+    0 14px 34px -6px rgba(124, 58, 237, 0.22),
+    0 4px 12px -2px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(10px) scale(0.88);
+  transform-origin: bottom center;
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.support-fab-menu.is-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.support-fab-channel {
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  border: none;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.support-fab-channel:hover {
+  transform: scale(1.1);
+}
+
+.support-fab-channel:active {
+  transform: scale(0.95);
+}
+
+.support-fab-channel--phone {
+  background: #7c3aed;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
+}
+
+.support-fab-channel--whatsapp {
+  background: #25d366;
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.35);
+}
+
+.support-fab-channel--email {
+  background: #ec4899;
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.35);
+}
+
+.support-fab-trigger {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  border-radius: 9999px;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, #6366f1 0%, #9333ea 48%, #ec4899 100%);
+  box-shadow: 0 10px 26px -4px rgba(147, 51, 234, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.support-fab-trigger:hover {
+  transform: scale(1.06);
+  box-shadow: 0 14px 30px -4px rgba(236, 72, 153, 0.55);
+}
+
+.support-fab-trigger:active {
+  transform: scale(0.95);
+}
+
+.support-fab-icon {
+  position: absolute;
+  transition: opacity 0.2s ease, transform 0.22s ease;
+}
+
+.support-fab-icon--headset {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+.support-fab-icon--close {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.5);
+}
+
+.support-fab-trigger.is-open .support-fab-icon--headset {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.5);
+}
+
+.support-fab-trigger.is-open .support-fab-icon--close {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+[data-theme='dark'] .support-fab-menu {
+  background: rgba(30, 41, 59, 0.98);
+  border-color: rgba(126, 34, 206, 0.38);
+  box-shadow:
+    0 16px 36px -6px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(148, 163, 184, 0.16);
+}
+
+.support-upgrade-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+
+.support-upgrade-backdrop.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.support-upgrade-modal {
+  width: 100%;
+  max-width: 410px;
+  background: #fff;
+  border: 1px solid rgba(233, 213, 255, 0.95);
+  border-radius: 22px;
+  padding: 28px 26px 24px;
+  box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.35);
+  text-align: center;
+  transform: translateY(14px) scale(0.96);
+  transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.support-upgrade-backdrop.is-visible .support-upgrade-modal {
+  transform: translateY(0) scale(1);
+}
+
+.support-upgrade-crown {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #fef08a 0%, #facc15 48%, #d97706 100%);
+  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.support-upgrade-title {
+  font-size: 19px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 8px;
+}
+
+.support-upgrade-desc {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #475569;
+  margin: 0 0 18px;
+}
+
+.support-upgrade-perks {
+  text-align: left;
+  background: #f8f4fc;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: 12.5px;
+  color: #0f172a;
+  font-weight: 500;
+}
+
+.support-upgrade-perk {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.support-upgrade-cta {
+  width: 100%;
+  padding: 12px 18px;
+  border-radius: 13px;
+  border: none;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, #6366f1 0%, #9333ea 48%, #ec4899 100%);
+  box-shadow: 0 8px 20px rgba(147, 51, 234, 0.32);
+  margin-bottom: 10px;
+  transition: opacity 0.18s ease, transform 0.15s ease;
+}
+
+.support-upgrade-cta:hover {
+  opacity: 0.94;
+}
+
+.support-upgrade-cta:active {
+  transform: scale(0.98);
+}
+
+.support-upgrade-cancel {
+  width: 100%;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.support-upgrade-cancel:hover {
+  color: #0f172a;
+}
+
+[data-theme='dark'] .support-upgrade-modal {
+  background: #1e293b;
+  border-color: rgba(126, 34, 206, 0.38);
+}
+
+[data-theme='dark'] .support-upgrade-title {
+  color: #f8fafc;
+}
+
+[data-theme='dark'] .support-upgrade-desc {
+  color: #cbd5e1;
+}
+
+[data-theme='dark'] .support-upgrade-perks {
+  background: rgba(15, 23, 42, 0.72);
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #f1f5f9;
+}
+
+[data-theme='dark'] .support-upgrade-cancel {
+  color: #94a3b8;
+}
+
+[data-theme='dark'] .support-upgrade-cancel:hover {
+  color: #f8fafc;
+}
+
+@media (max-width: 680px) {
+  .support-fab-root {
+    right: 16px;
+    bottom: 18px;
+  }
+
+  .support-upgrade-backdrop {
+    align-items: flex-end;
+    padding: 12px;
+  }
+
+  .support-upgrade-modal {
+    max-width: 100%;
+  }
+}

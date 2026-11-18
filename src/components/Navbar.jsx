@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, X } from 'lucide-react'
+import { Crown, Menu, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { BrandMark, LoggedInBrandName } from './AuthBrandAssets'
 import ThemeToggle from './ThemeToggle'
 import { getEmployeeNavItems, isEmployeeUser } from '../utils/employeeAccess'
+import api from '../api/axios'
 
 export default function Navbar() {
     const { user, logout } = useAuth()
@@ -12,7 +13,25 @@ export default function Navbar() {
     const location = useLocation()
     const [menuOpen, setMenuOpen] = useState(false)
     const [dropdownOpen, setDropdownOpen] = useState(false)
+    const [isPremium, setIsPremium] = useState(false)
     const dropdownRef = useRef(null)
+
+    useEffect(() => {
+        if (!user || isEmployeeUser(user)) {
+            setIsPremium(false)
+            return undefined
+        }
+        let cancelled = false
+        ;(async () => {
+            try {
+                const { data } = await api.get('/subscriptions/current')
+                if (!cancelled) setIsPremium(!!(data && data.active !== false))
+            } catch {
+                if (!cancelled) setIsPremium(false)
+            }
+        })()
+        return () => { cancelled = true }
+    }, [user])
 
     useEffect(() => {
         const handleClickOutside = (e) => {
@@ -114,13 +133,18 @@ export default function Navbar() {
                     <div className="profile-dropdown" ref={dropdownRef}>
                         <button
                             type="button"
-                            className="profile-icon-btn"
+                            className={`profile-icon-btn${isPremium ? ' is-premium' : ''}`}
                             onClick={() => setDropdownOpen((o) => !o)}
-                            aria-label="Profile menu"
+                            aria-label={isPremium ? 'Premium profile menu' : 'Profile menu'}
                         >
                             <span className="profile-icon">
                                 {(user?.displayName || user?.firstName)?.[0]?.toUpperCase() || '?'}
                             </span>
+                            {isPremium && (
+                                <span className="profile-premium-badge" title="Premium member" aria-hidden="true">
+                                    <Crown size={11} strokeWidth={2.4} />
+                                </span>
+                            )}
                         </button>
                         {dropdownOpen && (
                             <div className="dropdown-menu">
