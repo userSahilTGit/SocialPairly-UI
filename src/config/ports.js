@@ -11,8 +11,8 @@
  * (and http://127.0.0.1:FRONTEND_PORT) under Authorized JavaScript origins.
  * deploy/nginx.conf proxies /api and /uploads to BACKEND_PORT on the server.
  */
-export const FRONTEND_PORT = 3000
-export const BACKEND_PORT = 9030
+export const FRONTEND_PORT = 3001
+export const BACKEND_PORT = 9010
 
 export function frontendOrigin(host = 'localhost') {
   return `http://${host}:${FRONTEND_PORT}`

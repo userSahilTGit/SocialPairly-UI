@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { IDENTITY_CONTINUE_LATER_KEY, useAuth } from '../context/AuthContext'
+import { firstAdminPath, hasDashboardAccess, pathToDashboardKey } from '../utils/employeeAccess'
 import { userNeedsIdentityOnboarding } from '../utils/user'
 
 function isIdentityGateExempt(pathname) {
@@ -14,7 +15,7 @@ function isIdentityGateExempt(pathname) {
   )
 }
 
-export default function ProtectedRoute({ children, adminOnly = false }) {
+export default function ProtectedRoute({ children, adminOnly = false, dashboardKey = null }) {
   const { user } = useAuth()
   const location = useLocation()
 
@@ -24,6 +25,15 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
 
   if (adminOnly && user.role !== 'ADMIN') {
     return <Navigate to="/" replace />
+  }
+
+  const requiredDashboard = dashboardKey || (adminOnly ? pathToDashboardKey(location.pathname) : null)
+  if (adminOnly && requiredDashboard && !hasDashboardAccess(user, requiredDashboard)) {
+    const fallback = firstAdminPath(user)
+    if (fallback === location.pathname) {
+      return <Navigate to="/signin" replace />
+    }
+    return <Navigate to={fallback} replace />
   }
 
   const dismissedLater = sessionStorage.getItem(IDENTITY_CONTINUE_LATER_KEY) === '1'

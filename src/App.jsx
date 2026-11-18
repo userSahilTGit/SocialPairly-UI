@@ -24,7 +24,10 @@ import AdminIdentityDocuments from './pages/AdminIdentityDocuments'
 import AdminPlans from './pages/AdminPlans'
 import AdminFinance from './pages/AdminFinance'
 import AdminEvents from './pages/AdminEvents'
+import AdminCustomerSupport from './pages/AdminCustomerSupport'
+import AdminRoleAccess from './pages/AdminRoleAccess'
 import EventWorkspace from './pages/EventWorkspace'
+import { DASHBOARD_KEYS } from './utils/employeeAccess'
 import IdentityBackgroundPage from './pages/onboarding/IdentityBackgroundPage'
 import PersonalityLifestylePage from './pages/onboarding/PersonalityLifestylePage'
 import FaithOnboardingPage from './pages/onboarding/FaithOnboardingPage'
@@ -128,13 +131,13 @@ export default function App() {
         } />
 
         <Route path="/admin" element={
-          <ProtectedRoute adminOnly>
+          <ProtectedRoute adminOnly dashboardKey={DASHBOARD_KEYS.DASHBOARD}>
             <AdminDashboard />
           </ProtectedRoute>
         } />
 
         <Route path="/admin/questions" element={
-          <ProtectedRoute adminOnly>
+          <ProtectedRoute adminOnly dashboardKey={DASHBOARD_KEYS.QUESTIONS}>
             <AdminQuestions />
           </ProtectedRoute>
         } />
@@ -151,7 +154,7 @@ export default function App() {
         <Route
           path="/admin/media"
           element={
-            <ProtectedRoute adminOnly={true}>
+            <ProtectedRoute adminOnly dashboardKey={DASHBOARD_KEYS.MODERATION}>
               <AdminMediaModeration />
             </ProtectedRoute>
           }
@@ -160,27 +163,39 @@ export default function App() {
         <Route
           path="/admin/identity-documents"
           element={
-            <ProtectedRoute adminOnly={true}>
+            <ProtectedRoute adminOnly dashboardKey={DASHBOARD_KEYS.IDENTITY_DOCS}>
               <AdminIdentityDocuments />
             </ProtectedRoute>
           }
         />
 
       <Route path="/admin/finance" element={
-        <ProtectedRoute adminOnly>
+        <ProtectedRoute adminOnly dashboardKey={DASHBOARD_KEYS.FINANCE}>
           <AdminFinance />
         </ProtectedRoute>
       } />
 
         <Route path="/admin/plans" element={
-          <ProtectedRoute adminOnly>
+          <ProtectedRoute adminOnly dashboardKey={DASHBOARD_KEYS.PLANS}>
             <AdminPlans />
           </ProtectedRoute>
         } />
 
         <Route path="/admin/events" element={
-          <ProtectedRoute adminOnly>
+          <ProtectedRoute adminOnly dashboardKey={DASHBOARD_KEYS.EVENTS}>
             <AdminEvents />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/admin/customer-support" element={
+          <ProtectedRoute adminOnly dashboardKey={DASHBOARD_KEYS.CUSTOMER_SUPPORT}>
+            <AdminCustomerSupport />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/admin/access" element={
+          <ProtectedRoute adminOnly dashboardKey={DASHBOARD_KEYS.ROLE_ACCESS}>
+            <AdminRoleAccess />
           </ProtectedRoute>
         } />
 

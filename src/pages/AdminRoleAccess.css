@@ -1,0 +1,296 @@
+.admin-access-page {
+  flex: 1 0 auto;
+  min-height: 0;
+  background: linear-gradient(180deg, #f5f3ff 0%, #fdf2f8 45%, #f8fafc 100%);
+  padding-bottom: 24px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1e293b;
+}
+
+.admin-access-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
+.admin-access-header {
+  margin-bottom: 20px;
+}
+
+.admin-access-header .breadcrumb-tag {
+  font-size: 13px;
+  font-weight: 600;
+  color: #7c3aed;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.admin-access-header h1 {
+  font-size: 30px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.5px;
+}
+
+.admin-access-header p,
+.admin-access-loading {
+  color: #64748b;
+  font-size: 14px;
+  margin: 0;
+}
+
+.admin-access-alert {
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.admin-access-alert.error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.admin-access-alert.success {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.admin-access-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.admin-access-card h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.admin-access-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.admin-access-card-head .admin-access-hint {
+  margin-bottom: 0;
+}
+
+.admin-access-hint {
+  margin: 0 0 14px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.admin-access-dirty {
+  margin: 0 0 12px;
+  color: #b45309;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-access-form {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1.2fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.admin-access-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.admin-access-form input,
+.admin-access-form select,
+.admin-access-table select {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #fff;
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-access-matrix-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.btn-access-primary,
+.btn-access-secondary {
+  border: none;
+  border-radius: 24px;
+  padding: 11px 18px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.btn-access-primary {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+}
+
+.btn-access-primary:disabled,
+.btn-access-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-access-secondary {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.admin-access-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-access-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 720px;
+}
+
+.admin-access-table.matrix {
+  min-width: 980px;
+}
+
+.admin-access-table th,
+.admin-access-table td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 10px 8px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-access-table th {
+  color: #64748b;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.admin-access-email {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-access-table.matrix th,
+.admin-access-table.matrix td {
+  text-align: center;
+}
+
+.admin-access-table.matrix th:first-child,
+.admin-access-table.matrix td:first-child {
+  text-align: left;
+  min-width: 180px;
+  position: sticky;
+  left: 0;
+  background: #ffffff;
+  z-index: 1;
+}
+
+.matrix-cell input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.admin-access-locked {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-access-pill {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-access-pill.is-yes {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.admin-access-pill.is-no {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+@media (max-width: 960px) {
+  .admin-access-container {
+    padding: 20px 16px;
+  }
+
+  .admin-access-header h1 {
+    font-size: 24px;
+  }
+
+  .admin-access-form {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-access-card-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-access-matrix-actions {
+    width: 100%;
+  }
+
+  .admin-access-matrix-actions .btn-access-primary,
+  .admin-access-matrix-actions .btn-access-secondary {
+    flex: 1;
+    text-align: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-access-card {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .admin-access-table {
+    font-size: 12px;
+  }
+
+  .admin-access-table th,
+  .admin-access-table td {
+    padding: 8px 6px;
+  }
+}

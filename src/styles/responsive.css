@@ -27,6 +27,8 @@ iframe {
   .admin-finance-header,
   .admin-questions-header,
   .admin-moderation-header,
+  .admin-access-header,
+  .admin-cs-header,
   .ms-header {
     flex-wrap: wrap;
     gap: 12px;
@@ -36,7 +38,9 @@ iframe {
   .admin-events-header h1,
   .admin-plans-header h1,
   .admin-finance-header h1,
-  .admin-questions-header h1 {
+  .admin-questions-header h1,
+  .admin-access-header h1,
+  .admin-cs-header h1 {
     font-size: 26px;
   }
 
@@ -156,7 +160,9 @@ iframe {
   .admin-questions-container,
   .admin-plans-container,
   .admin-finance-container,
-  .admin-moderation-container {
+  .admin-moderation-container,
+  .admin-access-container,
+  .admin-cs-container {
     padding: 16px 14px 24px;
   }
 
@@ -309,7 +315,9 @@ iframe {
   .admin-events-header,
   .admin-plans-header,
   .admin-finance-header,
-  .admin-moderation-header {
+  .admin-moderation-header,
+  .admin-access-header,
+  .admin-cs-header {
     flex-direction: column;
     align-items: stretch;
   }
@@ -318,7 +326,9 @@ iframe {
   .admin-events-header h1,
   .admin-plans-header h1,
   .admin-finance-header h1,
-  .admin-questions-header h1 {
+  .admin-questions-header h1,
+  .admin-access-header h1,
+  .admin-cs-header h1 {
     font-size: 22px;
   }
 

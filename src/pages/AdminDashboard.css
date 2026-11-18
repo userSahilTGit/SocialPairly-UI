@@ -336,13 +336,13 @@
 }
 
 .badge-subscribed {
-    background: #ede9fe;
-    color: #7c3aed;
+    background: #dcfce7;
+    color: #15803d;
 }
 
 .badge-unsubscribed {
-    background: #f1f5f9;
-    color: #64748b;
+    background: #fee2e2;
+    color: #b91c1c;
 }
 
 .alert {

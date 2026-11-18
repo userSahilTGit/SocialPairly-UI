@@ -1,3 +1,5 @@
+import { firstAdminPath } from './employeeAccess'
+
 /** Normalize API / cached user shapes so verification flags are reliable. */
 export function normalizeUser(raw) {
   if (!raw) return null
@@ -13,6 +15,12 @@ export function normalizeUser(raw) {
     || raw.identityPage1Complete === 'true'
     || raw.identity_page1_complete === true
 
+  const allowedDashboards = Array.isArray(raw.allowedDashboards)
+    ? raw.allowedDashboards
+    : Array.isArray(raw.allowed_dashboards)
+      ? raw.allowed_dashboards
+      : undefined
+
   return {
     ...raw,
     firstName,
@@ -24,6 +32,9 @@ export function normalizeUser(raw) {
     identityPage1Complete,
     onboardingStep: raw.onboardingStep ?? raw.onboarding_step ?? null,
     userTokens: Number(raw.userTokens ?? raw.user_tokens ?? 0),
+    employeeRole: raw.employeeRole ?? raw.employee_role ?? null,
+    // undefined = legacy/cache before /users/me enrichment (treat as full employee access)
+    allowedDashboards,
   }
 }
 
@@ -35,7 +46,7 @@ export function userNeedsIdentityOnboarding(user) {
 /** Destination after signup/login based on role + identity onboarding. */
 export function postAuthPath(user) {
   if (!user) return '/signin'
-  if (user.role === 'ADMIN') return '/admin'
+  if (user.role === 'ADMIN') return firstAdminPath(user)
   if (userNeedsIdentityOnboarding(user)) return '/onboarding/identity'
   return '/'
 }

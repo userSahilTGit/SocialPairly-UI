@@ -4,6 +4,7 @@ import { Menu, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { BrandMark, LoggedInBrandName } from './AuthBrandAssets'
 import ThemeToggle from './ThemeToggle'
+import { getEmployeeNavItems, isEmployeeUser } from '../utils/employeeAccess'
 
 export default function Navbar() {
     const { user, logout } = useAuth()
@@ -89,27 +90,22 @@ export default function Navbar() {
                     </button>
                 </div>
                 <div id="primary-nav" className={`nav-links ${menuOpen ? 'is-open' : ''}`}>
-                    {user?.role !== 'ADMIN' && (
+                    {!isEmployeeUser(user) && (
                         <NavLink to="/">Home</NavLink>
                     )}
-                    {user?.role !== 'ADMIN' && (
+                    {!isEmployeeUser(user) && (
                         <NavLink to="/subscriptions">Subscription</NavLink>
                     )}
-                    {user?.role === 'ADMIN' && (
-                        <>
-                            <NavLink to="/admin" end>Dashboard</NavLink>
-                            <NavLink to="/admin/questions">Questions</NavLink>
-                            <NavLink to="/admin/media" className={({ isActive }) => isActive ? 'nav-active' : ''}>
-                                🛡️ Moderation Center
-                            </NavLink>
-                            <NavLink to="/admin/identity-documents" className={({ isActive }) => isActive ? 'nav-active' : ''}>
-                                Identity Docs
-                            </NavLink>
-                            <NavLink to="/admin/plans">Plan & Subscriptions</NavLink>
-                            <NavLink to="/admin/events">Events & Groups</NavLink>
-                            <NavLink to="/admin/finance">Finance</NavLink>
-                        </>
-                    )}
+                    {isEmployeeUser(user) && getEmployeeNavItems(user).map((item) => (
+                        <NavLink
+                            key={item.key}
+                            to={item.path}
+                            end={item.end === true}
+                            className={({ isActive }) => (isActive ? 'nav-active' : undefined)}
+                        >
+                            {item.label}
+                        </NavLink>
+                    ))}
 
                     <div className="nav-theme-desktop">
                         <ThemeToggle />
