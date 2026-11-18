@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronRight, Eye, EyeOff, Headphones, Images, Shield, Trash2, UserRound, X } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import SiteFooter from '../components/SiteFooter'
 import { useAuth } from '../context/AuthContext'
@@ -81,6 +81,7 @@ function PasswordInput({
 export default function Settings() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [deleteStep, setDeleteStep] = useState('send') // 'send' | 'otp'
   const [deleteOtp, setDeleteOtp] = useState('')
@@ -105,6 +106,15 @@ export default function Settings() {
   const [otpVerifying, setOtpVerifying] = useState(false)
   const [codeVerified, setCodeVerified] = useState(false)
   const [securityInfo, setSecurityInfo] = useState('')
+
+  useEffect(() => {
+    if (location.hash !== '#support') return
+    const el = document.getElementById('support')
+    if (!el) return
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [location.hash])
 
   const openDeleteModal = () => {
     setDeleteStep('send')
@@ -326,7 +336,7 @@ export default function Settings() {
             </div>
           </section>
 
-          <section className="settings-section" aria-labelledby="settings-support-heading">
+          <section id="support" className="settings-section" aria-labelledby="settings-support-heading">
             <h2 id="settings-support-heading">Support</h2>
             <div className="settings-group">
               <SettingsRow
