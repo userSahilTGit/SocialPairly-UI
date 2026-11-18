@@ -315,6 +315,8 @@
 [data-theme="dark"] .admin-finance-page,
 [data-theme="dark"] .admin-events-page,
 [data-theme="dark"] .admin-moderation-page,
+[data-theme="dark"] .admin-access-page,
+[data-theme="dark"] .admin-cs-page,
 [data-theme="dark"] .event-workspace-page,
 [data-theme="dark"] .user-home-page,
 [data-theme="dark"] .subscriptions-page,
@@ -325,8 +327,16 @@
   color: var(--text);
 }
 
-[data-theme="dark"] .breadcrumb-tag {
-  color: var(--color-brand500);
+[data-theme="dark"] .breadcrumb-tag,
+[data-theme="dark"] .admin-access-header .breadcrumb-tag,
+[data-theme="dark"] .admin-cs-header .breadcrumb-tag,
+[data-theme="dark"] .admin-dashboard-header .breadcrumb-tag,
+[data-theme="dark"] .admin-plans-header .breadcrumb-tag,
+[data-theme="dark"] .admin-questions-header .breadcrumb-tag,
+[data-theme="dark"] .admin-finance-header .breadcrumb-tag,
+[data-theme="dark"] .admin-events-header .breadcrumb-tag,
+[data-theme="dark"] .admin-moderation-header .breadcrumb-tag {
+  color: var(--color-brand500) !important;
 }
 
 [data-theme="dark"] .admin-dashboard-header h1,
@@ -335,6 +345,9 @@
 [data-theme="dark"] .admin-finance-header h1,
 [data-theme="dark"] .admin-events-header h1,
 [data-theme="dark"] .admin-moderation-header h1,
+[data-theme="dark"] .admin-access-header h1,
+[data-theme="dark"] .admin-access-card h2,
+[data-theme="dark"] .admin-cs-header h1,
 [data-theme="dark"] .subscribed-users-header h2,
 [data-theme="dark"] .dashboard-section-title,
 [data-theme="dark"] .dashboard-chart-card h3,
@@ -350,6 +363,10 @@
 [data-theme="dark"] .admin-questions-header p,
 [data-theme="dark"] .admin-finance-header p,
 [data-theme="dark"] .admin-events-header p,
+[data-theme="dark"] .admin-access-header p,
+[data-theme="dark"] .admin-access-hint,
+[data-theme="dark"] .admin-access-loading,
+[data-theme="dark"] .admin-cs-header p,
 [data-theme="dark"] .stat-label,
 [data-theme="dark"] .dashboard-loading {
   color: #94a3b8;
@@ -378,11 +395,78 @@
 [data-theme="dark"] .plans-table-wrapper,
 [data-theme="dark"] .empty-state,
 [data-theme="dark"] .loading-state,
-[data-theme="dark"] .events-stat-card {
+[data-theme="dark"] .events-stat-card,
+[data-theme="dark"] .admin-access-card,
+[data-theme="dark"] .admin-cs-placeholder {
   background: var(--card);
   border-color: var(--border);
   color: var(--text);
   box-shadow: none;
+}
+
+[data-theme="dark"] .admin-access-form label {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .admin-access-form input,
+[data-theme="dark"] .admin-access-form select,
+[data-theme="dark"] .admin-access-table select {
+  background: var(--bg-elevated, #0f172a);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+[data-theme="dark"] .admin-access-table th {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .admin-access-table th,
+[data-theme="dark"] .admin-access-table td {
+  border-bottom-color: var(--border);
+  color: var(--text);
+}
+
+[data-theme="dark"] .admin-access-table.matrix th:first-child,
+[data-theme="dark"] .admin-access-table.matrix td:first-child {
+  background: var(--card);
+}
+
+[data-theme="dark"] .btn-access-primary {
+  background: var(--gradient-brand-btn);
+  box-shadow: 0 4px 14px rgba(192, 38, 211, 0.35);
+}
+
+[data-theme="dark"] .btn-access-secondary {
+  background: #1a2236;
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .admin-access-alert.error {
+  background: rgba(248, 113, 113, 0.12);
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+[data-theme="dark"] .admin-access-alert.success {
+  background: rgba(74, 222, 128, 0.12);
+  color: #bbf7d0;
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+[data-theme="dark"] .admin-access-dirty {
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .admin-access-locked {
+  color: #64748b;
+}
+
+[data-theme="dark"] .admin-cs-placeholder h2 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .admin-cs-placeholder p {
+  color: #94a3b8;
 }
 
 [data-theme="dark"] .icon-purple,
@@ -458,18 +542,17 @@
 }
 [data-theme="dark"] .badge-yes,
 [data-theme="dark"] .badge-active,
-[data-theme="dark"] .badge-subscribed {
+[data-theme="dark"] .badge-subscribed,
+[data-theme="dark"] .admin-access-pill.is-yes {
   background: rgba(34, 197, 94, 0.16);
   color: #86efac;
 }
 [data-theme="dark"] .badge-no,
-[data-theme="dark"] .badge-inactive {
+[data-theme="dark"] .badge-inactive,
+[data-theme="dark"] .badge-unsubscribed,
+[data-theme="dark"] .admin-access-pill.is-no {
   background: rgba(244, 63, 94, 0.16);
   color: #fda4af;
-}
-[data-theme="dark"] .badge-unsubscribed {
-  background: #1a2236;
-  color: #94a3b8;
 }
 
 [data-theme="dark"] .alert-error {
@@ -1083,7 +1166,6 @@
 }
 
 [data-theme="dark"] .badge-admin,
-[data-theme="dark"] .badge-subscribed,
 [data-theme="dark"] .badge-type {
   background: rgba(217, 70, 239, 0.14);
   color: #f0abfc;
@@ -1098,6 +1180,7 @@
 }
 [data-theme="dark"] .badge-yes,
 [data-theme="dark"] .badge-active,
+[data-theme="dark"] .badge-subscribed,
 [data-theme="dark"] .refund-row-status-complete,
 [data-theme="dark"] .payment-status-succeeded,
 [data-theme="dark"] .events-status-badge.published,
@@ -1115,6 +1198,7 @@
 }
 [data-theme="dark"] .badge-no,
 [data-theme="dark"] .badge-inactive,
+[data-theme="dark"] .badge-unsubscribed,
 [data-theme="dark"] .refund-row-status-rejected,
 [data-theme="dark"] .payment-status-failed,
 [data-theme="dark"] .events-rsvp-badge.declined,
@@ -1126,7 +1210,6 @@
   border-color: rgba(251, 113, 133, 0.5);
   box-shadow: 0 0 16px -3px rgba(244, 63, 94, 0.5);
 }
-[data-theme="dark"] .badge-unsubscribed,
 [data-theme="dark"] .events-rsvp-badge.pending {
   background: rgba(148, 163, 184, 0.1);
   color: #cbd5e1;

@@ -261,7 +261,7 @@ export default function AdminDashboard() {
                                             <td className="col-phone" title={u.phoneNumber || ''}>{u.phoneNumber}</td>
                                             <td className="col-role">
                                                 <span className={`dashboard-badge ${u.role === 'ADMIN' ? 'badge-admin' : 'badge-user'}`}>
-                                                    {u.role}
+                                                    {u.employeeRole || u.role}
                                                 </span>
                                             </td>
                                             <td className="col-profile">
@@ -270,8 +270,8 @@ export default function AdminDashboard() {
                                                 </span>
                                             </td>
                                             <td className="col-subscription">
-                                                <span className={`dashboard-badge ${u.subscriptionDetails === 'Subscribed' ? 'badge-subscribed' : 'badge-unsubscribed'}`}>
-                                                    {u.subscriptionDetails || 'Unsubscribed'}
+                                                <span className={`dashboard-badge ${u.subscriptionDetails === 'Subscribed' ? 'badge-yes' : 'badge-no'}`}>
+                                                    {u.subscriptionDetails === 'Subscribed' ? 'Yes' : 'No'}
                                                 </span>
                                             </td>
                                             <td className="col-joined">{formatJoinedDate(u.createdAt)}</td>

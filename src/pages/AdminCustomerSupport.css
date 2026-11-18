@@ -1,0 +1,62 @@
+.admin-cs-page {
+  flex: 1 0 auto;
+  min-height: 0;
+  background: linear-gradient(180deg, #f5f3ff 0%, #fdf2f8 45%, #f8fafc 100%);
+  padding-bottom: 24px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1e293b;
+}
+
+.admin-cs-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
+.admin-cs-header {
+  margin-bottom: 24px;
+}
+
+.admin-cs-header .breadcrumb-tag {
+  font-size: 13px;
+  font-weight: 600;
+  color: #7c3aed;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.admin-cs-header h1 {
+  font-size: 30px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.5px;
+}
+
+.admin-cs-header p {
+  color: #64748b;
+  font-size: 14px;
+  margin: 0;
+}
+
+.admin-cs-placeholder {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 32px 28px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.admin-cs-placeholder h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  color: #0f172a;
+}
+
+.admin-cs-placeholder p {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.6;
+  max-width: 62ch;
+}
