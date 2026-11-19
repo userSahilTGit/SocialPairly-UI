@@ -16,6 +16,12 @@ dist-ssr
 !.env.example
 coverage/
 
+# Playwright smoke
+playwright-report/
+test-results/
+blob-report/
+e2e/smoke/.auth/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

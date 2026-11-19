@@ -10,7 +10,11 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:smoke": "playwright test",
+    "test:smoke:api": "playwright test --project=api-smoke",
+    "test:smoke:ui": "playwright test --project=ui-smoke",
+    "test:smoke:report": "playwright show-report"
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.5",
@@ -27,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
