@@ -18,6 +18,7 @@ import {
 
 const MAX_MEDIA_SLOTS = 6
 const MAX_VIDEO_DURATION_SEC = 45
+const MAX_VIDEO_SIZE_BYTES = 5 * 1024 * 1024
 const MEDIA_CATEGORIES = ['FULL_LENGTH', 'PRIMARY', 'LIFESTYLE', 'HOBBY']
 const DEFAULT_CATEGORY = 'FULL_LENGTH'
 const PRIVACY_OPTIONS = ['PUBLIC', 'MUTUAL_ONLY']
@@ -190,7 +191,12 @@ export default function ProfileMediaPage() {
     try {
       await api.post('/media/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (event) => {
+          if (!event.total) return
+          setUploadProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)))
+        },
       })
+      setUploadProgress(100)
       return true
     } catch (err) {
       setError(err.response?.data?.message || `Failed to upload ${file.name}`)
@@ -224,23 +230,33 @@ export default function ProfileMediaPage() {
     })
 
     if (videos.length > 0) {
+      const videoFile = videos[0]
+      if (videoFile.type && videoFile.type !== 'video/mp4') {
+        setError('Please upload MP4 video only so it plays correctly after upload.')
+        return
+      }
+      if (videoFile.size > MAX_VIDEO_SIZE_BYTES) {
+        setError(`Video "${videoFile.name}" exceeds the 5MB limit.`)
+        return
+      }
       try {
-        const duration = await getVideoDuration(videos[0])
+        const duration = await getVideoDuration(videoFile)
         if (duration > MAX_VIDEO_DURATION_SEC) {
-          setError(`Video "${videos[0].name}" is ${Math.round(duration)}s — maximum is ${MAX_VIDEO_DURATION_SEC}s.`)
+          setError(`Video "${videoFile.name}" is ${Math.round(duration)}s — maximum is ${MAX_VIDEO_DURATION_SEC}s.`)
           return
         }
       } catch (durationErr) {
         setError(durationErr.message)
         return
       }
-      setPendingVideoFile(videos[0])
+      setPendingVideoFile(videoFile)
       setShowPromptSelect(true)
       return
     }
 
     let uploaded = 0
     setUploading(true)
+    setUploadProgress(0)
     for (const file of images) {
       if (await doUpload(file)) {
         uploaded++
@@ -262,6 +278,7 @@ export default function ProfileMediaPage() {
     const file = pendingVideoFile
     setPendingVideoFile(null)
     setUploading(true)
+    setUploadProgress(0)
     const uploaded = await doUpload(file)
     setUploading(false)
     setUploadProgress(0)
@@ -365,6 +382,12 @@ export default function ProfileMediaPage() {
     if (!myMedia[index]) return
     setSelectedSlotIndex(index)
     setPreviewIndex(index)
+  }
+
+  const openMediaPreview = (item, e) => {
+    e?.stopPropagation?.()
+    if (!item) return
+    setActiveMedia(item)
   }
 
   const nextPreview = () => {
@@ -550,7 +573,7 @@ export default function ProfileMediaPage() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*,video/*"
+                    accept="image/*,video/mp4"
                     multiple
                     onChange={handleFileSelect}
                     className="hidden"
@@ -569,7 +592,7 @@ export default function ProfileMediaPage() {
                         <Camera className="w-8 h-8" />
                       </div>
                       <h3>Drag & drop photos or video clips here</h3>
-                      <p>High quality JPG, PNG or MP4 videos (Max 15MB each)</p>
+                      <p>High quality JPG, PNG or MP4 videos (Max 5MB each)</p>
                       <div className="ms-drop-actions" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
@@ -625,9 +648,16 @@ export default function ProfileMediaPage() {
                             <img src={getMediaUrl(item)} alt="" />
                           ) : (
                             <>
-                              <video src={getMediaUrl(item)} muted />
+                              <video src={getMediaUrl(item)} muted preload="metadata" playsInline />
                               <span className="ms-video-badge"><Video className="w-3 h-3" /> Video</span>
-                              <span className="ms-play"><Play className="w-4 h-4" fill="currentColor" /></span>
+                              <button
+                                type="button"
+                                className="ms-play"
+                                aria-label="Play video"
+                                onClick={(e) => openMediaPreview(item, e)}
+                              >
+                                <Play className="w-4 h-4" fill="currentColor" />
+                              </button>
                             </>
                           )}
                           {idx === 0 && (
@@ -904,7 +934,16 @@ export default function ProfileMediaPage() {
                   activePreview.mediaType === 'PHOTO' ? (
                     <img src={getMediaUrl(activePreview)} alt="" className="ms-phone-bg" />
                   ) : (
-                    <video src={getMediaUrl(activePreview)} className="ms-phone-bg" muted autoPlay loop playsInline />
+                    <video
+                      src={getMediaUrl(activePreview)}
+                      className="ms-phone-bg"
+                      muted
+                      autoPlay
+                      loop
+                      playsInline
+                      preload="metadata"
+                      onClick={() => openMediaPreview(activePreview)}
+                    />
                   )
                 ) : (
                   <div className="ms-phone-empty">

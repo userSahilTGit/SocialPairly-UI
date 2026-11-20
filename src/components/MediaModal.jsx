@@ -88,11 +88,14 @@ const MediaModal = ({ activeMedia, mediaList, onClose, onNavigate }) => {
       >
         {isVideoMedia ? (
           <video 
-            src={mediaSrc} 
+            key={mediaSrc}
             controls 
-            autoPlay 
+            autoPlay
+            playsInline
+            preload="auto"
             className="max-h-[85vh] max-w-[90vw] rounded-lg shadow-2xl"
           >
+            <source src={mediaSrc} type="video/mp4" />
             Your browser does not support the video tag.
           </video>
         ) : (

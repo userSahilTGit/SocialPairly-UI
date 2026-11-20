@@ -130,50 +130,111 @@ export function ScheduleSlotModal({ open, onClose, onSubmit, loading }) {
   )
 }
 
+const EMPTY_BANK_FORM = {
+  accountHolderName: '',
+  bankName: '',
+  accountNumber: '',
+  accountType: '',
+  abaRoutingNumber: '',
+  recipientsAddress: '',
+}
+
+const ACCOUNT_TYPE_OPTIONS = ['Checking', 'Savings', 'Business Checking', 'Business Savings']
+
+function validateBankDetailsForm(form) {
+  const errors = {}
+  const accountHolderName = form.accountHolderName.trim()
+  const bankName = form.bankName.trim()
+  const accountNumber = form.accountNumber.trim()
+  const accountType = form.accountType.trim()
+  const abaRoutingNumber = form.abaRoutingNumber.trim().toUpperCase()
+  const recipientsAddress = form.recipientsAddress.trim()
+
+  if (!accountHolderName) {
+    errors.accountHolderName = 'Account holder full name is required'
+  } else if (!/^[A-Za-z][A-Za-z .'-]{1,253}$/.test(accountHolderName)) {
+    errors.accountHolderName = 'Enter a valid name using letters only'
+  }
+
+  if (!bankName) {
+    errors.bankName = 'Banking institution name is required'
+  } else if (bankName.length < 2) {
+    errors.bankName = 'Enter a valid banking institution name'
+  }
+
+  if (!accountNumber) {
+    errors.accountNumber = 'Account number is required'
+  } else if (!/^\d{6,18}$/.test(accountNumber)) {
+    errors.accountNumber = 'Account number must be 6 to 18 digits'
+  }
+
+  if (!accountType) {
+    errors.accountType = 'Account type is required'
+  } else if (!ACCOUNT_TYPE_OPTIONS.includes(accountType)) {
+    errors.accountType = 'Select a valid account type'
+  }
+
+  if (!abaRoutingNumber) {
+    errors.abaRoutingNumber = 'IFSC / routing code is required'
+  } else if (!/^[A-Z0-9]{6,20}$/.test(abaRoutingNumber)) {
+    errors.abaRoutingNumber = 'Enter a valid IFSC or routing code (6–20 letters/numbers)'
+  }
+
+  if (!recipientsAddress) {
+    errors.recipientsAddress = "Recipient's address is required"
+  } else if (recipientsAddress.length < 10) {
+    errors.recipientsAddress = 'Enter a complete address including city and postal code'
+  }
+
+  return {
+    errors,
+    isValid: Object.keys(errors).length === 0,
+    cleaned: {
+      accountHolderName,
+      bankName,
+      accountNumber,
+      accountType,
+      abaRoutingNumber,
+      recipientsAddress,
+    },
+  }
+}
+
 export function BankDetailsModal({ open, onClose, onSubmit, loading }) {
-  const [form, setForm] = useState({
-    accountHolderName: '',
-    bankName: '',
-    accountNumber: '',
-    accountType: '',
-    abaRoutingNumber: '',
-    recipientsAddress: '',
-  })
+  const [form, setForm] = useState({ ...EMPTY_BANK_FORM })
+  const [errors, setErrors] = useState({})
+  const [touched, setTouched] = useState(false)
 
   useEffect(() => {
     if (!open) {
-      setForm({
-        accountHolderName: '',
-        bankName: '',
-        accountNumber: '',
-        accountType: '',
-        abaRoutingNumber: '',
-        recipientsAddress: '',
-      })
+      setForm({ ...EMPTY_BANK_FORM })
+      setErrors({})
+      setTouched(false)
     }
   }, [open])
 
   const updateField = (field) => (e) => {
-    setForm((prev) => ({ ...prev, [field]: e.target.value }))
+    const value = e.target.value
+    setForm((prev) => ({ ...prev, [field]: value }))
+    if (touched) {
+      setErrors(validateBankDetailsForm({ ...form, [field]: value }).errors)
+    }
   }
 
-  const isValid = form.accountHolderName && form.bankName && form.accountNumber
-    && form.accountType && form.abaRoutingNumber && form.recipientsAddress
+  const { isValid } = validateBankDetailsForm(form)
 
   const handleSubmit = () => {
-    if (!isValid) return
-    onSubmit(form)
+    setTouched(true)
+    const result = validateBankDetailsForm(form)
+    setErrors(result.errors)
+    if (!result.isValid) return
+    onSubmit(result.cleaned)
   }
 
   const handleClose = () => {
-    setForm({
-      accountHolderName: '',
-      bankName: '',
-      accountNumber: '',
-      accountType: '',
-      abaRoutingNumber: '',
-      recipientsAddress: '',
-    })
+    setForm({ ...EMPTY_BANK_FORM })
+    setErrors({})
+    setTouched(false)
     onClose()
   }
 
@@ -191,75 +252,107 @@ export function BankDetailsModal({ open, onClose, onSubmit, loading }) {
           </div>
           <div>
             <h3>Settlement Account Details</h3>
-            <p>Submit verified banking details to receive your approved disbursement.</p>
+            <p>Submit verified banking details to receive your approved disbursement. All fields are required.</p>
           </div>
         </div>
         <div className="refund-modal-body">
-          <label htmlFor="account-holder">Account Holder Full Name</label>
+          <label htmlFor="account-holder">Account Holder Full Name <span className="refund-required-marker" aria-hidden="true">*</span></label>
           <input
             id="account-holder"
             type="text"
             value={form.accountHolderName}
             onChange={updateField('accountHolderName')}
             placeholder="e.g. Sahil Tanwar"
+            aria-required="true"
+            aria-invalid={!!errors.accountHolderName}
+            className={errors.accountHolderName ? 'refund-input-error' : undefined}
+            maxLength={255}
           />
-          <label htmlFor="bank-name">Banking Institution Name</label>
+          {errors.accountHolderName && <span className="field-error">{errors.accountHolderName}</span>}
+
+          <label htmlFor="bank-name">Banking Institution Name <span className="refund-required-marker" aria-hidden="true">*</span></label>
           <input
             id="bank-name"
             type="text"
             value={form.bankName}
             onChange={updateField('bankName')}
             placeholder="e.g. Chase Bank / HDFC Bank"
+            aria-required="true"
+            aria-invalid={!!errors.bankName}
+            className={errors.bankName ? 'refund-input-error' : undefined}
+            maxLength={100}
           />
+          {errors.bankName && <span className="field-error">{errors.bankName}</span>}
+
           <div className="refund-form-row">
             <div>
-              <label htmlFor="account-number">Account Number</label>
+              <label htmlFor="account-number">Account Number <span className="refund-required-marker" aria-hidden="true">*</span></label>
               <input
                 id="account-number"
                 type="text"
+                inputMode="numeric"
                 value={form.accountNumber}
                 onChange={updateField('accountNumber')}
                 placeholder="9876543210"
+                aria-required="true"
+                aria-invalid={!!errors.accountNumber}
+                className={errors.accountNumber ? 'refund-input-error' : undefined}
+                maxLength={18}
               />
+              {errors.accountNumber && <span className="field-error">{errors.accountNumber}</span>}
             </div>
             <div>
-              <label htmlFor="account-type">Account Type</label>
+              <label htmlFor="account-type">Account Type <span className="refund-required-marker" aria-hidden="true">*</span></label>
               <select
                 id="account-type"
                 value={form.accountType}
                 onChange={updateField('accountType')}
+                aria-required="true"
+                aria-invalid={!!errors.accountType}
+                className={errors.accountType ? 'refund-input-error' : undefined}
               >
                 <option value="">Select account type</option>
-                <option value="Checking">Checking</option>
-                <option value="Savings">Savings</option>
-                <option value="Business Checking">Business Checking</option>
-                <option value="Business Savings">Business Savings</option>
+                {ACCOUNT_TYPE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
               </select>
+              {errors.accountType && <span className="field-error">{errors.accountType}</span>}
             </div>
           </div>
-          <label htmlFor="routing-code">IFSC / Routing Code</label>
+
+          <label htmlFor="routing-code">IFSC / Routing Code <span className="refund-required-marker" aria-hidden="true">*</span></label>
           <input
             id="routing-code"
             type="text"
             value={form.abaRoutingNumber}
             onChange={updateField('abaRoutingNumber')}
             placeholder="CHAS000123"
+            aria-required="true"
+            aria-invalid={!!errors.abaRoutingNumber}
+            className={errors.abaRoutingNumber ? 'refund-input-error' : undefined}
+            maxLength={20}
           />
-          <label htmlFor="recipients-address">Recipient&apos;s Address</label>
+          {errors.abaRoutingNumber && <span className="field-error">{errors.abaRoutingNumber}</span>}
+
+          <label htmlFor="recipients-address">Recipient&apos;s Address <span className="refund-required-marker" aria-hidden="true">*</span></label>
           <textarea
             id="recipients-address"
             value={form.recipientsAddress}
             onChange={updateField('recipientsAddress')}
             placeholder="Street address, city, state, ZIP / postal code"
             rows={3}
+            aria-required="true"
+            aria-invalid={!!errors.recipientsAddress}
+            className={errors.recipientsAddress ? 'refund-input-error' : undefined}
           />
+          {errors.recipientsAddress && <span className="field-error">{errors.recipientsAddress}</span>}
         </div>
         <div className="refund-modal-footer refund-modal-footer-single">
           <button
             type="button"
             className="btn-refund-bank-submit"
             onClick={handleSubmit}
-            disabled={loading || !isValid}
+            disabled={loading || (touched && !isValid)}
           >
             {loading ? 'Submitting...' : 'Submit Settlement Details'}
           </button>

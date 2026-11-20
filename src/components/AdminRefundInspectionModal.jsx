@@ -124,7 +124,7 @@ export default function AdminRefundInspectionModal({
                 disabled={disableRequestCall}
               >
                 <i className="fa-solid fa-phone" />
-                Request Call
+                Request Slot
               </button>
               <button
                 type="button"

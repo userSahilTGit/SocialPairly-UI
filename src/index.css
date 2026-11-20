@@ -5332,6 +5332,11 @@ button.ob-status-chip { cursor: pointer; }
   display: grid;
   place-items: center;
   color: #fff;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  z-index: 2;
 }
 .ms-slot-footer {
   position: absolute;
@@ -6577,6 +6582,74 @@ button.ob-status-chip { cursor: pointer; }
 }
 
 .sp-muted { color: #94a3b8; font-size: 0.875rem; margin: 0; }
+
+.sp-prompt-empty {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.sp-prompt-editor {
+  width: min(560px, 92vw);
+  background: #fff;
+  border-radius: 1.1rem;
+  padding: 1.25rem;
+  box-shadow: 0 25px 50px rgba(15, 23, 42, 0.25);
+}
+
+.sp-prompt-editor-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.sp-prompt-editor-head h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+
+.sp-prompt-editor-head p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.sp-prompt-editor-body {
+  display: grid;
+  gap: 0.85rem;
+  max-height: min(55vh, 420px);
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+
+.sp-prompt-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.sp-prompt-field span {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sp-prompt-field textarea,
+.sp-prompt-field select {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+
+.sp-prompt-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
 
 .sp-preview-overlay {
   position: fixed;
