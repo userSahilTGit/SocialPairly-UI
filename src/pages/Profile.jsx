@@ -67,6 +67,9 @@ export default function Profile() {
   const [educations, setEducations] = useState([emptyEducation])
   const [questions, setQuestions] = useState([])
   const [answers, setAnswers] = useState({})
+  const [draftAnswers, setDraftAnswers] = useState({})
+  const [editingPrompts, setEditingPrompts] = useState(false)
+  const [savingPrompts, setSavingPrompts] = useState(false)
   const [identity, setIdentity] = useState(null)
 
   const fetchUserMedia = useCallback(async () => {
@@ -173,6 +176,48 @@ export default function Profile() {
       await Promise.all([refreshUser(), fetchUserMedia()])
     } catch (err) {
       setError(err.response?.data?.message || 'Photo upload failed')
+    }
+  }
+
+  const openPromptEditor = () => {
+    setDraftAnswers({ ...answers })
+    setEditingPrompts(true)
+    setError('')
+    setMessage('')
+  }
+
+  const handleSavePrompts = async () => {
+    if (questions.length === 0) {
+      setError('No icebreaker prompts are available yet. Please try again later.')
+      return
+    }
+    const payload = questions
+      .map((q) => ({
+        questionId: q.id,
+        answerValue: String(draftAnswers[q.id] || '').trim(),
+      }))
+      .filter((row) => row.answerValue)
+
+    if (payload.length === 0) {
+      setError('Answer at least one prompt before saving.')
+      return
+    }
+
+    setSavingPrompts(true)
+    setError('')
+    try {
+      await api.post('/questions/answers', payload)
+      const nextAnswers = { ...answers }
+      payload.forEach((row) => {
+        nextAnswers[row.questionId] = row.answerValue
+      })
+      setAnswers(nextAnswers)
+      setEditingPrompts(false)
+      setMessage('Icebreaker prompts updated')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save icebreaker prompts')
+    } finally {
+      setSavingPrompts(false)
     }
   }
 
@@ -528,12 +573,19 @@ export default function Profile() {
               <section className="sp-card">
                 <div className="sp-card-head">
                   <h2><MessageSquareQuote className="w-5 h-5 text-rose-500" /> Icebreaker Prompts</h2>
-                  <button type="button" className="sp-soft-btn rose" onClick={() => navigate('/onboarding/personality')}>
-                    <Plus className="w-3.5 h-3.5" /> Edit
+                  <button type="button" className="sp-soft-btn rose" onClick={openPromptEditor}>
+                    <Plus className="w-3.5 h-3.5" /> {answeredPrompts.length === 0 ? 'Add answers' : 'Edit'}
                   </button>
                 </div>
                 {answeredPrompts.length === 0 ? (
-                  <p className="sp-muted">No prompts answered yet.</p>
+                  <div className="sp-prompt-empty">
+                    <p className="sp-muted">
+                      Icebreaker prompts help matches start a conversation with you. Answer a few short questions so people know how to break the ice.
+                    </p>
+                    <button type="button" className="sp-text-link" onClick={openPromptEditor}>
+                      Answer prompts
+                    </button>
+                  </div>
                 ) : (
                   <div className="sp-prompts">
                     {answeredPrompts.slice(0, 4).map((q, i) => (
@@ -707,6 +759,76 @@ export default function Profile() {
         onClose={() => setActiveMedia(null)}
         onNavigate={setActiveMedia}
       />
+
+      {editingPrompts && (
+        <div className="modal-overlay active" onClick={() => !savingPrompts && setEditingPrompts(false)}>
+          <div className="sp-prompt-editor" onClick={(e) => e.stopPropagation()}>
+            <div className="sp-prompt-editor-head">
+              <div>
+                <h3>Icebreaker Prompts</h3>
+                <p>Share short answers that help others start a natural conversation with you.</p>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setEditingPrompts(false)}
+                disabled={savingPrompts}
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="sp-prompt-editor-body">
+              {questions.length === 0 ? (
+                <p className="sp-muted">No prompts are available right now. Please check back soon.</p>
+              ) : (
+                questions.map((q) => (
+                  <label key={q.id} className="sp-prompt-field">
+                    <span>{q.questionText}</span>
+                    {(q.type === 'SINGLE_CHOICE' || q.type === 'MULTI_CHOICE') && Array.isArray(q.options) && q.options.length > 0 ? (
+                      <select
+                        value={draftAnswers[q.id] || ''}
+                        onChange={(e) => setDraftAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                      >
+                        <option value="">Select an answer</option>
+                        {q.options.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <textarea
+                        rows={3}
+                        maxLength={280}
+                        value={draftAnswers[q.id] || ''}
+                        onChange={(e) => setDraftAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                        placeholder="Write a short answer"
+                      />
+                    )}
+                  </label>
+                ))
+              )}
+            </div>
+            <div className="sp-prompt-editor-footer">
+              <button
+                type="button"
+                className="sp-soft-btn purple"
+                onClick={() => setEditingPrompts(false)}
+                disabled={savingPrompts}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="sp-soft-btn rose"
+                onClick={handleSavePrompts}
+                disabled={savingPrompts || questions.length === 0}
+              >
+                {savingPrompts ? 'Saving…' : 'Save answers'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <SiteFooter />
     </>
   )

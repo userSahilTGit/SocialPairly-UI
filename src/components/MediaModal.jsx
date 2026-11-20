@@ -73,7 +73,15 @@ const MediaModal = ({ activeMedia, mediaList, onClose, onNavigate }) => {
 
       <div className="media-viewer-content">
         {isVideoMedia ? (
-          <video src={mediaSrc} controls autoPlay className="media-viewer-media">
+          <video
+            key={mediaSrc}
+            controls
+            autoPlay
+            playsInline
+            preload="auto"
+            className="media-viewer-media"
+          >
+            <source src={mediaSrc} type="video/mp4" />
             Your browser does not support the video tag.
           </video>
         ) : (

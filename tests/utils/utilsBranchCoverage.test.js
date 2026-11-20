@@ -61,6 +61,8 @@ import {
   formatAlphanumericText,
   formatLettersSpacesText,
   formatNationalityListText,
+  formatEmployerName,
+  validateEmployerName,
   blockInvalidNumberKeys,
   formatEmploymentTypeText,
   validateCareerAlphanumeric,
@@ -681,6 +683,12 @@ describe('utils comprehensive branch coverage', () => {
       expect(errs3['civilJudgment.approxYear']).toBeTruthy()
       expect(errs3['safety.approxYear']).toBeTruthy()
       expect(errs3.idDocumentNumber).toBeTruthy()
+      expect(formatEmployerName(null)).toBe('')
+      expect(formatEmployerName("O'Reilly  Media, Inc. 123")).toBe("O'Reilly Media Inc. ")
+      expect(validateEmployerName('')).toBeNull()
+      expect(validateEmployerName('Acme 123')).toMatch(/cannot contain numbers/)
+      expect(validateEmployerName('...')).toMatch(/letters and spaces/)
+      expect(validateEmployerName("O'Reilly Media.")).toBeNull()
     })
   })
 })

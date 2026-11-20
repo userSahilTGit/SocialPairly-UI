@@ -38,6 +38,7 @@ import {
   formatLettersSpacesText,
   formatNationalityListText,
   formatStateOrDlNumber,
+  formatEmployerName,
   formatEmploymentTypeText,
   formatUnsignedDigits,
   blockInvalidNumberKeys,
@@ -2174,7 +2175,7 @@ export default function IdentityBackgroundPage() {
               <input
                 name="employerName"
                 value={form.career.employerName}
-                onChange={(e) => patchSection('career', { employerName: formatLettersSpacesText(e.target.value) })}
+                onChange={(e) => patchSection('career', { employerName: formatEmployerName(e.target.value) })}
                 {...inputA11y('career.employerName')}
               />
               <FieldError name="career.employerName" />

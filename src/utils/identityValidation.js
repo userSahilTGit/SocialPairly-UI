@@ -117,6 +117,13 @@ export function formatNationalityListText(value) {
     .replace(/\s{2,}/g, ' ')
 }
 
+/** Employer/company name: letters, spaces, and common punctuation only (no digits). */
+export function formatEmployerName(value) {
+  return String(value ?? '')
+    .replace(/[^\p{L} .'-]/gu, '')
+    .replace(/\s{2,}/g, ' ')
+}
+
 /** Prevent scientific-notation / signed keys on numeric fields. */
 export function blockInvalidNumberKeys(e) {
   if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault()
@@ -130,6 +137,7 @@ export function formatEmploymentTypeText(value) {
 }
 
 const CAREER_TEXT_RE = /^[\p{L}][\p{L} ]*$/u
+const EMPLOYER_NAME_RE = /^[\p{L}][\p{L} .'-]*$/u
 const EMPLOYMENT_TYPE_RE = /^[\p{L}\p{N}][\p{L}\p{N}\s/\-]*$/u
 
 export function validateCareerAlphanumeric(value, label) {
@@ -156,6 +164,14 @@ export function validateIdDocumentNumber(type, number) {
     }
   }
   if (v.length > 100) return 'Document number is too long'
+  return null
+}
+
+export function validateEmployerName(value) {
+  const v = String(value ?? '').trim()
+  if (!v) return null
+  if (/\d/.test(v)) return 'Employer name cannot contain numbers'
+  if (!EMPLOYER_NAME_RE.test(v)) return 'Employer name may contain letters and spaces only'
   return null
 }
 
@@ -1434,7 +1450,8 @@ export function validateIdentityForm(form, action, refData) {
   }
   careerAlnumErr('jobFunction', 'Job function')
   careerAlnumErr('industry', 'Industry')
-  careerAlnumErr('employerName', 'Employer name')
+  const employerErr = validateEmployerName(career.employerName)
+  if (employerErr) errors['career.employerName'] = employerErr
   careerAlnumErr('careerAmbitions', 'Career ambitions')
   const empTypeErr = validateEmploymentType(career.employmentType)
   if (empTypeErr) errors['career.employmentType'] = empTypeErr
