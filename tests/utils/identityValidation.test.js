@@ -525,7 +525,7 @@ describe('validateIdentityForm', () => {
     }), 'SAVE_LATER')
     expect(errors['educations.0.city']).toMatch(/letters/)
     expect(errors['educations.0.degree']).toMatch(/letters/)
-    expect(errors['educations.0.graduationYear']).toMatch(/before start/)
+    expect(errors['educations.0.graduationMonth']).toMatch(/before start/)
     expect(errors['educations.1.startYear']).toMatch(/4-digit/)
     expect(errors['educations.1.graduationYear']).toMatch(/between|4-digit/)
     expect(errors['educations.2.startYear']).toMatch(/date of birth/)

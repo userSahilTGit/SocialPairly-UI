@@ -62,7 +62,7 @@ export function getPhoneNationalLength(countryCode) {
 /** Digits only; caps length to the country max so users cannot overtype. */
 export function formatPhoneNationalInput(countryCode, rawValue) {
   const { max } = getPhoneNationalLength(countryCode)
-  return String(rawValue || '').replace(/\D/g, '').slice(0, max)
+  return normalizeNational(rawValue).slice(0, max)
 }
 
 export function phoneNationalValidationMessage(countryCode) {

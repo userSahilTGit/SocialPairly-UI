@@ -1,13 +1,14 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, startTransition } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   BadgeCheck, Briefcase, Calendar, Check, Eye, Globe2, Info,
   MapPin, PhoneCall, ShieldAlert, ShieldCheck, Sparkles, UserCheck, Users,
-  Home, Landmark, HeartHandshake, Wallet, Scale, Baby,
+  Home, Landmark, HeartHandshake, Wallet, Scale, Baby, Lock, AlertTriangle,
 } from 'lucide-react'
 import api from '../../api/axios'
 import { useAuth, IDENTITY_CONTINUE_LATER_KEY } from '../../context/AuthContext'
 import { readCompletionPercentage } from '../../utils/profileCompletion'
+import { hasUsablePhoneNumber } from '../../utils/verification'
 import OnboardingShell from '../../components/onboarding/OnboardingShell'
 import AccordionSection from '../../components/onboarding/AccordionSection'
 import PreferredFutureLocations from '../../components/onboarding/PreferredFutureLocations'
@@ -34,10 +35,13 @@ import {
   formatEducationCity,
   formatEducationText,
   formatEducationYear,
-  formatAlphanumericText,
+  formatLettersSpacesText,
+  formatNationalityListText,
+  formatStateOrDlNumber,
   formatEmploymentTypeText,
   formatUnsignedDigits,
   blockInvalidNumberKeys,
+  validateApproxYear,
   formatSsnInput,
   humanizeEnum,
   mapIdentityResponseToForm,
@@ -48,6 +52,10 @@ import {
   resolveAdditionalNationalities,
   formatAdditionalNationalitiesText,
   currentCalendarYear,
+  educationDateErrors,
+  isFutureYearMonth,
+  nationalityImmigrationChecks,
+  unrecognizedNationalityTokens,
   PROFICIENCY_LEVELS,
 } from '../../utils/identityValidation'
 import {
@@ -65,6 +73,25 @@ const MONTHS = [
     label: new Date(2000, i, 1).toLocaleString('en', { month: 'long' }),
   })),
 ]
+
+const LEGAL_NAME_FIELDS = ['firstName', 'middleName', 'lastName']
+
+const NAT_IMM_CHECK_KEYS = [
+  'nationality.countryOfCitizenship',
+  'immigration.currentCountryOfResidence',
+  'immigration.residencyCategory',
+  'immigration.futureSponsorshipRequired',
+]
+
+function unknownNationalitiesMessage(tokens) {
+  const list = tokens.slice(0, 3).map((t) => `"${t.length > 24 ? `${t.slice(0, 24)}…` : t}"`).join(', ')
+  const more = tokens.length > 3 ? ` and ${tokens.length - 3} more` : ''
+  return `Not recognized as a country: ${list}${more}. Use country names such as Canada or Germany (not "Canadian").`
+}
+
+const EDUCATION_DATE_FIELDS = ['startMonth', 'startYear', 'graduationMonth', 'graduationYear']
+/** Messages produced by educationDateErrors (not the per-field 1970–current range checks). */
+const EDUCATION_DATE_RULE_PATTERN = /cannot be (later than|before|in the future)/
 
 const SECTION_FOR_ERROR = {
   firstName: 'legal',
@@ -144,6 +171,9 @@ export default function IdentityBackgroundPage() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
+  const [nameLock, setNameLock] = useState({ used: false, changedAt: null, original: null })
+  const [primaryPhoneLocked, setPrimaryPhoneLocked] = useState(false)
+  const [pendingNameChangeAction, setPendingNameChangeAction] = useState(null)
   const [editMode, setEditMode] = useState(!!user?.identityPage1Complete)
   const [verifyBusy, setVerifyBusy] = useState(false)
   const [uploadFeedback, setUploadFeedback] = useState({})
@@ -162,6 +192,7 @@ export default function IdentityBackgroundPage() {
   )
 
   const countries = refData?.countries || []
+  const natImmChecks = nationalityImmigrationChecks(form, countries)
   const showRelationshipCounts = ['DIVORCED', 'SEPARATED', 'WIDOWED'].includes(
     form.relationship.maritalStatus,
   )
@@ -174,7 +205,8 @@ export default function IdentityBackgroundPage() {
   ].some((v) => v === 'YES' || v === 'PREFER_PRIVATE_DISCUSSION')
   const showCivilDetails = form.civilJudgment.hasJudgment === 'YES'
     || form.civilJudgment.hasJudgment === 'PREFER_PRIVATE_DISCUSSION'
-  const showFamilyChildren = form.family.hasChildren === 'YES'
+  const showFamilyChildren =
+    form.family.hasChildren === 'YES' || form.relationship.coParenting === 'YES'
 
   const load = async () => {
     setLoading(true)
@@ -196,6 +228,16 @@ export default function IdentityBackgroundPage() {
       setRefData(refRes.data || {})
       setEditMode(!!data.identityPage1Complete)
       setForm(mapped)
+      setPrimaryPhoneLocked(hasUsablePhoneNumber({ phoneNumber: data.primaryPhone }))
+      setNameLock({
+        used: !!data.legalNameChangeUsed,
+        changedAt: data.legalNameChangedAt || null,
+        original: {
+          firstName: mapped.firstName,
+          middleName: mapped.middleName,
+          lastName: mapped.lastName,
+        },
+      })
       setAdditionalNationalitiesText(
         formatAdditionalNationalitiesText(
           mapped.nationality?.additionalNationalities,
@@ -250,22 +292,52 @@ export default function IdentityBackgroundPage() {
 
   const onSectionChange = (section) => (e) => {
     const { name, value, type, checked } = e.target
-    patchSection(section, { [name]: type === 'checkbox' ? checked : value })
+    const next = type === 'checkbox' ? checked : value
+    if (section === 'relationship' && name === 'coParenting' && String(next).toUpperCase() === 'YES') {
+      setForm((prev) => ({
+        ...prev,
+        relationship: { ...prev.relationship, coParenting: next },
+        family: {
+          ...prev.family,
+          hasChildren: 'YES',
+          childrenCount:
+            prev.family.childrenCount === '' || prev.family.childrenCount == null
+              ? '1'
+              : prev.family.childrenCount,
+        },
+      }))
+      setFieldError('family.hasChildren', null)
+      setFieldError('relationship.coParenting', null)
+      return
+    }
+    patchSection(section, { [name]: next })
+    if (section === 'nationality' || section === 'immigration') {
+      NAT_IMM_CHECK_KEYS.forEach((key) => setFieldError(key, null))
+    }
   }
 
   const onApproxYearChange = (section) => (e) => {
-    const raw = e.target.value
+    const raw = formatUnsignedDigits(e.target.value, 4)
     if (raw === '') {
       patchSection(section, { approxYear: '' })
       return
     }
-    // Digits only — block minus / decimals / letters
-    if (!/^\d{0,4}$/.test(raw)) return
-    const year = Number(raw)
-    const maxYear = new Date().getFullYear()
-    if (year < 0) return
-    if (raw.length === 4 && (year < 1900 || year > maxYear)) return
+    const maxYear = currentCalendarYear()
+    if (raw.length === 4) {
+      const year = Number(raw)
+      if (year < 1900 || year > maxYear) return
+    }
     patchSection(section, { approxYear: raw })
+  }
+
+  const onApproxYearBlur = (section) => () => {
+    const raw = String(form[section]?.approxYear ?? '').trim()
+    const key = `${section}.approxYear`
+    if (!raw) {
+      setFieldError(key, null)
+      return
+    }
+    setFieldError(key, validateApproxYear(raw))
   }
 
   const onCountryChange = (e) => {
@@ -312,7 +384,35 @@ export default function IdentityBackgroundPage() {
     })
   }
 
+  const syncEducationDateErrors = (index, edu) => {
+    const rules = educationDateErrors(edu)
+    setFieldErrors((prev) => {
+      let changed = false
+      const next = { ...prev }
+      EDUCATION_DATE_FIELDS.forEach((field) => {
+        const key = `educations.${index}.${field}`
+        const message = rules[field]
+        if (message) {
+          if (next[key] !== message) {
+            next[key] = message
+            changed = true
+          }
+        } else if (next[key] && EDUCATION_DATE_RULE_PATTERN.test(next[key])) {
+          delete next[key]
+          changed = true
+        }
+      })
+      return changed ? next : prev
+    })
+  }
+
   const updateEducation = (index, field, value) => {
+    const base = form.educations?.[index] || {}
+    const merged = { ...base, [field]: value }
+    if (field === 'currentlyStudying' && value) {
+      merged.graduationMonth = ''
+      merged.graduationYear = ''
+    }
     setForm((prev) => {
       const rows = [...prev.educations]
       const next = { ...rows[index], [field]: value }
@@ -323,6 +423,9 @@ export default function IdentityBackgroundPage() {
       rows[index] = next
       return { ...prev, educations: rows }
     })
+    if (EDUCATION_DATE_FIELDS.includes(field) || field === 'currentlyStudying') {
+      syncEducationDateErrors(index, merged)
+    }
   }
 
   const updateLanguage = (index, field, value) => {
@@ -366,6 +469,35 @@ export default function IdentityBackgroundPage() {
     'aria-required': required || undefined,
     'aria-describedby': fieldErrors[name] ? `${name.replace(/\./g, '-')}-error` : undefined,
   })
+
+  /** Live nationality/immigration consistency notes; hidden when the same key already shows a submit error. */
+  const ConsistencyNotes = ({ keys }) => {
+    const notes = keys
+      .filter((key) => !fieldErrors[key])
+      .map((key) => {
+        if (natImmChecks.errors[key]) return { key, tone: 'error', text: natImmChecks.errors[key] }
+        if (natImmChecks.warnings[key]) return { key, tone: 'warn', text: natImmChecks.warnings[key] }
+        return null
+      })
+      .filter(Boolean)
+    if (!notes.length) return null
+    return (
+      <div className="ob-consistency-notes">
+        {notes.map((n) => (
+          <div
+            key={n.key}
+            className={`ob-consistency-note is-${n.tone}`}
+            role={n.tone === 'error' ? 'alert' : 'status'}
+          >
+            {n.tone === 'error'
+              ? <ShieldAlert className="w-4 h-4" style={{ flexShrink: 0, marginTop: 2 }} />
+              : <AlertTriangle className="w-4 h-4" style={{ flexShrink: 0, marginTop: 2 }} />}
+            <span>{n.text}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   const FieldError = ({ name }) => (
     fieldErrors[name]
@@ -442,7 +574,19 @@ export default function IdentityBackgroundPage() {
     return codes
   }
 
-  const submit = async (action) => {
+  const legalNameChanged = () => {
+    const original = nameLock.original
+    if (!original) return false
+    return LEGAL_NAME_FIELDS.some(
+      (field) => String(form[field] ?? '').trim() !== String(original[field] ?? '').trim(),
+    )
+  }
+
+  const submit = async (action, { nameChangeConfirmed = false } = {}) => {
+    if (!nameLock.used && !nameChangeConfirmed && legalNameChanged()) {
+      setPendingNameChangeAction(action)
+      return
+    }
     setFormError('')
     const additionalNationalities = syncAdditionalNationalities(additionalNationalitiesText)
     const formForSubmit = {
@@ -453,6 +597,10 @@ export default function IdentityBackgroundPage() {
       },
     }
     const errors = validateIdentityForm(formForSubmit, action, refData)
+    const unknownNationalities = unrecognizedNationalityTokens(additionalNationalitiesText, countries)
+    if (unknownNationalities.length && !errors['nationality.additionalNationalities']) {
+      errors['nationality.additionalNationalities'] = unknownNationalitiesMessage(unknownNationalities)
+    }
     setFieldErrors(errors)
     if (Object.keys(errors).length) {
       setFormError('Please fix the highlighted fields before continuing.')
@@ -660,6 +808,43 @@ export default function IdentityBackgroundPage() {
       collapseAll={collapseAll}
     >
       <div ref={workspaceTopRef} tabIndex={-1} className="sr-only">Identity and background form</div>
+      {pendingNameChangeAction && (
+        <div className="modal-overlay" onClick={() => setPendingNameChangeAction(null)}>
+          <div
+            className="modal ob-name-change-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="ob-name-change-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="ob-name-change-title">Change your legal name?</h2>
+            <p>
+              Your name will change from <strong>{[nameLock.original?.firstName, nameLock.original?.middleName, nameLock.original?.lastName].filter(Boolean).join(' ') || '—'}</strong>{' '}
+              to <strong>{[form.firstName, form.middleName, form.lastName].map((v) => String(v || '').trim()).filter(Boolean).join(' ') || '—'}</strong>.
+            </p>
+            <p className="ob-name-change-warn">
+              This is a one-time change. After saving, your first, middle, and last name cannot be edited again.
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setPendingNameChangeAction(null)}>
+                Go back
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  const action = pendingNameChangeAction
+                  setPendingNameChangeAction(null)
+                  submit(action, { nameChangeConfirmed: true })
+                }}
+              >
+                Yes, change my name
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {formError && (
         <div
           ref={formErrorRef}
@@ -695,17 +880,17 @@ export default function IdentityBackgroundPage() {
           </label>
           <label className={fieldClass('firstName')}>
             <span>First name <span className="ob-required-marker" aria-hidden="true">*</span><span className="sr-only">(required)</span></span>
-            <input name="firstName" value={form.firstName} onChange={onChange} autoComplete="given-name" {...inputA11y('firstName', { required: true })} />
+            <input name="firstName" value={form.firstName} onChange={onChange} autoComplete="given-name" readOnly={nameLock.used} aria-readonly={nameLock.used} className={nameLock.used ? 'ob-input-locked' : undefined} {...inputA11y('firstName', { required: true })} />
             <FieldError name="firstName" />
           </label>
           <label className={fieldClass('middleName')}>
             <span>Middle name</span>
-            <input name="middleName" value={form.middleName} onChange={onChange} autoComplete="additional-name" {...inputA11y('middleName')} />
+            <input name="middleName" value={form.middleName} onChange={onChange} autoComplete="additional-name" readOnly={nameLock.used} aria-readonly={nameLock.used} className={nameLock.used ? 'ob-input-locked' : undefined} {...inputA11y('middleName')} />
             <FieldError name="middleName" />
           </label>
           <label className={fieldClass('lastName')}>
             <span>Last name <span className="ob-required-marker" aria-hidden="true">*</span><span className="sr-only">(required)</span></span>
-            <input name="lastName" value={form.lastName} onChange={onChange} autoComplete="family-name" {...inputA11y('lastName', { required: true })} />
+            <input name="lastName" value={form.lastName} onChange={onChange} autoComplete="family-name" readOnly={nameLock.used} aria-readonly={nameLock.used} className={nameLock.used ? 'ob-input-locked' : undefined} {...inputA11y('lastName', { required: true })} />
             <FieldError name="lastName" />
           </label>
           <label className={fieldClass('nameSuffix')}>
@@ -718,6 +903,24 @@ export default function IdentityBackgroundPage() {
           </label>
         </div>
         <p className="ob-hint">Legal name is stored privately and is not shown to other members.</p>
+        {nameLock.used ? (
+          <div className="ob-info-callout ob-name-lock-note is-locked" role="note">
+            <Lock className="w-4 h-4" style={{ flexShrink: 0, marginTop: 2 }} />
+            <span>
+              Your first, middle, and last name were already changed
+              {nameLock.changedAt ? ` on ${new Date(nameLock.changedAt).toLocaleDateString()}` : ''}. Names can be
+              changed only once per account. Contact support if your legal name needs a correction.
+            </span>
+          </div>
+        ) : (
+          <div className="ob-info-callout ob-name-lock-note" role="note">
+            <AlertTriangle className="w-4 h-4" style={{ flexShrink: 0, marginTop: 2 }} />
+            <span>
+              You can change your first, middle, or last name <strong>only once</strong> for the lifetime of your
+              account. Please double-check spelling before saving.
+            </span>
+          </div>
+        )}
         <div className="ob-info-callout">
           <Info className="w-4 h-4" style={{ flexShrink: 0, marginTop: 2 }} />
           <span>
@@ -852,12 +1055,21 @@ export default function IdentityBackgroundPage() {
                 inputMode="tel"
                 autoComplete="tel"
                 placeholder="10-digit phone number"
+                readOnly={primaryPhoneLocked}
+                aria-readonly={primaryPhoneLocked}
+                className={primaryPhoneLocked ? 'ob-input-locked' : undefined}
                 {...inputA11y('primaryPhone')}
               />
               <div className="ob-contact-meta ob-contact-meta--tall">
                 <small className={`ob-badge ${form.phoneVerified ? 'ok' : 'warn'}`}>
-                  {form.phoneVerified ? 'Verified' : 'Unverified — changing number requires re-verification'}
+                  {form.phoneVerified ? 'Verified' : 'Unverified'}
                 </small>
+                {primaryPhoneLocked && (
+                  <small className="ob-phone-lock-note">
+                    <Lock size={12} aria-hidden="true" /> To change this number, go to{' '}
+                    <Link to="/profile">Profile &gt; Contact</Link>; you&apos;ll confirm with a code sent to your email.
+                  </small>
+                )}
                 <FieldError name="primaryPhone" />
               </div>
             </label>
@@ -1268,16 +1480,27 @@ export default function IdentityBackgroundPage() {
           <span>Additional nationalities</span>
           <input
             value={additionalNationalitiesText}
-            onChange={(e) => setAdditionalNationalitiesText(e.target.value)}
-            onBlur={() => syncAdditionalNationalities(additionalNationalitiesText)}
+            onChange={(e) => setAdditionalNationalitiesText(formatNationalityListText(e.target.value))}
+            onBlur={() => {
+              syncAdditionalNationalities(additionalNationalitiesText)
+              const unknown = unrecognizedNationalityTokens(additionalNationalitiesText, countries)
+              setFieldError(
+                'nationality.additionalNationalities',
+                unknown.length ? unknownNationalitiesMessage(unknown) : null,
+              )
+            }}
             placeholder="e.g. Canada, Mexico (comma-separated country names)"
             aria-describedby="nationality-additional-hint"
+            aria-invalid={fieldErrors['nationality.additionalNationalities'] ? true : undefined}
+            inputMode="text"
+            autoComplete="off"
           />
           <p id="nationality-additional-hint" className="ob-hint">
-            Enter valid country names separated by commas. Unknown entries are ignored.
+            Enter country names separated by commas, e.g. Canada, Germany. Unrecognized entries must be fixed before saving.
           </p>
           <FieldError name="nationality.additionalNationalities" />
         </div>
+        <ConsistencyNotes keys={['nationality.countryOfCitizenship']} />
         <div style={{ marginTop: 14 }}>
           <span className="ob-hint">Languages</span>
           {(form.nationality.languages || []).map((lang, idx) => (
@@ -1395,6 +1618,13 @@ export default function IdentityBackgroundPage() {
             section="immigration"
           />
         </div>
+        <ConsistencyNotes
+          keys={[
+            'immigration.currentCountryOfResidence',
+            'immigration.residencyCategory',
+            'immigration.futureSponsorshipRequired',
+          ]}
+        />
         <p className="ob-hint">You may select Prefer not to say for any immigration field.</p>
       </AccordionSection>
 
@@ -1530,6 +1760,7 @@ export default function IdentityBackgroundPage() {
             options={refData?.yesNoPrefer}
             onChange={onSectionChange('family')}
             section="family"
+            errorKey="family.hasChildren"
           />
           {showFamilyChildren && (
             <label className={fieldClass('family.childrenCount')}>
@@ -1746,7 +1977,13 @@ export default function IdentityBackgroundPage() {
                   {...inputA11y(`educations.${idx}.startMonth`)}
                 >
                   {MONTHS.map((m) => (
-                    <option key={m.value || 'none'} value={m.value}>{m.label}</option>
+                    <option
+                      key={m.value || 'none'}
+                      value={m.value}
+                      disabled={!!m.value && isFutureYearMonth(m.value, edu.startYear)}
+                    >
+                      {m.label}
+                    </option>
                   ))}
                 </select>
                 <FieldError name={`educations.${idx}.startMonth`} />
@@ -1760,7 +1997,23 @@ export default function IdentityBackgroundPage() {
                   maxLength={4}
                   placeholder="YYYY"
                   value={edu.startYear}
-                  onChange={(e) => updateEducation(idx, 'startYear', formatEducationYear(e.target.value))}
+                  onChange={(e) => {
+                    setFieldError(`educations.${idx}.startYear`, null)
+                    updateEducation(idx, 'startYear', formatEducationYear(e.target.value))
+                  }}
+                  onBlur={() => {
+                    const raw = String(form.educations?.[idx]?.startYear ?? '').trim()
+                    if (!raw) return
+                    const y = Number(raw)
+                    const maxY = currentCalendarYear()
+                    if (!/^\d{4}$/.test(raw) || y < 1970 || y > maxY) {
+                      setFieldError(
+                        `educations.${idx}.startYear`,
+                        `Start year must be between 1970 and ${maxY}`,
+                      )
+                    }
+                  }}
+                  onKeyDown={blockInvalidNumberKeys}
                   {...inputA11y(`educations.${idx}.startYear`)}
                 />
                 <FieldError name={`educations.${idx}.startYear`} />
@@ -1775,7 +2028,13 @@ export default function IdentityBackgroundPage() {
                   {...inputA11y(`educations.${idx}.graduationMonth`)}
                 >
                   {MONTHS.map((m) => (
-                    <option key={m.value || 'none'} value={m.value}>{m.label}</option>
+                    <option
+                      key={m.value || 'none'}
+                      value={m.value}
+                      disabled={!!m.value && isFutureYearMonth(m.value, edu.graduationYear)}
+                    >
+                      {m.label}
+                    </option>
                   ))}
                 </select>
                 <FieldError name={`educations.${idx}.graduationMonth`} />
@@ -1789,7 +2048,24 @@ export default function IdentityBackgroundPage() {
                   maxLength={4}
                   placeholder="YYYY"
                   value={edu.currentlyStudying ? '' : edu.graduationYear}
-                  onChange={(e) => updateEducation(idx, 'graduationYear', formatEducationYear(e.target.value))}
+                  onChange={(e) => {
+                    setFieldError(`educations.${idx}.graduationYear`, null)
+                    updateEducation(idx, 'graduationYear', formatEducationYear(e.target.value))
+                  }}
+                  onBlur={() => {
+                    if (edu.currentlyStudying) return
+                    const raw = String(form.educations?.[idx]?.graduationYear ?? '').trim()
+                    if (!raw) return
+                    const y = Number(raw)
+                    const maxY = currentCalendarYear()
+                    if (!/^\d{4}$/.test(raw) || y < 1970 || y > maxY) {
+                      setFieldError(
+                        `educations.${idx}.graduationYear`,
+                        `Graduation year must be between 1970 and ${maxY}`,
+                      )
+                    }
+                  }}
+                  onKeyDown={blockInvalidNumberKeys}
                   disabled={!!edu.currentlyStudying}
                   aria-disabled={!!edu.currentlyStudying}
                   {...inputA11y(`educations.${idx}.graduationYear`)}
@@ -1877,7 +2153,7 @@ export default function IdentityBackgroundPage() {
             <input
               name="jobFunction"
               value={form.career.jobFunction}
-              onChange={(e) => patchSection('career', { jobFunction: formatAlphanumericText(e.target.value) })}
+              onChange={(e) => patchSection('career', { jobFunction: formatLettersSpacesText(e.target.value) })}
               {...inputA11y('career.jobFunction')}
             />
             <FieldError name="career.jobFunction" />
@@ -1887,7 +2163,7 @@ export default function IdentityBackgroundPage() {
             <input
               name="industry"
               value={form.career.industry}
-              onChange={(e) => patchSection('career', { industry: formatAlphanumericText(e.target.value) })}
+              onChange={(e) => patchSection('career', { industry: formatLettersSpacesText(e.target.value) })}
               {...inputA11y('career.industry')}
             />
             <FieldError name="career.industry" />
@@ -1898,7 +2174,7 @@ export default function IdentityBackgroundPage() {
               <input
                 name="employerName"
                 value={form.career.employerName}
-                onChange={(e) => patchSection('career', { employerName: formatAlphanumericText(e.target.value) })}
+                onChange={(e) => patchSection('career', { employerName: formatLettersSpacesText(e.target.value) })}
                 {...inputA11y('career.employerName')}
               />
               <FieldError name="career.employerName" />
@@ -1932,7 +2208,7 @@ export default function IdentityBackgroundPage() {
             <input
               name="careerAmbitions"
               value={form.career.careerAmbitions}
-              onChange={(e) => patchSection('career', { careerAmbitions: formatAlphanumericText(e.target.value) })}
+              onChange={(e) => patchSection('career', { careerAmbitions: formatLettersSpacesText(e.target.value) })}
               {...inputA11y('career.careerAmbitions')}
             />
             <FieldError name="career.careerAmbitions" />
@@ -2007,8 +2283,12 @@ export default function IdentityBackgroundPage() {
                   maxLength={4}
                   value={form.safety.approxYear}
                   onChange={onApproxYearChange('safety')}
+                  onBlur={onApproxYearBlur('safety')}
                   onKeyDown={blockInvalidNumberKeys}
+                  aria-label="Approximate year of safety disclosure"
+                  {...inputA11y('safety.approxYear')}
                 />
+                <FieldError name="safety.approxYear" />
               </label>
               <label className="ob-check-field">
                 <input type="checkbox" name="caseResolved" checked={!!form.safety.caseResolved} onChange={onSectionChange('safety')} />
@@ -2060,6 +2340,7 @@ export default function IdentityBackgroundPage() {
                   maxLength={4}
                   value={form.civilJudgment.approxYear}
                   onChange={onApproxYearChange('civilJudgment')}
+                  onBlur={onApproxYearBlur('civilJudgment')}
                   onKeyDown={blockInvalidNumberKeys}
                   aria-label="Approximate year of civil judgment"
                   {...inputA11y('civilJudgment.approxYear')}
@@ -2128,13 +2409,29 @@ export default function IdentityBackgroundPage() {
             </span>
             <input
               type="text"
+              inputMode={form.idDocumentType === 'PASSPORT' ? 'text' : 'numeric'}
+              maxLength={form.idDocumentType === 'PASSPORT' ? 100 : 8}
               value={form.idDocumentNumber || ''}
-              onChange={(e) => setForm((prev) => ({ ...prev, idDocumentNumber: e.target.value }))}
-              placeholder={form.idDocumentType ? 'Enter number on the document' : 'Select a document type first'}
+              onChange={(e) => {
+                const next =
+                  form.idDocumentType === 'DRIVER_LICENSE' || form.idDocumentType === 'STATE_ID'
+                    ? formatStateOrDlNumber(e.target.value)
+                    : e.target.value
+                setForm((prev) => ({ ...prev, idDocumentNumber: next }))
+              }}
+              placeholder={
+                form.idDocumentType === 'DRIVER_LICENSE' || form.idDocumentType === 'STATE_ID'
+                  ? '8-digit number'
+                  : form.idDocumentType
+                    ? 'Enter number on the document'
+                    : 'Select a document type first'
+              }
               disabled={!form.idDocumentType}
               autoComplete="off"
               aria-label="Identity document number"
+              {...inputA11y('idDocumentNumber')}
             />
+            <FieldError name="idDocumentNumber" />
           </label>
           <label className={fieldClass('ssn')}>
             <span>Social Security Number (SSN) <em className="ob-optional">(optional)</em></span>

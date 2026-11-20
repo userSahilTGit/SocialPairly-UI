@@ -15,7 +15,8 @@ import AuthPageLayout from '../components/AuthPageLayout'
 import PhoneCountryCodeSelect from '../components/PhoneCountryCodeSelect'
 import { AppleGlyph, GoogleGlyph } from '../components/AuthBrandAssets'
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+/** Match identityValidation / ContactIdentifier; allow apostrophe local-parts. */
+const EMAIL_RE = /^[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 
 function authErrorMessage(err, fallback) {
   if (!err.response) {

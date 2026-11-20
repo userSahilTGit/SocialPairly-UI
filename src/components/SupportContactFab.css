@@ -255,6 +255,107 @@
   color: #0f172a;
 }
 
+.support-phone-modal {
+  width: 100%;
+  max-width: 390px;
+  background: #fff;
+  border: 1px solid rgba(233, 213, 255, 0.95);
+  border-radius: 22px;
+  padding: 26px 24px 20px;
+  box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.35);
+  text-align: center;
+}
+
+.support-phone-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 8px;
+}
+
+.support-phone-desc {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #475569;
+  margin: 0 0 18px;
+}
+
+.support-phone-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.support-phone-action {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 13px;
+  border: none;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.18s ease, transform 0.15s ease;
+}
+
+.support-phone-action:active {
+  transform: scale(0.98);
+}
+
+.support-phone-action--call {
+  color: #fff;
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  box-shadow: 0 8px 18px rgba(124, 58, 237, 0.28);
+}
+
+.support-phone-action--callback {
+  color: #4c1d95;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+}
+
+.support-phone-action--callback:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.support-phone-success {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #047857;
+}
+
+.support-phone-error {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+[data-theme='dark'] .support-phone-modal {
+  background: #1e293b;
+  border-color: rgba(126, 34, 206, 0.38);
+}
+
+[data-theme='dark'] .support-phone-title {
+  color: #f8fafc;
+}
+
+[data-theme='dark'] .support-phone-desc {
+  color: #cbd5e1;
+}
+
+[data-theme='dark'] .support-phone-action--callback {
+  color: #ede9fe;
+  background: rgba(15, 23, 42, 0.72);
+  border-color: rgba(148, 163, 184, 0.28);
+}
+
 [data-theme='dark'] .support-upgrade-modal {
   background: #1e293b;
   border-color: rgba(126, 34, 206, 0.38);

@@ -38,6 +38,8 @@ export default function AdminDashboard() {
     const { isDark } = useTheme()
     const [stats, setStats] = useState(null)
     const [users, setUsers] = useState([])
+    const [callbackAlerts, setCallbackAlerts] = useState([])
+    const [pendingCallbacks, setPendingCallbacks] = useState(0)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     // null = API order; 'desc' = newest first; 'asc' = oldest first
@@ -56,6 +58,18 @@ export default function AdminDashboard() {
                 setError('Failed to load dashboard data')
             } finally {
                 setLoading(false)
+            }
+
+            try {
+                const [summaryRes, notificationsRes] = await Promise.all([
+                    api.get('/admin/callback-alerts/summary'),
+                    api.get('/admin/callback-alerts/notifications'),
+                ])
+                setPendingCallbacks(summaryRes.data?.pendingCount || 0)
+                setCallbackAlerts((notificationsRes.data || []).filter((item) => !item.read).slice(0, 5))
+            } catch {
+                setPendingCallbacks(0)
+                setCallbackAlerts([])
             }
         }
         load()
@@ -126,6 +140,9 @@ export default function AdminDashboard() {
                             <p>Monitor user growth, profile completion, and subscription activity at a glance.</p>
                         </div>
                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                            <Link to="/admin/customer-support" className="btn-dashboard-action">
+                                Customer Support
+                            </Link>
                             <Link to="/admin/identity-documents" className="btn-dashboard-action">
                                 Identity Documents
                             </Link>
@@ -135,11 +152,29 @@ export default function AdminDashboard() {
                         </div>
                     </div>
 
+                    {(pendingCallbacks > 0 || callbackAlerts.length > 0) && (
+                        <div className="dashboard-callback-banner" role="status">
+                            <div>
+                                <strong>
+                                    {pendingCallbacks} pending premium callback{pendingCallbacks === 1 ? '' : 's'}
+                                </strong>
+                                <p>
+                                    {callbackAlerts[0]?.message
+                                        || 'A premium member requested a phone callback.'}
+                                </p>
+                            </div>
+                            <Link to="/admin/customer-support" className="btn-dashboard-action">
+                                Open support queue
+                            </Link>
+                        </div>
+                    )}
+
                     <div className="stats-grid">
                         <StatCard value={stats.totalUsers} label="Total Users" icon="👥" iconClass="icon-purple" />
                         <StatCard value={stats.completedProfiles} label="Completed Profiles" icon="✓" iconClass="icon-green" />
                         <StatCard value={stats.incompleteProfiles} label="Incomplete Profiles" icon="○" iconClass="icon-pink" />
-                        <StatCard value={stats.newUsersLast7Days} label="New (7 days)" icon="⚡" iconClass="icon-violet" />
+                        <StatCard value={stats.newUsersLast7Days ?? stats.newUsersLastDays} label="New (7 days)" icon="⚡" iconClass="icon-violet" />
+                        <StatCard value={pendingCallbacks} label="Pending Callbacks" icon="☎" iconClass="icon-violet" />
                     </div>
 
                     <div className="dashboard-charts-grid">

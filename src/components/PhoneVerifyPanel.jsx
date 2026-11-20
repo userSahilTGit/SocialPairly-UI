@@ -13,8 +13,13 @@ import {
   resetInvisibleRecaptcha,
 } from '../utils/firebasePhone'
 
+const PHONE_CHANGE_APPROVAL_PATTERN = /requires approval/i
+
+const digitsOnly = (value) => String(value || '').replace(/\D/g, '')
+
 /**
  * Shared Firebase phone add / change / verify UI for Profile and Modal.
+ * Replacing an existing number first needs the 4-digit email code (backend-enforced).
  * Captcha runs invisibly off-screen (Firebase web still requires it for real SMS).
  */
 export default function PhoneVerifyPanel({
@@ -27,6 +32,7 @@ export default function PhoneVerifyPanel({
   const [countryCode, setCountryCode] = useState('+91')
   const [national, setNational] = useState('')
   const [otp, setOtp] = useState('')
+  const [approvalOtp, setApprovalOtp] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
@@ -38,6 +44,7 @@ export default function PhoneVerifyPanel({
   const phoneE164 = formatPhoneE164(countryCode, national)
   const phoneStored = formatPhoneStorage(countryCode, national)
   const testMode = import.meta.env.VITE_FIREBASE_PHONE_TEST_MODE === 'true'
+  const isReplacingNumber = hasPhone && digitsOnly(user?.phoneNumber) !== digitsOnly(phoneStored)
 
   useEffect(() => {
     setEditing(!hasUsablePhoneNumber(user) || user?.phoneVerified !== true)
@@ -60,6 +67,13 @@ export default function PhoneVerifyPanel({
     }
   }
 
+  const requestChangeApproval = async () => {
+    const { data } = await api.post('/users/me/phone/send-otp')
+    setApprovalOtp('')
+    setStep('approve')
+    setMessage(data?.message || `We emailed a 4-digit code to ${user?.email}.`)
+  }
+
   const sendCode = async (e) => {
     e?.preventDefault?.()
     setError('')
@@ -70,9 +84,64 @@ export default function PhoneVerifyPanel({
     }
     setLoading(true)
     try {
-      const { data } = await api.put('/users/me/phone', { phoneNumber: phoneStored })
-      applyUser(data)
+      if (isReplacingNumber && step === 'phone') {
+        await requestChangeApproval()
+        return
+      }
+      await savePhoneAndSendSms()
+    } catch (err) {
+      await resetInvisibleRecaptcha(verifierRef)
+      const msg = err.response?.data?.message || err.response?.data?.error || firebasePhoneErrorMessage(err)
+      if (PHONE_CHANGE_APPROVAL_PATTERN.test(msg) && step !== 'approve') {
+        await requestChangeApproval().catch(() => setError(msg))
+      } else {
+        setError(msg)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
 
+  const approveChange = async (e) => {
+    e.preventDefault()
+    setError('')
+    setMessage('')
+    setLoading(true)
+    try {
+      await savePhoneAndSendSms(approvalOtp)
+      setApprovalOtp('')
+    } catch (err) {
+      await resetInvisibleRecaptcha(verifierRef)
+      setError(err.response?.data?.message || err.response?.data?.error || firebasePhoneErrorMessage(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resendApproval = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      await requestChangeApproval()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not send the code. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const savePhoneAndSendSms = async (otpForChange) => {
+    const { data } = await api.put('/users/me/phone', {
+      phoneNumber: phoneStored,
+      ...(otpForChange ? { otp: otpForChange } : {}),
+    })
+    applyUser(data)
+    if (otpForChange) {
+      setStep('phone')
+      setMessage('Number change approved.')
+    }
+
+    try {
       // Recreate verifier each send — safest after previous confirm/clear
       await resetInvisibleRecaptcha(verifierRef)
       const appVerifier = await getInvisibleRecaptcha(verifierRef)
@@ -85,9 +154,8 @@ export default function PhoneVerifyPanel({
       setStep('otp')
     } catch (err) {
       await resetInvisibleRecaptcha(verifierRef)
-      setError(err.response?.data?.message || err.response?.data?.error || firebasePhoneErrorMessage(err))
-    } finally {
-      setLoading(false)
+      const smsError = firebasePhoneErrorMessage(err)
+      setError(otpForChange ? `Your number was updated, but the SMS code could not be sent: ${smsError}` : smsError)
     }
   }
 
@@ -124,6 +192,7 @@ export default function PhoneVerifyPanel({
     setEditing(true)
     setStep('phone')
     setOtp('')
+    setApprovalOtp('')
     setError('')
     setMessage('')
     confirmationRef.current = null
@@ -162,7 +231,9 @@ export default function PhoneVerifyPanel({
         <>
           <h3>{hasPhone ? 'Update & verify mobile' : 'Add mobile number'}</h3>
           <p className="auth-side-sub">
-            SMS is sent by Firebase. You can change your number anytime and verify again.
+            {hasPhone
+              ? 'For your security, changing your number needs a code sent to your account email, then SMS verification of the new number.'
+              : 'SMS is sent by Firebase.'}
           </p>
         </>
       )}
@@ -207,13 +278,54 @@ export default function PhoneVerifyPanel({
             className="btn btn-block auth-primary-btn"
             disabled={loading || !isValidPhoneNational(national, countryCode)}
           >
-            {loading ? 'Sending...' : 'Send verification code'}
+            {loading ? 'Sending...' : isReplacingNumber ? 'Request change approval' : 'Send verification code'}
           </button>
           {hasPhone && (
             <button type="button" className="btn btn-block btn-secondary" onClick={() => setEditing(false)} disabled={loading}>
               Cancel
             </button>
           )}
+        </form>
+      ) : step === 'approve' ? (
+        <form onSubmit={approveChange} className="phone-verify-actions">
+          <p className="auth-side-sub" style={{ marginTop: 0 }}>
+            To change <strong>{user?.phoneNumber}</strong> to <strong>{phoneStored}</strong>, enter the 4-digit code
+            we sent to <strong>{user?.email}</strong>.
+          </p>
+          <div className="form-group">
+            <label>4-digit email code</label>
+            <input
+              className="auth-input"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={approvalOtp}
+              onChange={(e) => setApprovalOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              placeholder="0000"
+              maxLength={4}
+              required
+              autoFocus
+            />
+          </div>
+          <button type="submit" className="btn btn-block auth-primary-btn" disabled={loading || approvalOtp.length !== 4}>
+            {loading ? 'Approving...' : 'Approve change'}
+          </button>
+          <button type="button" className="link-btn" style={{ display: 'block', margin: '8px auto 0' }} onClick={resendApproval} disabled={loading}>
+            Resend email code
+          </button>
+          <button
+            type="button"
+            className="link-btn"
+            style={{ display: 'block', margin: '8px auto 0' }}
+            onClick={() => {
+              setStep('phone')
+              setApprovalOtp('')
+              setMessage('')
+            }}
+            disabled={loading}
+          >
+            Back
+          </button>
         </form>
       ) : (
         <form onSubmit={verify} className="phone-verify-actions">

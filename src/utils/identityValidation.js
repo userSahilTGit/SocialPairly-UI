@@ -1,7 +1,8 @@
 import { formatPhoneStorage, splitPhone } from './phoneFormat'
 
 const NAME_RE = /^[\p{L}][\p{L} .'-]{0,59}$/u
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+/** Common mailbox formats (includes apostrophe local-parts). Trim before testing. */
+const EMAIL_RE = /^[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 const SSN_RE = /^\d{3}-\d{2}-\d{4}$/
 
 export const NAME_PREFIXES = ['', 'Mr.', 'Ms.', 'Mrs.', 'Dr.', 'Other']
@@ -102,6 +103,20 @@ export function formatAlphanumericText(value) {
     .replace(/\s{2,}/g, ' ')
 }
 
+/** Letters and spaces only (occupation / career text — no digits). */
+export function formatLettersSpacesText(value) {
+  return String(value ?? '')
+    .replace(/[^\p{L}\s]/gu, '')
+    .replace(/\s{2,}/g, ' ')
+}
+
+/** Additional nationalities free-text: letters, spaces, commas, hyphens. */
+export function formatNationalityListText(value) {
+  return String(value ?? '')
+    .replace(/[^\p{L}\s,\-]/gu, '')
+    .replace(/\s{2,}/g, ' ')
+}
+
 /** Prevent scientific-notation / signed keys on numeric fields. */
 export function blockInvalidNumberKeys(e) {
   if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault()
@@ -114,13 +129,33 @@ export function formatEmploymentTypeText(value) {
     .replace(/\s{2,}/g, ' ')
 }
 
-const CAREER_ALNUM_RE = /^[\p{L}\p{N}][\p{L}\p{N} ]*$/u
+const CAREER_TEXT_RE = /^[\p{L}][\p{L} ]*$/u
 const EMPLOYMENT_TYPE_RE = /^[\p{L}\p{N}][\p{L}\p{N}\s/\-]*$/u
 
 export function validateCareerAlphanumeric(value, label) {
   const v = String(value ?? '').trim()
   if (!v) return null
-  if (!CAREER_ALNUM_RE.test(v)) return `${label} may contain letters and numbers only`
+  if (!CAREER_TEXT_RE.test(v)) return `${label} may contain letters and spaces only`
+  return null
+}
+
+export const ID_DOCUMENT_DIGIT_LEN = 8
+
+/** State ID / US driver license: exactly 8 digits, no special characters. */
+export function formatStateOrDlNumber(value) {
+  return formatUnsignedDigits(value, ID_DOCUMENT_DIGIT_LEN)
+}
+
+export function validateIdDocumentNumber(type, number) {
+  const docType = String(type ?? '').trim().toUpperCase()
+  const v = trimValue(number)
+  if (!v) return null
+  if (docType === 'DRIVER_LICENSE' || docType === 'STATE_ID') {
+    if (!/^\d{8}$/.test(v)) {
+      return `${docType === 'STATE_ID' ? 'State ID' : "Driver's license"} number must be exactly 8 digits`
+    }
+  }
+  if (v.length > 100) return 'Document number is too long'
   return null
 }
 
@@ -535,8 +570,11 @@ export function currentCalendarYear() {
 export function validateApproxYear(value, { required = false } = {}) {
   const v = trimValue(value)
   if (!v) return required ? 'Year is required' : null
-  const year = Number(v)
   const max = currentCalendarYear()
+  if (!/^\d{4}$/.test(v)) {
+    return `Enter a 4-digit year between ${MIN_APPROX_YEAR} and ${max}`
+  }
+  const year = Number(v)
   if (!Number.isInteger(year) || year < MIN_APPROX_YEAR || year > max) {
     return `Year must be between ${MIN_APPROX_YEAR} and ${max}`
   }
@@ -554,11 +592,85 @@ export const PROFICIENCY_LEVELS = [
  * Resolve comma-separated country names/codes to ISO codes (#1552).
  * Unknown entries are ignored per defect spec.
  */
-export function resolveAdditionalNationalities(text, countries = []) {
-  const tokens = String(text ?? '')
-    .split(/[,;]+/)
+function splitNationalityTokens(text) {
+  return String(text ?? '')
+    .split(/[,;]+|\s+and\s+|\s*&\s*/i)
     .map((t) => trimValue(t))
     .filter(Boolean)
+}
+
+/** Entries in the free-text list that don't match a country name or ISO code. */
+export function unrecognizedNationalityTokens(text, countries = []) {
+  const codes = new Set((countries || []).map((c) => String(c.code || '').toUpperCase()))
+  const names = new Set((countries || []).map((c) => String(c.name || '').toLowerCase()))
+  if (!codes.size && !names.size) return []
+  return splitNationalityTokens(text).filter(
+    (token) => !codes.has(token.toUpperCase()) && !names.has(token.toLowerCase()),
+  )
+}
+
+const NON_CITIZEN_RESIDENCY = ['PERMANENT_RESIDENT', 'WORK_AUTHORIZED', 'STUDENT', 'TEMPORARY_RESIDENT']
+
+/**
+ * Cross-checks Nationality vs Immigration. `errors` block saving (mirrors the server);
+ * `warnings` are advisory. Keys match form field paths.
+ */
+export function nationalityImmigrationChecks(form, countries = []) {
+  const errors = {}
+  const warnings = {}
+  const nat = form?.nationality || {}
+  const imm = form?.immigration || {}
+  const up = (v) => trimValue(v).toUpperCase()
+  const nameOf = (code) => (countries || []).find((c) => c.code === code)?.name || code
+
+  const primary = up(nat.primaryNationality)
+  const citizenship = up(nat.countryOfCitizenship)
+  const additional = (nat.additionalNationalities || []).map(up).filter(Boolean)
+  const held = new Set([primary, citizenship, ...additional].filter(Boolean))
+  const residence = up(imm.currentCountryOfResidence)
+  const category = up(imm.residencyCategory)
+  const sponsorship = up(imm.futureSponsorshipRequired)
+  const addressCountry = up(form?.currentResidence?.countryCode)
+
+  if (category === 'CITIZEN' && sponsorship === 'YES') {
+    errors['immigration.futureSponsorshipRequired'] =
+      'Citizens do not need visa sponsorship. Choose No or Prefer not to say.'
+  } else if (category === 'PERMANENT_RESIDENT' && sponsorship === 'YES') {
+    warnings['immigration.futureSponsorshipRequired'] =
+      'Permanent residents usually do not need sponsorship. Double-check this answer.'
+  }
+
+  if (residence && category && held.size) {
+    const holdsResidence = held.has(residence)
+    if (category === 'CITIZEN' && !holdsResidence) {
+      errors['immigration.residencyCategory'] =
+        `You chose Citizen, but ${nameOf(residence)} is not one of your nationalities. `
+        + 'Add it under Additional nationalities or choose another category.'
+    } else if (NON_CITIZEN_RESIDENCY.includes(category) && holdsResidence) {
+      errors['immigration.residencyCategory'] =
+        `You hold ${nameOf(residence)} nationality, so your residency category there should be Citizen.`
+    }
+  } else if (category === 'CITIZEN' && residence && !held.size) {
+    warnings['immigration.residencyCategory'] =
+      'Add your nationality above so we can confirm your citizenship.'
+  }
+
+  if (primary && citizenship && primary !== citizenship && !additional.includes(citizenship)) {
+    warnings['nationality.countryOfCitizenship'] =
+      `Country of citizenship (${nameOf(citizenship)}) differs from your primary nationality (${nameOf(primary)}). `
+      + `If you hold both, add ${nameOf(citizenship)} to Additional nationalities.`
+  }
+
+  if (residence && addressCountry && residence !== addressCountry) {
+    warnings['immigration.currentCountryOfResidence'] =
+      `Your current address is in ${nameOf(addressCountry)}, but your country of residence is ${nameOf(residence)}.`
+  }
+
+  return { errors, warnings }
+}
+
+export function resolveAdditionalNationalities(text, countries = []) {
+  const tokens = splitNationalityTokens(text)
   if (!tokens.length) return []
 
   const byCode = new Map(
@@ -673,6 +785,59 @@ function yearMonthValue(month, year) {
   const m = month === '' || month == null ? 1 : Number(month)
   if (!Number.isFinite(m) || m < 1 || m > 12) return null
   return y * 12 + m
+}
+
+/** Current month as a year*12+month key, read from the clock so limits roll forward automatically. */
+function currentYearMonthValue(now = new Date()) {
+  return now.getFullYear() * 12 + (now.getMonth() + 1)
+}
+
+/** True when month (1-12) of the given year is after the current month. */
+export function isFutureYearMonth(month, year, now = new Date()) {
+  const y = Number(year)
+  const m = Number(month)
+  if (!/^\d{4}$/.test(String(year ?? '').trim()) || !Number.isFinite(m) || m < 1 || m > 12) return false
+  return y * 12 + m > currentYearMonthValue(now)
+}
+
+/**
+ * Cross-field education date rules, keyed by field name (startMonth, startYear, graduationMonth,
+ * graduationYear). Only complete 4-digit years are compared.
+ */
+export function educationDateErrors(edu, now = new Date()) {
+  const errors = {}
+  if (!edu) return errors
+  const fullYear = (v) => /^\d{4}$/.test(String(v ?? '').trim())
+  const nowYear = now.getFullYear()
+  const nowKey = currentYearMonthValue(now)
+
+  if (fullYear(edu.startYear)) {
+    const sy = Number(edu.startYear)
+    if (sy > nowYear) {
+      errors.startYear = `Start year cannot be later than ${nowYear}`
+    } else if (edu.startMonth && yearMonthValue(edu.startMonth, sy) > nowKey) {
+      errors.startMonth = 'Start month cannot be in the future'
+    }
+  }
+
+  if (!edu.currentlyStudying && fullYear(edu.graduationYear)) {
+    const gy = Number(edu.graduationYear)
+    if (gy > nowYear) {
+      errors.graduationYear = `Graduation year cannot be later than ${nowYear}`
+    } else if (fullYear(edu.startYear) && gy < Number(edu.startYear)) {
+      errors.graduationYear = 'Graduation year cannot be before start year'
+    } else if (edu.graduationMonth && yearMonthValue(edu.graduationMonth, gy) > nowKey) {
+      errors.graduationMonth = 'Graduation month cannot be in the future'
+    } else if (
+      fullYear(edu.startYear)
+      && edu.startMonth
+      && edu.graduationMonth
+      && yearMonthValue(edu.graduationMonth, gy) < yearMonthValue(edu.startMonth, edu.startYear)
+    ) {
+      errors.graduationMonth = 'Graduation date cannot be before start date'
+    }
+  }
+  return errors
 }
 
 /**
@@ -1148,7 +1313,28 @@ export function validateIdentityForm(form, action, refData) {
       `Event travel radius must be between 0 and ${MAX_EVENT_TRAVEL_RADIUS_MILES} miles`
   }
 
+  const hasChildren = String(form.family?.hasChildren || '').trim().toUpperCase()
+  const coParenting = String(form.relationship?.coParenting || '').trim().toUpperCase()
   const childrenCount = toNullableInt(form.family?.childrenCount)
+
+  if (coParenting === 'YES') {
+    if (hasChildren !== 'YES') {
+      errors['family.hasChildren'] = 'Co-parenting requires Has children = Yes'
+      errors['relationship.coParenting'] = 'Set Has children to Yes when co-parenting'
+    }
+    if (childrenCount == null || childrenCount < 1) {
+      errors['family.childrenCount'] = 'Number of children must be at least 1 when co-parenting'
+    }
+  }
+
+  if (hasChildren === 'YES') {
+    if (childrenCount == null) {
+      errors['family.childrenCount'] = 'Enter number of children when Has children is Yes'
+    } else if (childrenCount < 1) {
+      errors['family.childrenCount'] = 'Number of children must be at least 1 when Has children is Yes'
+    }
+  }
+
   if (childrenCount != null && (childrenCount < 0 || childrenCount > MAX_CHILDREN_COUNT)) {
     errors['family.childrenCount'] =
       `Number of children (own and adopted combined) cannot exceed ${MAX_CHILDREN_COUNT}`
@@ -1233,14 +1419,11 @@ export function validateIdentityForm(form, action, refData) {
       errors[`educations.${i}.graduationMonth`] = 'Graduation month must be between 1 and 12'
     }
 
-    if (!currentlyStudying) {
-      const startKey = yearMonthValue(edu.startMonth, edu.startYear)
-      const endKey = yearMonthValue(edu.graduationMonth, edu.graduationYear)
-      if (startKey != null && endKey != null && endKey < startKey) {
-        errors[`educations.${i}.graduationYear`] = 'Graduation date cannot be before start date'
-      } else if (start != null && grad != null && grad < start) {
-        errors[`educations.${i}.graduationYear`] = 'Graduation year cannot be before start year'
-      }
+    if (start != null || grad != null) {
+      Object.entries(educationDateErrors(edu)).forEach(([field, message]) => {
+        const key = `educations.${i}.${field}`
+        if (!errors[key]) errors[key] = message
+      })
     }
   })
 
@@ -1255,19 +1438,24 @@ export function validateIdentityForm(form, action, refData) {
   careerAlnumErr('careerAmbitions', 'Career ambitions')
   const empTypeErr = validateEmploymentType(career.employmentType)
   if (empTypeErr) errors['career.employmentType'] = empTypeErr
-  if (trimValue(career.yearsInProfession) && !/^\d+$/.test(String(career.yearsInProfession).trim())) {
-    errors['career.yearsInProfession'] = 'Years in profession must be numbers only'
+  if (trimValue(career.yearsInProfession)) {
+    if (!/^\d+$/.test(String(career.yearsInProfession).trim())) {
+      errors['career.yearsInProfession'] = 'Years in profession must be numbers only'
+    } else {
+      const years = Number(career.yearsInProfession)
+      if (years > 80) {
+        errors['career.yearsInProfession'] = 'Years in profession cannot exceed 80'
+      }
+    }
   }
 
-  const currentYear = new Date().getFullYear()
-  const civilYear = toNullableInt(form.civilJudgment?.approxYear)
-  if (civilYear != null && (civilYear < 1900 || civilYear > currentYear)) {
-    errors['civilJudgment.approxYear'] = `Enter a year between 1900 and ${currentYear}`
-  }
-  const safetyYear = toNullableInt(form.safety?.approxYear)
-  if (safetyYear != null && (safetyYear < 1900 || safetyYear > currentYear)) {
-    errors['safety.approxYear'] = `Enter a year between 1900 and ${currentYear}`
-  }
+  const civilApproxErr = validateApproxYear(form.civilJudgment?.approxYear)
+  if (civilApproxErr) errors['civilJudgment.approxYear'] = civilApproxErr
+  const safetyApproxErr = validateApproxYear(form.safety?.approxYear)
+  if (safetyApproxErr) errors['safety.approxYear'] = safetyApproxErr
+
+  const idDocErr = validateIdDocumentNumber(form.idDocumentType, form.idDocumentNumber)
+  if (idDocErr) errors.idDocumentNumber = idDocErr
 
   const primary = trimValue(form.nationality?.primaryNationality).toUpperCase()
   const additional = (form.nationality?.additionalNationalities || [])
@@ -1276,6 +1464,7 @@ export function validateIdentityForm(form, action, refData) {
   if (primary && additional.includes(primary)) {
     errors['nationality.additionalNationalities'] = 'Additional nationalities cannot duplicate primary'
   }
+  Object.assign(errors, nationalityImmigrationChecks(form, refData?.countries || []).errors)
   const seen = new Set()
   for (const code of additional) {
     if (seen.has(code)) {

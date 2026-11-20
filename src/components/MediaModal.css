@@ -1,0 +1,96 @@
+.media-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4.5rem 4.5rem 2rem;
+  background: rgba(0, 0, 0, 0.88);
+}
+
+.media-viewer-close {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10002;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: rgba(17, 17, 17, 0.75);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.media-viewer-close:hover {
+  background: #e11d48;
+  border-color: #e11d48;
+  transform: scale(1.08);
+}
+.media-viewer-close:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+.media-viewer-nav {
+  position: fixed;
+  top: 50%;
+  z-index: 10001;
+  width: 48px;
+  height: 48px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 2.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.media-viewer-nav:hover { background: rgba(255, 255, 255, 0.4); }
+.media-viewer-nav--prev { left: 1rem; }
+.media-viewer-nav--next { right: 1rem; }
+
+.media-viewer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.media-viewer-media {
+  max-width: 100%;
+  max-height: calc(100vh - 9rem);
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.media-viewer-caption {
+  margin-top: 1rem;
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.media-viewer-counter {
+  margin-top: 0.5rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .media-viewer { padding: 4.5rem 0.75rem 1.5rem; }
+  .media-viewer-nav { top: auto; bottom: 1rem; transform: none; }
+}

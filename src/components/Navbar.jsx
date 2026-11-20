@@ -4,7 +4,8 @@ import { Crown, Menu, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { BrandMark, LoggedInBrandName } from './AuthBrandAssets'
 import ThemeToggle from './ThemeToggle'
-import { getEmployeeNavItems, isEmployeeUser } from '../utils/employeeAccess'
+import { DASHBOARD_KEYS, getEmployeeNavItems, isEmployeeUser } from '../utils/employeeAccess'
+import { SUPPORT_INBOX_EVENT, formatUnreadBadge } from '../utils/supportInbox'
 import api from '../api/axios'
 
 export default function Navbar() {
@@ -14,6 +15,7 @@ export default function Navbar() {
     const [menuOpen, setMenuOpen] = useState(false)
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const [isPremium, setIsPremium] = useState(false)
+    const [supportUnread, setSupportUnread] = useState(0)
     const dropdownRef = useRef(null)
 
     useEffect(() => {
@@ -32,6 +34,30 @@ export default function Navbar() {
         })()
         return () => { cancelled = true }
     }, [user])
+
+    const employeeNavItems = isEmployeeUser(user) ? getEmployeeNavItems(user) : []
+    const hasSupportDesk = employeeNavItems.some((item) => item.key === DASHBOARD_KEYS.CUSTOMER_SUPPORT)
+
+    useEffect(() => {
+        if (!hasSupportDesk) return undefined
+        let cancelled = false
+        const fetchUnread = async () => {
+            try {
+                const { data } = await api.get('/admin/customer-support/notifications/unread-count')
+                if (!cancelled) setSupportUnread(Number(data?.unreadCount) || 0)
+            } catch {
+                /* keep last known count */
+            }
+        }
+        fetchUnread()
+        const timer = setInterval(fetchUnread, 30000)
+        window.addEventListener(SUPPORT_INBOX_EVENT, fetchUnread)
+        return () => {
+            cancelled = true
+            clearInterval(timer)
+            window.removeEventListener(SUPPORT_INBOX_EVENT, fetchUnread)
+        }
+    }, [hasSupportDesk])
 
     useEffect(() => {
         const handleClickOutside = (e) => {
@@ -115,16 +141,33 @@ export default function Navbar() {
                     {!isEmployeeUser(user) && (
                         <NavLink to="/subscriptions">Subscription</NavLink>
                     )}
-                    {isEmployeeUser(user) && getEmployeeNavItems(user).map((item) => (
-                        <NavLink
-                            key={item.key}
-                            to={item.path}
-                            end={item.end === true}
-                            className={({ isActive }) => (isActive ? 'nav-active' : undefined)}
-                        >
-                            {item.label}
-                        </NavLink>
-                    ))}
+                    {isEmployeeUser(user) && employeeNavItems.map((item) => {
+                        const badge = item.key === DASHBOARD_KEYS.CUSTOMER_SUPPORT
+                            ? formatUnreadBadge(hasSupportDesk ? supportUnread : 0)
+                            : null
+                        return (
+                            <NavLink
+                                key={item.key}
+                                to={item.path}
+                                end={item.end === true}
+                                className={({ isActive }) => [
+                                    isActive ? 'nav-active' : '',
+                                    badge ? 'nav-link-with-badge' : '',
+                                ].filter(Boolean).join(' ') || undefined}
+                            >
+                                <span>{item.label}</span>
+                                {badge && (
+                                    <span
+                                        key={badge}
+                                        className="nav-unread-badge"
+                                        aria-label={`${supportUnread} unread support notifications`}
+                                    >
+                                        {badge}
+                                    </span>
+                                )}
+                            </NavLink>
+                        )
+                    })}
 
                     <div className="nav-theme-desktop">
                         <ThemeToggle />

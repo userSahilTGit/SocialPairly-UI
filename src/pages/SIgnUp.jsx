@@ -35,6 +35,69 @@ const COMPLETED_STEP = IS_PHONE_SMS_VERIFICATION_ENABLED ? 4 : 3
 const PHONE_STEP = 3
 const EMAIL_OTP_TTL_MS = 10 * 60 * 1000
 
+const MAX_FULL_NAME_LENGTH = 80
+const MAX_NAME_PART_LENGTH = 60
+const MAX_EMAIL_LENGTH = 120
+const SIGNUP_EMAIL_RE = /^[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
+const SIGNUP_NAME_RE = /^[\p{L}][\p{L} .'-]*$/u
+
+function validateSignupFullName(value) {
+  const trimmed = String(value ?? '').trim()
+  if (!trimmed) return 'Username / full name is required.'
+  if (trimmed.length > MAX_FULL_NAME_LENGTH) {
+    return `Username is too long (maximum ${MAX_FULL_NAME_LENGTH} characters).`
+  }
+  const { firstName, middleName, lastName } = splitFullName(trimmed)
+  if (
+    firstName.length > MAX_NAME_PART_LENGTH ||
+    lastName.length > MAX_NAME_PART_LENGTH ||
+    middleName.length > MAX_NAME_PART_LENGTH
+  ) {
+    return `Username is too long (maximum ${MAX_NAME_PART_LENGTH} characters per name part).`
+  }
+  if (!SIGNUP_NAME_RE.test(trimmed)) {
+    return 'Username can only contain letters, spaces, apostrophes, hyphens, and periods.'
+  }
+  return ''
+}
+
+function validateSignupEmail(value) {
+  const trimmed = String(value ?? '').trim()
+  if (!trimmed) return 'Email address is required.'
+  if (trimmed.length > MAX_EMAIL_LENGTH) {
+    return `Email address is too long (maximum ${MAX_EMAIL_LENGTH} characters).`
+  }
+  if (!SIGNUP_EMAIL_RE.test(trimmed)) {
+    return 'Please enter a valid email address (e.g. name@example.com).'
+  }
+  return ''
+}
+
+function extractSignupApiErrors(data) {
+  const fieldErrs = { fullName: '', email: '', phoneNumber: '' }
+  const fields = data?.fields && typeof data.fields === 'object' ? data.fields : null
+  if (fields) {
+    const nameMsg = fields.firstName || fields.middleName || fields.lastName
+    if (nameMsg) fieldErrs.fullName = nameMsg
+    if (fields.email) fieldErrs.email = fields.email
+    if (fields.phoneNumber) fieldErrs.phoneNumber = fields.phoneNumber
+  }
+  const rawMessage = String(data?.message || data?.error || '').trim()
+  const lower = rawMessage.toLowerCase()
+  if (!fieldErrs.fullName && (lower.includes('username') || lower.includes('first name') || lower.includes('last name') || lower.includes('middle name') || lower.includes('full name'))) {
+    fieldErrs.fullName = rawMessage
+  }
+  if (!fieldErrs.email && lower.includes('email')) {
+    fieldErrs.email = rawMessage
+  }
+  if (!fieldErrs.phoneNumber && lower.includes('phone')) {
+    fieldErrs.phoneNumber = rawMessage
+  }
+  const hasFieldError = !!(fieldErrs.fullName || fieldErrs.email || fieldErrs.phoneNumber)
+  const banner = hasFieldError || rawMessage === 'Validation failed' ? '' : (rawMessage || 'Unable to create account. Please check your details and try again.')
+  return { fieldErrs, banner }
+}
+
 function formatOtpCountdown(totalSeconds) {
   const safe = Math.max(0, totalSeconds)
   const mins = Math.floor(safe / 60)
@@ -69,6 +132,7 @@ export default function SignUp() {
   const [phoneOtp, setPhoneOtp] = useState('')
   const [phoneCodeSent, setPhoneCodeSent] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({ fullName: '', email: '', phoneNumber: '' })
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const phoneConfirmationRef = useRef(null)
@@ -99,6 +163,16 @@ export default function SignUp() {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
     setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
+    if (name === 'fullName') {
+      const nextErr = value.trim().length > MAX_FULL_NAME_LENGTH
+        ? `Username is too long (maximum ${MAX_FULL_NAME_LENGTH} characters).`
+        : ''
+      setFieldErrors((prev) => (prev.fullName !== nextErr ? { ...prev, fullName: nextErr } : prev))
+      setError('')
+    } else if (name === 'email') {
+      setFieldErrors((prev) => (prev.email ? { ...prev, email: '' } : prev))
+      setError('')
+    }
   }
 
   /** One checkbox covers Terms, Privacy, and identity consent for the API. */
@@ -117,16 +191,26 @@ export default function SignUp() {
     setError('')
     setMessage('')
 
+    const nextFieldErrors = {
+      fullName: validateSignupFullName(form.fullName),
+      email: validateSignupEmail(form.email),
+      phoneNumber: !form.phoneNumber.trim()
+        ? 'Phone number is required.'
+        : !isValidPhoneNational(form.phoneNumber, countryCode)
+          ? phoneNationalValidationMessage(countryCode)
+          : '',
+    }
+    setFieldErrors(nextFieldErrors)
+    if (nextFieldErrors.fullName || nextFieldErrors.email || nextFieldErrors.phoneNumber) {
+      return
+    }
+
     if (form.password !== form.confirmPassword) {
       setError('Passwords do not match')
       return
     }
     if (!requiredConsentsOk) {
       setError('Please accept the required consents to continue.')
-      return
-    }
-    if (!isValidPhoneNational(form.phoneNumber, countryCode)) {
-      setError(phoneNationalValidationMessage(countryCode))
       return
     }
 
@@ -160,10 +244,18 @@ export default function SignUp() {
       setStep(2)
     } catch (err) {
       const data = err.response?.data
-      if (err.response?.status === 429) {
+      if (!err.response) {
+        setError('Unable to reach the server. Please check your connection and try again.')
+      } else if (err.response?.status === 429) {
         setError(data?.message || 'Too many attempts. Try again later.')
       } else {
-        setError(data?.message || data?.error || 'Registration failed.')
+        const { fieldErrs, banner } = extractSignupApiErrors(data)
+        setFieldErrors((prev) => ({
+          fullName: fieldErrs.fullName || prev.fullName,
+          email: fieldErrs.email || prev.email,
+          phoneNumber: fieldErrs.phoneNumber || prev.phoneNumber,
+        }))
+        setError(banner)
       }
     } finally {
       setLoading(false)
@@ -317,30 +409,56 @@ export default function SignUp() {
           {message && <div className="success">{message}</div>}
 
           {step === 1 && (
-            <form onSubmit={handleCreateAccount}>
+            <form onSubmit={handleCreateAccount} noValidate>
               <div className="form-group">
-                <label>Full name</label>
-                <input className="auth-input"
+                <label htmlFor="signup-full-name">Full name</label>
+                <input
+                  id="signup-full-name"
+                  className="auth-input"
                   name="fullName"
                   value={form.fullName}
                   onChange={handleChange}
+                  onBlur={() => {
+                    const errMsg = validateSignupFullName(form.fullName)
+                    setFieldErrors((prev) => ({ ...prev, fullName: form.fullName ? errMsg : prev.fullName }))
+                  }}
                   placeholder="Alex Rivera"
+                  aria-invalid={!!fieldErrors.fullName || undefined}
+                  aria-describedby={fieldErrors.fullName ? 'signup-fullname-error' : undefined}
                   required
                 />
+                {fieldErrors.fullName && (
+                  <p className="field-error" id="signup-fullname-error" role="alert">
+                    {fieldErrors.fullName}
+                  </p>
+                )}
               </div>
               <div className="form-group">
-                <label>Email address</label>
-                <input className="auth-input"
+                <label htmlFor="signup-email">Email address</label>
+                <input
+                  id="signup-email"
+                  className="auth-input"
                   type="email"
                   name="email"
                   value={form.email}
                   onChange={handleChange}
+                  onBlur={() => {
+                    const errMsg = validateSignupEmail(form.email)
+                    setFieldErrors((prev) => ({ ...prev, email: form.email ? errMsg : prev.email }))
+                  }}
                   placeholder="you@example.com"
+                  aria-invalid={!!fieldErrors.email || undefined}
+                  aria-describedby={fieldErrors.email ? 'signup-email-error' : undefined}
                   required
                 />
+                {fieldErrors.email && (
+                  <p className="field-error" id="signup-email-error" role="alert">
+                    {fieldErrors.email}
+                  </p>
+                )}
               </div>
               <div className="form-group">
-                <label>Mobile number</label>
+                <label htmlFor="signup-phone">Mobile number</label>
                 <div className="phone-field">
                   <PhoneCountryCodeSelect
                     value={countryCode}
@@ -350,9 +468,12 @@ export default function SignUp() {
                         ...prev,
                         phoneNumber: formatPhoneNationalInput(dialCode, prev.phoneNumber),
                       }))
+                      setFieldErrors((prev) => (prev.phoneNumber ? { ...prev, phoneNumber: '' } : prev))
+                      setError('')
                     }}
                   />
                   <input
+                    id="signup-phone"
                     className="auth-input"
                     name="phoneNumber"
                     type="tel"
@@ -360,10 +481,14 @@ export default function SignUp() {
                     pattern="[0-9]*"
                     maxLength={getPhoneNationalLength(countryCode).max}
                     value={form.phoneNumber}
-                    onChange={(e) => setForm((prev) => ({
-                      ...prev,
-                      phoneNumber: formatPhoneNationalInput(countryCode, e.target.value),
-                    }))}
+                    onChange={(e) => {
+                      setForm((prev) => ({
+                        ...prev,
+                        phoneNumber: formatPhoneNationalInput(countryCode, e.target.value),
+                      }))
+                      setFieldErrors((prev) => (prev.phoneNumber ? { ...prev, phoneNumber: '' } : prev))
+                      setError('')
+                    }}
                     placeholder={
                       countryCode === '+971'
                         ? '501234567'
@@ -372,9 +497,19 @@ export default function SignUp() {
                           : '9876543210'
                     }
                     required
-                    aria-invalid={form.phoneNumber && !isValidPhoneNational(form.phoneNumber, countryCode) ? true : undefined}
+                    aria-invalid={
+                      !!fieldErrors.phoneNumber ||
+                      (form.phoneNumber && !isValidPhoneNational(form.phoneNumber, countryCode)) ||
+                      undefined
+                    }
+                    aria-describedby={fieldErrors.phoneNumber ? 'signup-phone-error' : undefined}
                   />
                 </div>
+                {fieldErrors.phoneNumber && (
+                  <p className="field-error" id="signup-phone-error" role="alert">
+                    {fieldErrors.phoneNumber}
+                  </p>
+                )}
                 <p className="field-hint">
                   Numbers only — {getPhoneNationalLength(countryCode).label} for {countryCode}.
                 </p>

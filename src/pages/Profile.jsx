@@ -697,11 +697,6 @@ export default function Profile() {
                 {form.aboutMe && <p className="bio">&ldquo;{form.aboutMe}&rdquo;</p>}
               </div>
             </div>
-            <div className="sp-preview-actions">
-              <span className="ghost"><X className="w-6 h-6" /></span>
-              <span className="heart"><Heart className="w-7 h-7" fill="currentColor" /></span>
-              <span className="ghost spark"><Sparkles className="w-6 h-6" /></span>
-            </div>
           </div>
         </div>
       )}

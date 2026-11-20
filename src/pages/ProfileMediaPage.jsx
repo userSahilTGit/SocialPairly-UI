@@ -12,7 +12,7 @@ import {
   UploadCloud, Film, Image as ImageIcon, X, GripVertical,
   ChevronLeft, ChevronRight, Play, Pencil, Trash2, Save,
   AlertCircle, Plus, CheckCircle2, Camera, LogOut, Video,
-  Star, Tag, Smartphone, ArrowRight,
+  Star, Smartphone, ArrowRight,
   LayoutGrid, Heart,
 } from 'lucide-react'
 
@@ -22,13 +22,14 @@ const MEDIA_CATEGORIES = ['FULL_LENGTH', 'PRIMARY', 'LIFESTYLE', 'HOBBY']
 const DEFAULT_CATEGORY = 'FULL_LENGTH'
 const PRIVACY_OPTIONS = ['PUBLIC', 'MUTUAL_ONLY']
 const DEFAULT_PRIVACY = 'PUBLIC'
+const SUCCESS_TOAST_MS = 5000
 
-const STORY_PROMPTS = [
-  'My favorite weekend spot',
-  'A quick story about this photo',
-  'Catch me in my element',
-  'Sunday morning routine',
-]
+/** SHA-256 hex matching the backend `contentHash`; null where Web Crypto is unavailable (non-secure origin). */
+async function hashFile(file) {
+  if (!window.crypto?.subtle) return null
+  const digest = await window.crypto.subtle.digest('SHA-256', await file.arrayBuffer())
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
+}
 
 function getVideoDuration(file) {
   return new Promise((resolve, reject) => {
@@ -99,7 +100,18 @@ export default function ProfileMediaPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [successToast, setSuccessToast] = useState({ text: '', id: 0 })
+  const success = successToast.text
+  /** Each call gets a fresh id so a repeat message replaces the old one and replays the slide-in. */
+  const setSuccess = useCallback((text) => {
+    setSuccessToast(text ? { text, id: Date.now() } : { text: '', id: 0 })
+  }, [])
+
+  useEffect(() => {
+    if (!successToast.id) return undefined
+    const timer = setTimeout(() => setSuccessToast({ text: '', id: 0 }), SUCCESS_TOAST_MS)
+    return () => clearTimeout(timer)
+  }, [successToast.id])
   const [activeStep, setActiveStep] = useState(1)
   const [editingMedia, setEditingMedia] = useState(null)
   const [draggedIndex, setDraggedIndex] = useState(null)
@@ -111,7 +123,6 @@ export default function ProfileMediaPage() {
   const [showPromptSelect, setShowPromptSelect] = useState(false)
   const [selectedSlotIndex, setSelectedSlotIndex] = useState(0)
   const [previewIndex, setPreviewIndex] = useState(0)
-  const [promptChoice, setPromptChoice] = useState(STORY_PROMPTS[0])
   const [previewProfile, setPreviewProfile] = useState({
     aboutMe: '',
     occupation: '',
@@ -120,6 +131,22 @@ export default function ProfileMediaPage() {
     age: null,
   })
   const [dragOverDropzone, setDragOverDropzone] = useState(false)
+  const [cardAnim, setCardAnim] = useState('')
+  const [previewEffect, setPreviewEffect] = useState('')
+  const [previewConfirm, setPreviewConfirm] = useState(null)
+  const [duplicateNotice, setDuplicateNotice] = useState(null)
+  const previewTimersRef = useRef([])
+
+  const clearPreviewTimers = () => {
+    previewTimersRef.current.forEach(clearTimeout)
+    previewTimersRef.current = []
+  }
+
+  const schedulePreview = (fn, ms) => {
+    previewTimersRef.current.push(setTimeout(fn, ms))
+  }
+
+  useEffect(() => clearPreviewTimers, [])
 
   const fetchMyMedia = useCallback(async () => {
     try {
@@ -193,7 +220,12 @@ export default function ProfileMediaPage() {
       })
       return true
     } catch (err) {
-      setError(err.response?.data?.message || `Failed to upload ${file.name}`)
+      const message = err.response?.data?.message || `Failed to upload ${file.name}`
+      if (/already in your media library/i.test(message)) {
+        setDuplicateNotice({ names: [file.name], message })
+      } else {
+        setError(message)
+      }
       return false
     }
   }
@@ -212,9 +244,38 @@ export default function ProfileMediaPage() {
       return
     }
 
-    const toUpload = files.slice(0, remaining)
     setError('')
     setSuccess('')
+
+    const existingHashes = new Set(myMedia.map((m) => m.contentHash).filter(Boolean))
+    const seenHashes = new Set()
+    const unique = []
+    const skipped = []
+    for (const file of files) {
+      const hash = await hashFile(file).catch(() => null)
+      if (hash && (existingHashes.has(hash) || seenHashes.has(hash))) {
+        skipped.push(file.name)
+        continue
+      }
+      if (hash) seenHashes.add(hash)
+      unique.push(file)
+    }
+
+    if (skipped.length > 0) {
+      setDuplicateNotice({
+        names: skipped,
+        message:
+          unique.length === 0
+            ? 'These files are already in your media library, so nothing was uploaded.'
+            : 'These files are already in your media library and were skipped. The rest will upload.',
+      })
+    }
+    if (unique.length === 0) return
+
+    const toUpload = unique.slice(0, remaining)
+    if (unique.length > remaining) {
+      setError(`Only ${remaining} slot(s) left — extra files were not uploaded.`)
+    }
 
     const images = []
     const videos = []
@@ -238,6 +299,8 @@ export default function ProfileMediaPage() {
       setShowPromptSelect(true)
       return
     }
+
+    if (images.length === 0) return
 
     let uploaded = 0
     setUploading(true)
@@ -271,18 +334,36 @@ export default function ProfileMediaPage() {
     }
   }
 
-  const handleDelete = async (mediaId, e) => {
-    e?.stopPropagation?.()
+  const canDeleteMedia = (target) => {
+    const photoCount = myMedia.filter((m) => m.mediaType === 'PHOTO').length
     if (myMedia.length <= 1) {
-      setError('You need at least 1 primary photo for your profile.')
-      return
+      setError('Keep at least one media item on your profile. Upload another photo before deleting this one.')
+      return false
     }
+    if (target?.mediaType === 'PHOTO' && photoCount <= 1) {
+      setError('Keep at least one photo as your primary profile image. Add another photo before deleting this one.')
+      return false
+    }
+    return true
+  }
+
+  const handleDelete = (mediaId, e) => {
+    e?.stopPropagation?.()
+    e?.preventDefault?.()
+    const target = myMedia.find((m) => m.id === mediaId)
+    if (!target || !canDeleteMedia(target)) return
+    setPreviewConfirm({ type: 'delete', item: target })
+  }
+
+  const performDelete = async (mediaId) => {
     try {
       await api.delete(`/media/${mediaId}`)
+      setError('')
       setSuccess('Media removed successfully.')
+      setActiveMedia((prev) => (prev?.id === mediaId ? null : prev))
       await fetchMyMedia()
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to delete media.')
+      setError(err.response?.data?.message || 'Failed to delete media. Try again or refresh the page.')
     }
   }
 
@@ -295,15 +376,6 @@ export default function ProfileMediaPage() {
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update caption.')
     }
-  }
-
-  const attachPromptToSelected = async () => {
-    const item = myMedia[selectedSlotIndex]
-    if (!item) {
-      setError('Select a filled media slot first.')
-      return
-    }
-    await handleUpdateCaption(item.id, promptChoice)
   }
 
   const updateMediaField = (mediaId, field, value) => {
@@ -367,6 +439,12 @@ export default function ProfileMediaPage() {
     setPreviewIndex(index)
   }
 
+  const openMediaModal = (item, e) => {
+    e?.stopPropagation?.()
+    if (!item) return
+    setActiveMedia(item)
+  }
+
   const nextPreview = () => {
     if (myMedia.length === 0) return
     setPreviewIndex((i) => (i + 1) % myMedia.length)
@@ -375,6 +453,85 @@ export default function ProfileMediaPage() {
   const prevPreview = () => {
     if (myMedia.length === 0) return
     setPreviewIndex((i) => (i - 1 + myMedia.length) % myMedia.length)
+  }
+
+  const triggerPreviewAction = (type) => {
+    const item = activePreview
+    if (!item || cardAnim || previewEffect) return
+    if (type === 'pass' && !canDeleteMedia(item)) return
+    clearPreviewTimers()
+    setError('')
+    setSuccess('')
+
+    const exitClass =
+      type === 'pass' ? 'exit-left' : type === 'like' ? 'exit-right' : 'exit-up'
+    setPreviewEffect(type)
+
+    schedulePreview(() => {
+      setPreviewEffect('')
+      setCardAnim(exitClass)
+      schedulePreview(() => {
+        if (type === 'like') nextPreview()
+        setCardAnim('card-pop-in')
+        schedulePreview(() => {
+          setCardAnim('')
+          if (type === 'pass') {
+            setPreviewConfirm({ type: 'delete', item })
+          } else if (type === 'super') {
+            if (item.mediaType === 'PHOTO') {
+              setPreviewConfirm({ type: 'cover', item })
+            } else {
+              setError('Only photos can be set as your profile photo. Pick a photo and tap the star.')
+            }
+          }
+        }, 380)
+      }, 420)
+    }, 600)
+  }
+
+  const makeProfilePhoto = async (item) => {
+    const index = myMedia.findIndex((m) => m.id === item.id)
+    if (index < 0 || myMedia[index].mediaType !== 'PHOTO') return
+    if (myMedia[index].isCover && index === 0) {
+      setSuccess('This is already your profile photo.')
+      return
+    }
+    const reordered = [...myMedia]
+    const [moved] = reordered.splice(index, 1)
+    reordered.unshift(moved)
+    const updated = reordered.map((m, i) => ({
+      ...m,
+      isCover: m.mediaType === 'PHOTO' ? i === 0 : false,
+    }))
+    setMyMedia(updated)
+    setSelectedSlotIndex(0)
+    setPreviewIndex(0)
+    try {
+      for (let i = 0; i < updated.length; i++) {
+        const m = updated[i]
+        await api.put(`/media/${m.id}`, {
+          caption: m.caption || '',
+          displayOrder: i + 1,
+          mediaCategory: m.mediaCategory || DEFAULT_CATEGORY,
+          privacyMode: m.privacyMode || DEFAULT_PRIVACY,
+          isCover: !!m.isCover,
+        })
+      }
+      setSuccess('Profile photo updated!')
+      await fetchMyMedia()
+      await refreshUser()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update profile photo.')
+      await fetchMyMedia()
+    }
+  }
+
+  const confirmPreviewAction = async () => {
+    const pending = previewConfirm
+    setPreviewConfirm(null)
+    if (!pending) return
+    if (pending.type === 'delete') await performDelete(pending.item.id)
+    else if (pending.type === 'cover') await makeProfilePhoto(pending.item)
   }
 
   const setAsPrimary = (index) => {
@@ -471,6 +628,70 @@ export default function ProfileMediaPage() {
           </div>
         )}
 
+        {previewConfirm && (
+          <div className="modal-overlay" onClick={() => setPreviewConfirm(null)}>
+            <div className="modal ms-confirm-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+              <div className="ms-confirm-thumb">
+                {previewConfirm.item.mediaType === 'PHOTO' ? (
+                  <img src={getMediaUrl(previewConfirm.item)} alt="" />
+                ) : (
+                  <video src={getMediaUrl(previewConfirm.item)} muted playsInline />
+                )}
+              </div>
+              {previewConfirm.type === 'delete' ? (
+                <>
+                  <h2>{previewConfirm.item.mediaType === 'VIDEO' ? 'Delete this video?' : 'Delete this photo?'}</h2>
+                  <p className="ms-confirm-desc">
+                    It will be removed from your profile and media library. This cannot be undone.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2>Make this your profile photo?</h2>
+                  <p className="ms-confirm-desc">
+                    This photo will become your primary picture and move to the first slot.
+                  </p>
+                </>
+              )}
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setPreviewConfirm(null)}>
+                  {previewConfirm.type === 'delete' ? 'Keep it' : 'Not now'}
+                </button>
+                <button
+                  type="button"
+                  className={previewConfirm.type === 'delete' ? 'btn btn-danger' : 'btn btn-primary'}
+                  onClick={confirmPreviewAction}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  {previewConfirm.type === 'delete' ? (
+                    <><Trash2 size={16} /> Delete</>
+                  ) : (
+                    <><Star size={16} fill="currentColor" /> Make profile photo</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {duplicateNotice && (
+          <div className="modal-overlay" onClick={() => setDuplicateNotice(null)}>
+            <div className="modal ms-confirm-modal" onClick={(e) => e.stopPropagation()} role="alertdialog" aria-modal="true">
+              <div className="ms-dup-icon"><AlertCircle size={28} /></div>
+              <h2>Duplicate upload blocked</h2>
+              <p className="ms-confirm-desc">{duplicateNotice.message}</p>
+              <ul className="ms-dup-list">
+                {duplicateNotice.names.map((name, i) => <li key={`${name}-${i}`}>{name}</li>)}
+              </ul>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-primary" onClick={() => setDuplicateNotice(null)}>
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="ms-header">
           <div>
@@ -508,7 +729,18 @@ export default function ProfileMediaPage() {
 
         <ProfileReadinessBanner />
         {error && <div className="error">{error}</div>}
-        {success && <div className="success">{success}</div>}
+        {success && (
+          <div className="ms-toast-lane">
+            <div
+              key={successToast.id}
+              className="success ms-success-toast"
+              role="status"
+              style={{ '--ms-toast-ms': `${SUCCESS_TOAST_MS}ms` }}
+            >
+              {success}
+            </div>
+          </div>
+        )}
 
         <div className="ms-layout">
           {/* LEFT — fixed height panels so steps 1–3 never jump layout */}
@@ -637,43 +869,30 @@ export default function ProfileMediaPage() {
                           )}
                           <div className="ms-slot-footer">
                             <span>{idx + 1}</span>
-                            <button
-                              type="button"
-                              className="ms-slot-del"
-                              onClick={(e) => handleDelete(item.id, e)}
-                              aria-label="Delete"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="ms-slot-actions">
+                              <button
+                                type="button"
+                                className="ms-slot-del"
+                                onClick={(e) => openMediaModal(item, e)}
+                                aria-label="Open full preview"
+                                title="Open full preview"
+                              >
+                                <Play className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                className="ms-slot-del"
+                                onClick={(e) => handleDelete(item.id, e)}
+                                aria-label="Delete"
+                                title="Delete media"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       )
                     })}
-                  </div>
-                </div>
-
-                <div className="ms-prompt-box">
-                  <div className="ms-prompt-head">
-                    <span>
-                      <Tag className="w-3.5 h-3.5" /> Add Story Prompt Sticker to Selected Photo
-                    </span>
-                    <span className="ms-prompt-slot">
-                      Editing Slot #{Math.min(selectedSlotIndex + 1, Math.max(myMedia.length, 1))}
-                      {selectedSlotIndex === 0 ? ' (Primary)' : ''}
-                    </span>
-                  </div>
-                  <div className="ms-prompt-row">
-                    <select
-                      value={promptChoice}
-                      onChange={(e) => setPromptChoice(e.target.value)}
-                    >
-                      {STORY_PROMPTS.map((p) => (
-                        <option key={p} value={p}>{`"${p}..."`}</option>
-                      ))}
-                    </select>
-                    <button type="button" className="ms-btn-purple" onClick={attachPromptToSelected}>
-                      Attach
-                    </button>
                   </div>
                 </div>
 
@@ -899,7 +1118,10 @@ export default function ProfileMediaPage() {
 
             <div className="ms-phone">
               <div className="ms-phone-notch" />
-              <div className="ms-phone-screen">
+              <div
+                id="activeMatchCard"
+                className={`ms-phone-screen${cardAnim ? ` ${cardAnim}` : ''}`}
+              >
                 {activePreview ? (
                   activePreview.mediaType === 'PHOTO' ? (
                     <img src={getMediaUrl(activePreview)} alt="" className="ms-phone-bg" />
@@ -955,12 +1177,71 @@ export default function ProfileMediaPage() {
                     <p className="ms-phone-bio">&ldquo;{previewProfile.aboutMe}&rdquo;</p>
                   )}
                 </div>
-              </div>
 
-              <div className="ms-phone-actions">
-                <span className="ghost"><X className="w-5 h-5" /></span>
-                <span className="heart"><Heart className="w-6 h-6" fill="currentColor" /></span>
-                <span className="ghost spark"><Star className="w-5 h-5" fill="currentColor" /></span>
+                {/* Non-blocking gradient so story taps still work above the dock */}
+                <div className="ms-phone-bottom-grad" aria-hidden="true" />
+
+                {previewEffect && (
+                  <div className={`ms-phone-effect ms-phone-effect--${previewEffect}`} aria-hidden="true">
+                    {previewEffect === 'pass' && <X className="ms-effect-icon" strokeWidth={3} />}
+                    {previewEffect === 'like' && (
+                      <>
+                        <Heart className="ms-effect-icon" fill="currentColor" />
+                        {[0, 1, 2, 3, 4, 5].map((i) => (
+                          <Heart key={i} className={`ms-effect-particle p${i}`} fill="currentColor" />
+                        ))}
+                      </>
+                    )}
+                    {previewEffect === 'super' && (
+                      <>
+                        <Star className="ms-effect-icon" fill="currentColor" />
+                        {[0, 1, 2, 3, 4, 5].map((i) => (
+                          <Star key={i} className={`ms-effect-particle p${i}`} fill="currentColor" />
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Action dock above taps/overlays so ✕ ♥ ★ always receive clicks */}
+                <div className="ms-phone-actions" role="group" aria-label="Preview match actions">
+                  <button
+                    type="button"
+                    className="ghost"
+                    aria-label="Delete this media"
+                    title="Delete this media"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      triggerPreviewAction('pass')
+                    }}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                  <button
+                    type="button"
+                    className="heart"
+                    aria-label="Like and show next"
+                    title="Like and show next"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      triggerPreviewAction('like')
+                    }}
+                  >
+                    <Heart className="w-6 h-6" fill="currentColor" />
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost spark"
+                    aria-label="Make profile photo"
+                    title="Make profile photo"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      triggerPreviewAction('super')
+                    }}
+                  >
+                    <Star className="w-5 h-5" fill="currentColor" />
+                  </button>
+                </div>
               </div>
             </div>
 

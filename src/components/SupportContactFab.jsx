@@ -15,8 +15,12 @@ export default function SupportContactFab() {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [showPhoneOptions, setShowPhoneOptions] = useState(false)
   const [isPremium, setIsPremium] = useState(false)
   const [premiumResolved, setPremiumResolved] = useState(false)
+  const [callbackBusy, setCallbackBusy] = useState(false)
+  const [callbackMessage, setCallbackMessage] = useState('')
+  const [callbackError, setCallbackError] = useState('')
   const rootRef = useRef(null)
 
   useEffect(() => {
@@ -25,7 +29,6 @@ export default function SupportContactFab() {
       try {
         const { data } = await api.get('/subscriptions/current')
         if (cancelled) return
-        // Free payload is { active: false }. Paid payload is SubscriptionDto (id + status).
         const premium = !!(
           data
           && data.active !== false
@@ -43,12 +46,13 @@ export default function SupportContactFab() {
   }, [])
 
   useEffect(() => {
-    if (!open && !showUpgradeModal) return undefined
+    if (!open && !showUpgradeModal && !showPhoneOptions) return undefined
 
     const onKeyDown = (event) => {
       if (event.key === 'Escape') {
         setOpen(false)
         setShowUpgradeModal(false)
+        setShowPhoneOptions(false)
       }
     }
 
@@ -56,7 +60,7 @@ export default function SupportContactFab() {
     return () => {
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [open, showUpgradeModal])
+  }, [open, showUpgradeModal, showPhoneOptions])
 
   useEffect(() => {
     if (!open) return undefined
@@ -74,13 +78,13 @@ export default function SupportContactFab() {
   }, [open])
 
   useEffect(() => {
-    if (!showUpgradeModal) return undefined
+    if (!showUpgradeModal && !showPhoneOptions) return undefined
     const previous = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = previous
     }
-  }, [showUpgradeModal])
+  }, [showUpgradeModal, showPhoneOptions])
 
   const closeMenu = () => setOpen(false)
 
@@ -88,10 +92,12 @@ export default function SupportContactFab() {
     if (!premiumResolved) return
     if (isPremium) {
       setShowUpgradeModal(false)
+      setShowPhoneOptions(false)
       setOpen((value) => !value)
       return
     }
     setOpen(false)
+    setShowPhoneOptions(false)
     setShowUpgradeModal(true)
   }
 
@@ -107,6 +113,34 @@ export default function SupportContactFab() {
     navigate({ pathname: '/settings', hash: 'support' })
   }
 
+  const openPhoneOptions = (event) => {
+    event.preventDefault()
+    closeMenu()
+    setCallbackMessage('')
+    setCallbackError('')
+    setShowPhoneOptions(true)
+  }
+
+  const closePhoneOptions = () => {
+    if (callbackBusy) return
+    setShowPhoneOptions(false)
+  }
+
+  const requestCallback = async () => {
+    setCallbackBusy(true)
+    setCallbackError('')
+    setCallbackMessage('')
+    try {
+      await api.post('/support/callback', {})
+      setCallbackMessage('Callback requested. Our support team will call you back shortly.')
+    } catch (err) {
+      const apiMessage = err?.response?.data?.message || err?.response?.data?.error
+      setCallbackError(apiMessage || 'Unable to request a callback right now. Please try again.')
+    } finally {
+      setCallbackBusy(false)
+    }
+  }
+
   return (
     <>
       <div className="support-fab-root" ref={rootRef}>
@@ -117,18 +151,18 @@ export default function SupportContactFab() {
             aria-label="Contact support options"
             aria-hidden={!open}
           >
-            <a
-              href={SUPPORT_PHONE_TEL}
+            <button
+              type="button"
               className="support-fab-channel support-fab-channel--phone"
               role="menuitem"
-              aria-label={`Call support at +91 ${SUPPORT_PHONE_DISPLAY}`}
-              title={`Call +91 ${SUPPORT_PHONE_DISPLAY}`}
-              onClick={closeMenu}
+              aria-label={`Phone support options for +91 ${SUPPORT_PHONE_DISPLAY}`}
+              title={`Phone +91 ${SUPPORT_PHONE_DISPLAY}`}
+              onClick={openPhoneOptions}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
               </svg>
-            </a>
+            </button>
 
             <a
               href={SUPPORT_WHATSAPP_URL}
@@ -163,7 +197,7 @@ export default function SupportContactFab() {
 
         <button
           type="button"
-          className={`support-fab-trigger${open || showUpgradeModal ? ' is-open' : ''}`}
+          className={`support-fab-trigger${open || showUpgradeModal || showPhoneOptions ? ' is-open' : ''}`}
           aria-label={isPremium ? 'Contact support' : 'Premium support'}
           aria-haspopup={isPremium ? 'menu' : 'dialog'}
           aria-expanded={isPremium ? open : showUpgradeModal}
@@ -234,6 +268,57 @@ export default function SupportContactFab() {
             </button>
             <button type="button" className="support-upgrade-cancel" onClick={continueWithEmailSupport}>
               Maybe later (continue with email support)
+            </button>
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {showPhoneOptions && createPortal(
+        <div
+          className="support-upgrade-backdrop is-visible"
+          role="presentation"
+          onClick={closePhoneOptions}
+        >
+          <div
+            className="support-phone-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="support-phone-title"
+            aria-describedby="support-phone-desc"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="support-phone-title" id="support-phone-title">
+              Phone support
+            </h2>
+            <p className="support-phone-desc" id="support-phone-desc">
+              Call us now at <strong>+91 {SUPPORT_PHONE_DISPLAY}</strong>, or request a callback and
+              our team will reach you on your profile phone number.
+            </p>
+
+            <div className="support-phone-actions">
+              <a
+                href={SUPPORT_PHONE_TEL}
+                className="support-phone-action support-phone-action--call"
+                onClick={closePhoneOptions}
+              >
+                Call now
+              </a>
+              <button
+                type="button"
+                className="support-phone-action support-phone-action--callback"
+                onClick={requestCallback}
+                disabled={callbackBusy}
+              >
+                {callbackBusy ? 'Requesting…' : 'Request a callback'}
+              </button>
+            </div>
+
+            {callbackMessage && <p className="support-phone-success" role="status">{callbackMessage}</p>}
+            {callbackError && <p className="support-phone-error" role="alert">{callbackError}</p>}
+
+            <button type="button" className="support-upgrade-cancel" onClick={closePhoneOptions} disabled={callbackBusy}>
+              Close
             </button>
           </div>
         </div>,
