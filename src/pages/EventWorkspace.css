@@ -298,11 +298,46 @@
     letter-spacing: 0.06em;
 }
 
+.event-reaction-hint {
+    margin: -8px 0 12px;
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.45;
+}
+
 .event-reaction-msg {
     margin: 0 0 12px;
     font-size: 13px;
     color: #16a34a;
     font-weight: 600;
+}
+
+.event-reaction-msg.warn {
+    color: #b45309;
+}
+
+.event-subscribe-cta {
+    margin: 0 0 14px;
+}
+
+.event-subscribe-btn {
+    border: none;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #7c3aed, #db2777);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0.65rem 1.1rem;
+    cursor: pointer;
+}
+
+.event-subscribe-btn:hover {
+    filter: brightness(1.05);
+}
+
+.event-reaction-btn.needs-tokens {
+    border-color: #fcd34d;
+    background: #fffbeb;
 }
 
 .event-reactions-grid {

@@ -1286,6 +1286,11 @@ a:focus-visible {
   margin-bottom: 0.4rem;
 }
 
+.refund-required-marker {
+  color: #dc2626;
+  margin-left: 0.15rem;
+}
+
 .refund-modal-body textarea,
 .refund-modal-body input[type="text"],
 .refund-modal-body input[type="datetime-local"],
@@ -1298,6 +1303,18 @@ a:focus-visible {
   margin-bottom: 0.85rem;
   box-sizing: border-box;
   background: #fff;
+}
+
+.refund-modal-body .refund-input-error {
+  border-color: #dc2626;
+  margin-bottom: 0.35rem;
+}
+
+.refund-modal-body .field-error {
+  display: block;
+  margin: -0.35rem 0 0.75rem;
+  font-size: 0.78rem;
+  color: #dc2626;
 }
 
 .refund-modal-body textarea {

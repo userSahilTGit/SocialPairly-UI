@@ -41,6 +41,7 @@ export default function EventWorkspace() {
     const [loading, setLoading] = useState(true)
     const [reacting, setReacting] = useState(false)
     const [message, setMessage] = useState('')
+    const [showSubscribeCta, setShowSubscribeCta] = useState(false)
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -75,24 +76,37 @@ export default function EventWorkspace() {
         if (!profile || reacting) return
         if (profile.sentReactions?.includes(reactionType)) {
             setMessage(`You already sent ${reactionType} to this profile`)
+            setShowSubscribeCta(false)
+            return
+        }
+        const reaction = REACTIONS.find((r) => r.type === reactionType)
+        if (reaction && tokenBalance < reaction.cost) {
+            setMessage(`You need ${reaction.cost} tokens to send ${reactionType}. Get more tokens to keep connecting.`)
+            setShowSubscribeCta(true)
             return
         }
         setReacting(true)
         setMessage('')
+        setShowSubscribeCta(false)
         try {
             const res = await api.post(`/events/${eventId}/reactions`, {
                 toUserId: profile.userId,
                 reactionType,
             })
-            setTokenBalance(res.data.tokenBalance ?? tokenBalance)
+            const nextBalance = res.data.tokenBalance ?? tokenBalance
+            setTokenBalance(nextBalance)
             setProfiles((prev) => prev.map((p, i) => (
                 i === profileIndex
                     ? { ...p, sentReactions: [...(p.sentReactions || []), reactionType] }
                     : p
             )))
-            setMessage(`${reactionType} sent!`)
+            setMessage(`${reactionType} sent! Keep connecting with more profiles, or get tokens to send higher reactions.`)
+            setShowSubscribeCta(nextBalance < 5)
         } catch (err) {
-            setMessage(err.response?.data?.message || 'Failed to send reaction')
+            const apiMessage = err.response?.data?.message || 'Failed to send reaction'
+            setMessage(apiMessage)
+            const needsTokens = /token/i.test(apiMessage)
+            setShowSubscribeCta(needsTokens)
         } finally {
             setReacting(false)
         }
@@ -245,7 +259,23 @@ export default function EventWorkspace() {
 
                                 <div className="event-reactions-section">
                                     <h4>SEND TOKEN REACTION TO PROFILE</h4>
-                                    {message && <p className="event-reaction-msg">{message}</p>}
+                                    <p className="event-reaction-hint">
+                                        Show interest with a reaction. When you need more tokens, continue to subscription plans.
+                                    </p>
+                                    {message && (
+                                        <p className={`event-reaction-msg ${showSubscribeCta ? 'warn' : ''}`}>{message}</p>
+                                    )}
+                                    {showSubscribeCta && (
+                                        <div className="event-subscribe-cta">
+                                            <button
+                                                type="button"
+                                                className="event-subscribe-btn"
+                                                onClick={() => navigate('/subscriptions')}
+                                            >
+                                                Continue to Subscription
+                                            </button>
+                                        </div>
+                                    )}
                                     <div className="event-reactions-grid">
                                         {REACTIONS.map((r) => {
                                             const sent = profile.sentReactions?.includes(r.type)
@@ -254,8 +284,8 @@ export default function EventWorkspace() {
                                                 <button
                                                     key={r.type}
                                                     type="button"
-                                                    className={`event-reaction-btn ${sent ? 'sent' : ''}`}
-                                                    disabled={reacting || sent || insufficient}
+                                                    className={`event-reaction-btn ${sent ? 'sent' : ''} ${insufficient ? 'needs-tokens' : ''}`}
+                                                    disabled={reacting || sent}
                                                     onClick={() => handleReaction(r.type)}
                                                     title={insufficient ? `Need ${r.cost} tokens (you have ${tokenBalance})` : undefined}
                                                 >
