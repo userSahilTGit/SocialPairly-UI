@@ -26,7 +26,7 @@ vi.mock('@/api/axios', () => ({
 }))
 
 describe('Settings page', () => {
-  it('offers identity, customer care, and delete account', async () => {
+  it('offers identity, security, and delete account without duplicate support row', async () => {
     const user = userEvent.setup()
     render(
       <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -37,10 +37,10 @@ describe('Settings page', () => {
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /identity & background/i })).toHaveAttribute('href', '/onboarding/identity')
     expect(screen.getByRole('link', { name: /photos & videos/i })).toHaveAttribute('href', '/profile/media')
-    expect(screen.getByText(/manage your account, identity, and support/i)).toBeInTheDocument()
+    expect(screen.getByText(/manage your account, identity, and security/i)).toBeInTheDocument()
     expect(screen.queryByText(/discovery & pair preferences/i)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /account & security/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /contact customer care/i })).toHaveAttribute('href', '/contact')
+    expect(screen.queryByRole('link', { name: /contact customer care/i })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /delete account/i }))
     expect(screen.getByRole('heading', { name: /delete account\?/i })).toBeInTheDocument()

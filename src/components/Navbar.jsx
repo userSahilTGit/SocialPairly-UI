@@ -6,6 +6,7 @@ import { BrandMark, LoggedInBrandName } from './AuthBrandAssets'
 import ThemeToggle from './ThemeToggle'
 import { DASHBOARD_KEYS, getEmployeeNavItems, isEmployeeUser } from '../utils/employeeAccess'
 import { SUPPORT_INBOX_EVENT, formatUnreadBadge } from '../utils/supportInbox'
+import { usePremiumStatus } from '../utils/subscriptionStatus'
 import api from '../api/axios'
 
 export default function Navbar() {
@@ -14,26 +15,9 @@ export default function Navbar() {
     const location = useLocation()
     const [menuOpen, setMenuOpen] = useState(false)
     const [dropdownOpen, setDropdownOpen] = useState(false)
-    const [isPremium, setIsPremium] = useState(false)
+    const { isPremium } = usePremiumStatus(user)
     const [supportUnread, setSupportUnread] = useState(0)
     const dropdownRef = useRef(null)
-
-    useEffect(() => {
-        if (!user || isEmployeeUser(user)) {
-            setIsPremium(false)
-            return undefined
-        }
-        let cancelled = false
-        ;(async () => {
-            try {
-                const { data } = await api.get('/subscriptions/current')
-                if (!cancelled) setIsPremium(!!(data && data.active !== false))
-            } catch {
-                if (!cancelled) setIsPremium(false)
-            }
-        })()
-        return () => { cancelled = true }
-    }, [user])
 
     const employeeNavItems = isEmployeeUser(user) ? getEmployeeNavItems(user) : []
     const hasSupportDesk = employeeNavItems.some((item) => item.key === DASHBOARD_KEYS.CUSTOMER_SUPPORT)

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import api from '../api/axios'
 import { normalizeUser } from '../utils/user'
+import { clearCachedPremiumStatus, writeCachedPremiumStatus } from '../utils/subscriptionStatus'
 
 /**
  * Central toggle for phone verification enforcement.
@@ -54,6 +55,10 @@ export function AuthProvider({ children }) {
           const rememberMe = !!localStorage.getItem('token')
           const storage = rememberMe ? localStorage : sessionStorage
           const normalized = normalizeUser(data)
+          const subState = String(normalized?.subscriptionDetails || '').trim().toLowerCase()
+          if (subState === 'subscribed' || subState === 'unsubscribed') {
+            writeCachedPremiumStatus(normalized, subState === 'subscribed')
+          }
           storage.setItem('user', JSON.stringify(normalized))
           setUser(normalized)
         }
@@ -74,6 +79,10 @@ export function AuthProvider({ children }) {
     other.removeItem('token')
     other.removeItem('user')
     const normalizedUser = normalizeUser(data.user)
+    const subState = String(normalizedUser?.subscriptionDetails || '').trim().toLowerCase()
+    if (subState === 'subscribed' || subState === 'unsubscribed') {
+      writeCachedPremiumStatus(normalizedUser, subState === 'subscribed')
+    }
     storage.setItem('token', data.token)
     storage.setItem('user', JSON.stringify(normalizedUser))
     setUser(normalizedUser)
@@ -135,6 +144,7 @@ export function AuthProvider({ children }) {
     sessionStorage.removeItem('user')
     sessionStorage.removeItem(PHONE_VERIFY_DISMISS_KEY)
     sessionStorage.removeItem(IDENTITY_CONTINUE_LATER_KEY)
+    clearCachedPremiumStatus()
     setUser(null)
   }
 

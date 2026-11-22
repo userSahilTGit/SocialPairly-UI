@@ -11,10 +11,11 @@ import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import { downloadReceiptPdf } from '../utils/downloadReceiptPdf'
 import { logClientError } from '../utils/safeLog'
+import { notifySubscriptionChanged } from '../utils/subscriptionStatus'
 import './Subscriptions.css'
 
 export default function Subscriptions() {
-  const { refreshUser } = useAuth()
+  const { user, refreshUser } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
@@ -102,9 +103,11 @@ export default function Subscriptions() {
     try {
       const { data } = await api.get('/subscriptions/current')
       if (data && data.active === false) {
+        notifySubscriptionChanged(false, user)
         return null
       }
       if (data && data.active !== false) {
+        notifySubscriptionChanged(true, user)
         try {
           await refreshUserRef.current()
         } catch {
@@ -116,7 +119,7 @@ export default function Subscriptions() {
       logClientError('Failed to load current subscription', err)
       return null
     }
-  }, [])
+  }, [user])
 
   const fetchLatestPaymentStatus = useCallback(async () => {
     try {
@@ -281,6 +284,7 @@ export default function Subscriptions() {
         const { data } = await api.post('/payment/confirm-session', { sessionId })
 
         if (data?.subscription) {
+          notifySubscriptionChanged(true, user)
           setPendingSubscription(data.subscription)
           try {
             await refreshUserRef.current()

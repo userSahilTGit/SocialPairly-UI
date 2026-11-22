@@ -23,7 +23,8 @@ import Navbar from '../components/Navbar'
 import SiteFooter from '../components/SiteFooter'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
-import { CUSTOMER_CARE_EMAIL } from '../config/oauth'
+import { getSupportEmailForMember } from '../config/supportContacts'
+import { usePremiumStatus } from '../utils/subscriptionStatus'
 
 const ISSUE_OPTIONS = [
   { label: 'Account & sign-in', icon: User },
@@ -52,6 +53,8 @@ function fileAllowed(file) {
 
 export default function ContactSupport() {
   const { user } = useAuth()
+  const { isPremium } = usePremiumStatus(user)
+  const supportEmail = getSupportEmailForMember(isPremium)
   const fileInputRef = useRef(null)
 
   const accountName = useMemo(() => {
@@ -202,6 +205,13 @@ export default function ContactSupport() {
                 <span>{success}</span>
               </div>
             )}
+
+            <div className={`cc-recipient-banner${isPremium ? ' is-premium' : ''}`} data-testid="support-recipient-banner">
+              <Mail size={15} aria-hidden />
+              <span>
+                Support inbox: <strong>{supportEmail}</strong>
+              </span>
+            </div>
 
             <div className="cc-grid-2">
               <div className="cc-field">
@@ -391,7 +401,7 @@ export default function ContactSupport() {
               <p className="cc-hint">
                 <Mail size={14} aria-hidden />
                 Prefer email? Write us at{' '}
-                <a href={`mailto:${CUSTOMER_CARE_EMAIL}`}>{CUSTOMER_CARE_EMAIL}</a>
+                <a href={`mailto:${supportEmail}`}>{supportEmail}</a>
               </p>
             </div>
           </form>

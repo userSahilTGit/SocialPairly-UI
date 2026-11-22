@@ -41,9 +41,11 @@
 .support-fab-channel {
   width: 44px;
   height: 44px;
+  padding: 0;
   border-radius: 9999px;
   border: none;
   color: #fff;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
