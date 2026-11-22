@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import PhoneVerificationModal from './components/PhoneVerificationModal'
 import SessionTimeoutDialog from './components/SessionTimeoutDialog'
 import SupportContactFab from './components/SupportContactFab'
+import RateUsPrompt from './components/RateUsPrompt'
 import RouteSeo from './components/RouteSeo'
 import { userNeedsPhoneVerification } from './utils/verification'
 import { GOOGLE_CLIENT_ID } from './config/oauth'
@@ -26,6 +27,7 @@ import AdminPlans from './pages/AdminPlans'
 import AdminFinance from './pages/AdminFinance'
 import AdminEvents from './pages/AdminEvents'
 import AdminCustomerSupport from './pages/AdminCustomerSupport'
+import AdminRatings from './pages/AdminRatings'
 import AdminRoleAccess from './pages/AdminRoleAccess'
 import EventWorkspace from './pages/EventWorkspace'
 import { DASHBOARD_KEYS, isEmployeeUser } from './utils/employeeAccess'
@@ -194,6 +196,12 @@ export default function App() {
           </ProtectedRoute>
         } />
 
+        <Route path="/admin/ratings" element={
+          <ProtectedRoute adminOnly dashboardKey={DASHBOARD_KEYS.RATINGS}>
+            <AdminRatings />
+          </ProtectedRoute>
+        } />
+
         <Route path="/admin/access" element={
           <ProtectedRoute adminOnly dashboardKey={DASHBOARD_KEYS.ROLE_ACCESS}>
             <AdminRoleAccess />
@@ -208,6 +216,7 @@ export default function App() {
         onVerified={() => setShowPhoneModal(false)}
       />
       {user && !isEmployeeUser(user) && <SupportContactFab />}
+      {user && !isEmployeeUser(user) && <RateUsPrompt />}
       <SessionTimeoutDialog />
     </GoogleOAuthProvider>
   )

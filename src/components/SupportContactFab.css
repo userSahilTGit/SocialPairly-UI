@@ -268,6 +268,247 @@
   text-align: center;
 }
 
+.support-phone-modal--slots {
+  max-width: 560px;
+  max-height: min(88vh, 720px);
+  overflow-y: auto;
+  text-align: left;
+  padding: 24px 24px 18px;
+}
+
+.support-phone-header {
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.support-phone-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.1);
+  color: #6d28d9;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.support-phone-active-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  font-size: 12.5px;
+  color: #4c1d95;
+}
+
+.support-phone-confirmed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 14px;
+  margin: 4px 0 16px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f5f3ff 0%, #eef2ff 100%);
+  border: 1px solid #ddd6fe;
+  text-align: center;
+}
+
+.support-phone-confirmed-slot {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #4c1d95;
+  line-height: 1.35;
+}
+
+.support-phone-confirmed-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.support-phone-active-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #7c3aed;
+}
+
+.support-slot-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.support-slot-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.support-slot-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.support-slot-step-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.support-slot-selected-day {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.support-day-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.support-day-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 11px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.support-day-pill:hover {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+}
+
+.support-day-pill.is-selected {
+  background: linear-gradient(135deg, #7c3aed 0%, #9333ea 100%);
+  border-color: #7c3aed;
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(124, 58, 237, 0.28);
+}
+
+.support-day-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.support-day-date {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.support-time-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.support-time-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 9px 11px;
+  border-radius: 11px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.support-time-pill:hover:not(:disabled) {
+  border-color: #a78bfa;
+  background: #faf5ff;
+}
+
+.support-time-pill.is-selected {
+  border-color: #7c3aed;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(236, 72, 153, 0.1) 100%);
+  box-shadow: 0 0 0 1.5px #7c3aed;
+}
+
+.support-time-pill.is-disabled,
+.support-time-pill:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  background: #f1f5f9;
+}
+
+.support-time-range {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.support-time-period {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.support-time-pill.is-selected .support-time-range {
+  color: #5b21b6;
+}
+
+.support-time-pill.is-selected .support-time-period {
+  color: #7c3aed;
+}
+
+.support-slot-note-input {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  font-size: 12.5px;
+  outline: none;
+}
+
+.support-slot-note-input:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.14);
+}
+
+.support-slot-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 9px 12px;
+  border-radius: 11px;
+  background: #fdf4ff;
+  border: 1px solid #f5d0fe;
+  font-size: 12px;
+  color: #701a75;
+}
+
+.support-phone-action--call:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .support-phone-title {
   font-size: 18px;
   font-weight: 800;
@@ -356,6 +597,80 @@
   color: #ede9fe;
   background: rgba(15, 23, 42, 0.72);
   border-color: rgba(148, 163, 184, 0.28);
+}
+
+[data-theme='dark'] .support-phone-badge {
+  background: rgba(139, 92, 246, 0.22);
+  color: #ddd6fe;
+}
+
+[data-theme='dark'] .support-phone-active-slot {
+  background: rgba(124, 58, 237, 0.16);
+  border-color: rgba(167, 139, 250, 0.35);
+  color: #ede9fe;
+}
+
+[data-theme='dark'] .support-phone-active-label,
+[data-theme='dark'] .support-slot-selected-day {
+  color: #c4b5fd;
+}
+
+[data-theme='dark'] .support-slot-step-label {
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .support-day-pill {
+  background: #0f172a;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+[data-theme='dark'] .support-day-pill.is-selected {
+  background: linear-gradient(135deg, #7c3aed 0%, #9333ea 100%);
+  border-color: #8b5cf6;
+  color: #fff;
+}
+
+[data-theme='dark'] .support-time-pill {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+[data-theme='dark'] .support-time-pill.is-selected {
+  background: rgba(124, 58, 237, 0.25);
+  border-color: #a78bfa;
+}
+
+[data-theme='dark'] .support-time-pill.is-selected .support-time-range,
+[data-theme='dark'] .support-time-pill.is-selected .support-time-period {
+  color: #ede9fe;
+}
+
+[data-theme='dark'] .support-time-period {
+  color: #94a3b8;
+}
+
+[data-theme='dark'] .support-slot-note-input {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+[data-theme='dark'] .support-slot-summary {
+  background: rgba(139, 92, 246, 0.16);
+  border-color: rgba(192, 132, 252, 0.32);
+  color: #f5d0fe;
+}
+
+@media (max-width: 680px) {
+  .support-day-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .support-time-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 [data-theme='dark'] .support-upgrade-modal {

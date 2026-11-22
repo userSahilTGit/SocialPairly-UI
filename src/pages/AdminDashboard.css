@@ -97,6 +97,68 @@
     color: #92400e;
 }
 
+.dashboard-callbacks-card {
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    padding: 20px 22px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+    margin-bottom: 24px;
+}
+
+.dashboard-callbacks-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.dashboard-callbacks-head h2 {
+    font-size: 18px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 4px 0;
+}
+
+.dashboard-callbacks-head p {
+    margin: 0;
+    font-size: 13px;
+    color: #64748b;
+}
+
+.dashboard-cb-member {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.dashboard-cb-email {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.dashboard-cb-phone {
+    font-weight: 600;
+    color: #6d28d9;
+    text-decoration: none;
+}
+
+.dashboard-cb-phone:hover {
+    text-decoration: underline;
+}
+
+.dashboard-cb-slot-pill {
+    display: inline-flex;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #ede9fe;
+    color: #5b21b6;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));

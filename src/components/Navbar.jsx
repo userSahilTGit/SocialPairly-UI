@@ -5,7 +5,11 @@ import { useAuth } from '../context/AuthContext'
 import { BrandMark, LoggedInBrandName } from './AuthBrandAssets'
 import ThemeToggle from './ThemeToggle'
 import { DASHBOARD_KEYS, getEmployeeNavItems, isEmployeeUser } from '../utils/employeeAccess'
-import { SUPPORT_INBOX_EVENT, formatUnreadBadge } from '../utils/supportInbox'
+import {
+  SUPPORT_INBOX_EVENT,
+  RATINGS_INBOX_EVENT,
+  formatUnreadBadge,
+} from '../utils/supportInbox'
 import { usePremiumStatus } from '../utils/subscriptionStatus'
 import api from '../api/axios'
 
@@ -17,10 +21,12 @@ export default function Navbar() {
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const { isPremium } = usePremiumStatus(user)
     const [supportUnread, setSupportUnread] = useState(0)
+    const [ratingsUnread, setRatingsUnread] = useState(0)
     const dropdownRef = useRef(null)
 
     const employeeNavItems = isEmployeeUser(user) ? getEmployeeNavItems(user) : []
     const hasSupportDesk = employeeNavItems.some((item) => item.key === DASHBOARD_KEYS.CUSTOMER_SUPPORT)
+    const hasRatingsDesk = employeeNavItems.some((item) => item.key === DASHBOARD_KEYS.RATINGS)
 
     useEffect(() => {
         if (!hasSupportDesk) return undefined
@@ -42,6 +48,27 @@ export default function Navbar() {
             window.removeEventListener(SUPPORT_INBOX_EVENT, fetchUnread)
         }
     }, [hasSupportDesk])
+
+    useEffect(() => {
+        if (!hasRatingsDesk) return undefined
+        let cancelled = false
+        const fetchUnread = async () => {
+            try {
+                const { data } = await api.get('/admin/ratings/notifications/unread-count')
+                if (!cancelled) setRatingsUnread(Number(data?.unreadCount) || 0)
+            } catch {
+                /* keep last known count */
+            }
+        }
+        fetchUnread()
+        const timer = setInterval(fetchUnread, 30000)
+        window.addEventListener(RATINGS_INBOX_EVENT, fetchUnread)
+        return () => {
+            cancelled = true
+            clearInterval(timer)
+            window.removeEventListener(RATINGS_INBOX_EVENT, fetchUnread)
+        }
+    }, [hasRatingsDesk])
 
     useEffect(() => {
         const handleClickOutside = (e) => {
@@ -126,9 +153,18 @@ export default function Navbar() {
                         <NavLink to="/subscriptions">Subscription</NavLink>
                     )}
                     {isEmployeeUser(user) && employeeNavItems.map((item) => {
-                        const badge = item.key === DASHBOARD_KEYS.CUSTOMER_SUPPORT
-                            ? formatUnreadBadge(hasSupportDesk ? supportUnread : 0)
-                            : null
+                        let badge = null
+                        let badgeCount = 0
+                        let badgeLabel = ''
+                        if (item.key === DASHBOARD_KEYS.CUSTOMER_SUPPORT) {
+                            badgeCount = hasSupportDesk ? supportUnread : 0
+                            badge = formatUnreadBadge(badgeCount)
+                            badgeLabel = `${badgeCount} unread support notifications`
+                        } else if (item.key === DASHBOARD_KEYS.RATINGS) {
+                            badgeCount = hasRatingsDesk ? ratingsUnread : 0
+                            badge = formatUnreadBadge(badgeCount)
+                            badgeLabel = `${badgeCount} unread rating notifications`
+                        }
                         return (
                             <NavLink
                                 key={item.key}
@@ -142,9 +178,9 @@ export default function Navbar() {
                                 <span>{item.label}</span>
                                 {badge && (
                                     <span
-                                        key={badge}
+                                        key={`${item.key}-${badge}`}
                                         className="nav-unread-badge"
-                                        aria-label={`${supportUnread} unread support notifications`}
+                                        aria-label={badgeLabel}
                                     >
                                         {badge}
                                     </span>

@@ -3,7 +3,10 @@ import api from '@/api/axios'
 import {
   DASHBOARD_KEYS,
   isEmployeeUser,
+  isSupportOpsUser,
   hasDashboardAccess,
+  canViewCallRequests,
+  canViewRatings,
   getEmployeeNavItems,
   firstAdminPath,
   pathToDashboardKey,
@@ -109,6 +112,8 @@ describe('utils comprehensive branch coverage', () => {
       expect(hasDashboardAccess(null, DASHBOARD_KEYS.DASHBOARD)).toBe(false)
       expect(hasDashboardAccess({ role: 'ADMIN' }, '')).toBe(false)
       expect(hasDashboardAccess({ role: 'ADMIN' }, DASHBOARD_KEYS.FINANCE)).toBe(true)
+      expect(hasDashboardAccess({ role: 'ADMIN' }, DASHBOARD_KEYS.CUSTOMER_SUPPORT)).toBe(false)
+      expect(hasDashboardAccess({ role: 'ADMIN' }, DASHBOARD_KEYS.RATINGS)).toBe(false)
       expect(
         hasDashboardAccess(
           { role: 'ADMIN', allowedDashboards: [DASHBOARD_KEYS.FINANCE] },
@@ -121,6 +126,32 @@ describe('utils comprehensive branch coverage', () => {
           DASHBOARD_KEYS.PLANS,
         ),
       ).toBe(false)
+      expect(
+        hasDashboardAccess(
+          {
+            role: 'ADMIN',
+            employeeRole: 'FINANCE',
+            allowedDashboards: [DASHBOARD_KEYS.CUSTOMER_SUPPORT, DASHBOARD_KEYS.RATINGS],
+          },
+          DASHBOARD_KEYS.CUSTOMER_SUPPORT,
+        ),
+      ).toBe(false)
+      expect(
+        canViewCallRequests({
+          role: 'ADMIN',
+          employeeRole: 'SUPER_ADMIN',
+          allowedDashboards: [DASHBOARD_KEYS.CUSTOMER_SUPPORT],
+        }),
+      ).toBe(true)
+      expect(
+        canViewRatings({
+          role: 'ADMIN',
+          employeeRole: 'CUSTOMER_SUPPORT',
+          allowedDashboards: [DASHBOARD_KEYS.RATINGS],
+        }),
+      ).toBe(true)
+      expect(isSupportOpsUser({ role: 'ADMIN', employeeRole: 'EVENT_TEAM' })).toBe(false)
+      expect(isSupportOpsUser({ role: 'ADMIN', employeeRole: 'ADMIN' })).toBe(true)
 
       expect(getEmployeeNavItems({ role: 'USER' })).toEqual([])
       expect(getEmployeeNavItems({ role: 'ADMIN', allowedDashboards: [DASHBOARD_KEYS.EVENTS] })).toHaveLength(1)
@@ -133,6 +164,7 @@ describe('utils comprehensive branch coverage', () => {
       expect(pathToDashboardKey('/admin')).toBe(DASHBOARD_KEYS.DASHBOARD)
       expect(pathToDashboardKey('/admin/')).toBe(DASHBOARD_KEYS.DASHBOARD)
       expect(pathToDashboardKey('/admin/customer-support/123')).toBe(DASHBOARD_KEYS.CUSTOMER_SUPPORT)
+      expect(pathToDashboardKey('/admin/ratings')).toBe(DASHBOARD_KEYS.RATINGS)
       expect(pathToDashboardKey('/unknown')).toBeNull()
     })
   })

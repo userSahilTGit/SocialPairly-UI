@@ -1,14 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import {
   SUPPORT_PHONE_DISPLAY,
-  SUPPORT_PHONE_TEL,
   SUPPORT_WHATSAPP_URL,
   getSupportEmailForMember,
 } from '../config/supportContacts'
+import {
+  TWO_HOUR_SLOTS,
+  buildUpcomingDays,
+  formatCallbackSchedule,
+  isSlotAvailableForDate,
+} from '../utils/callbackSlots'
 import { isEmployeeUser } from '../utils/employeeAccess'
 import { usePremiumStatus } from '../utils/subscriptionStatus'
 import './SupportContactFab.css'
@@ -21,6 +26,13 @@ export default function SupportContactFab() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [showPhoneOptions, setShowPhoneOptions] = useState(false)
   const { isPremium, premiumResolved, refreshPremiumStatus } = usePremiumStatus(user)
+
+  const upcomingDays = useMemo(() => buildUpcomingDays(new Date(), 7), [showPhoneOptions])
+  const [selectedDate, setSelectedDate] = useState(() => buildUpcomingDays(new Date(), 1)[0]?.isoDate || '')
+  const [selectedSlot, setSelectedSlot] = useState('')
+  const [callbackNote, setCallbackNote] = useState('')
+  const [activeCallback, setActiveCallback] = useState(null)
+
   const [callbackBusy, setCallbackBusy] = useState(false)
   const [callbackMessage, setCallbackMessage] = useState('')
   const [callbackError, setCallbackError] = useState('')
@@ -110,6 +122,15 @@ export default function SupportContactFab() {
     navigate('/contact')
   }
 
+  const loadActiveCallback = async () => {
+    try {
+      const res = await api.get('/support/callback/active')
+      setActiveCallback(res.status === 200 && res.data ? res.data : null)
+    } catch {
+      setActiveCallback(null)
+    }
+  }
+
   const handlePhoneClick = async (event) => {
     event.preventDefault()
     const activePremium = premiumResolved ? isPremium : await refreshPremiumStatus()
@@ -118,9 +139,15 @@ export default function SupportContactFab() {
       return
     }
     closeMenu()
+    const days = buildUpcomingDays(new Date(), 7)
+    const defaultDay = days[0]?.isoDate || ''
+    setSelectedDate(defaultDay)
+    setSelectedSlot('')
+    setCallbackNote('')
     setCallbackMessage('')
     setCallbackError('')
     setShowPhoneOptions(true)
+    loadActiveCallback()
   }
 
   const handleWhatsAppClick = async (event) => {
@@ -138,16 +165,51 @@ export default function SupportContactFab() {
     setShowPhoneOptions(false)
   }
 
-  const requestCallback = async () => {
+  const handleSelectDay = (isoDate) => {
+    setSelectedDate(isoDate)
+    setCallbackError('')
+    if (selectedSlot && !isSlotAvailableForDate(selectedSlot, isoDate, new Date())) {
+      setSelectedSlot('')
+    }
+  }
+
+  const handleSelectSlot = (slotCode) => {
+    setSelectedSlot(slotCode)
+    setCallbackError('')
+  }
+
+  const selectedDayMeta = upcomingDays.find((d) => d.isoDate === selectedDate) || upcomingDays[0]
+  const selectedSlotMeta = TWO_HOUR_SLOTS.find((s) => s.code === selectedSlot) || null
+
+  const requestCallback = async (event) => {
+    if (event) event.preventDefault()
+    if (!selectedDate || !selectedSlot) {
+      setCallbackError('Please select one day and one 2-hour time slot.')
+      return
+    }
     setCallbackBusy(true)
     setCallbackError('')
     setCallbackMessage('')
     try {
-      await api.post('/support/callback', {})
-      setCallbackMessage('Callback requested. Our support team will call you back shortly.')
+      const payload = {
+        preferredDate: selectedDate,
+        timeSlot: selectedSlot,
+        note: callbackNote.trim() || null,
+      }
+      const { data } = await api.post('/support/callback', payload)
+      setActiveCallback(data)
+      setCallbackMessage('Your call slot is confirmed. Our support team will contact you during this window.')
     } catch (err) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.error
-      setCallbackError(apiMessage || 'Unable to request a callback right now. Please try again.')
+      const alreadyBooked = /already requested a callback/i.test(String(apiMessage || ''))
+      if (alreadyBooked) {
+        // Slot was already booked — switch UI to the confirmed view instead of staying on the form.
+        await loadActiveCallback()
+        setCallbackError('')
+        setCallbackMessage('You already have a scheduled callback. Our team will reach out during your selected slot.')
+      } else {
+        setCallbackError(apiMessage || 'Unable to schedule a callback right now. Please try again.')
+      }
     } finally {
       setCallbackBusy(false)
     }
@@ -156,6 +218,8 @@ export default function SupportContactFab() {
   if (!user || isEmployeeUser(user)) {
     return null
   }
+
+  const activeSchedule = activeCallback ? formatCallbackSchedule(activeCallback) : null
 
   return (
     <>
@@ -170,8 +234,8 @@ export default function SupportContactFab() {
             type="button"
             className="support-fab-channel support-fab-channel--phone"
             role="menuitem"
-            aria-label={isPremium ? `Phone support options for +91 ${SUPPORT_PHONE_DISPLAY}` : 'Phone support (Premium)'}
-            title={isPremium ? `Phone +91 ${SUPPORT_PHONE_DISPLAY}` : 'Phone support (Premium only)'}
+            aria-label={isPremium ? 'Schedule 24/7 phone support call' : 'Phone support (Premium)'}
+            title={isPremium ? 'Schedule a 2-hour phone call slot (24/7)' : 'Phone support (Premium only)'}
             onClick={handlePhoneClick}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -276,7 +340,7 @@ export default function SupportContactFab() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
-                <span>Instant priority phone &amp; WhatsApp helpdesk</span>
+                <span>24/7 priority phone slot booking &amp; WhatsApp helpdesk</span>
               </div>
               <div className="support-upgrade-perk">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EC4899" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -310,41 +374,154 @@ export default function SupportContactFab() {
           onClick={closePhoneOptions}
         >
           <div
-            className="support-phone-modal"
+            className="support-phone-modal support-phone-modal--slots"
             role="dialog"
             aria-modal="true"
             aria-labelledby="support-phone-title"
             aria-describedby="support-phone-desc"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 className="support-phone-title" id="support-phone-title">
-              Phone support
-            </h2>
-            <p className="support-phone-desc" id="support-phone-desc">
-              Call us now at <strong>+91 {SUPPORT_PHONE_DISPLAY}</strong>, or request a callback and
-              our team will reach you on your profile phone number.
-            </p>
+            {activeCallback && activeSchedule ? (
+              <>
+                <div className="support-phone-header">
+                  <span className="support-phone-badge">Call Slot Confirmed</span>
+                  <h2 className="support-phone-title" id="support-phone-title">
+                    You&apos;re all set
+                  </h2>
+                  <p className="support-phone-desc" id="support-phone-desc">
+                    Our support team will call your registered phone number during the window below.
+                  </p>
+                </div>
 
-            <div className="support-phone-actions">
-              <a
-                href={SUPPORT_PHONE_TEL}
-                className="support-phone-action support-phone-action--call"
-                onClick={closePhoneOptions}
-              >
-                Call now
-              </a>
-              <button
-                type="button"
-                className="support-phone-action support-phone-action--callback"
-                onClick={requestCallback}
-                disabled={callbackBusy}
-              >
-                {callbackBusy ? 'Requesting…' : 'Request a callback'}
-              </button>
-            </div>
+                <div className="support-phone-confirmed" role="status">
+                  <span className="support-phone-active-label">Scheduled callback</span>
+                  <strong className="support-phone-confirmed-slot">{activeSchedule.fullSummary}</strong>
+                  {activeCallback.note ? (
+                    <p className="support-phone-confirmed-note">Note: {activeCallback.note}</p>
+                  ) : null}
+                  {callbackMessage ? (
+                    <p className="support-phone-success" role="status">{callbackMessage}</p>
+                  ) : (
+                    <p className="support-phone-success" role="status">
+                      Your request is in the Customer Support queue. You can close this window.
+                    </p>
+                  )}
+                </div>
 
-            {callbackMessage && <p className="support-phone-success" role="status">{callbackMessage}</p>}
-            {callbackError && <p className="support-phone-error" role="alert">{callbackError}</p>}
+                <div className="support-phone-actions">
+                  <button
+                    type="button"
+                    className="support-phone-action support-phone-action--call"
+                    onClick={closePhoneOptions}
+                  >
+                    Done
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="support-phone-header">
+                  <span className="support-phone-badge">24/7 Concierge · 2-Hour Slots</span>
+                  <h2 className="support-phone-title" id="support-phone-title">
+                    Schedule a Phone Call
+                  </h2>
+                  <p className="support-phone-desc" id="support-phone-desc">
+                    Choose a day and one <strong>2-hour time slot</strong> below. Our team will call your
+                    registered phone number during the selected slot.
+                  </p>
+                </div>
+
+                <form className="support-slot-form" onSubmit={requestCallback}>
+                  <div className="support-slot-section">
+                    <span className="support-slot-step-label">1. Select Day</span>
+                    <div className="support-day-strip" role="radiogroup" aria-label="Select callback day">
+                      {upcomingDays.map((day) => {
+                        const isSelected = day.isoDate === selectedDate
+                        return (
+                          <button
+                            key={day.isoDate}
+                            type="button"
+                            role="radio"
+                            aria-checked={isSelected}
+                            className={`support-day-pill${isSelected ? ' is-selected' : ''}`}
+                            onClick={() => handleSelectDay(day.isoDate)}
+                          >
+                            <span className="support-day-tag">{day.tag}</span>
+                            <span className="support-day-date">{day.monthDay}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="support-slot-section">
+                    <div className="support-slot-head-row">
+                      <span className="support-slot-step-label">2. Select One 2-Hour Time Slot (24/7)</span>
+                      {selectedDayMeta && (
+                        <span className="support-slot-selected-day">{selectedDayMeta.dayName}</span>
+                      )}
+                    </div>
+                    <div className="support-time-grid" role="radiogroup" aria-label="Select 2-hour time slot">
+                      {TWO_HOUR_SLOTS.map((slot) => {
+                        const available = isSlotAvailableForDate(slot, selectedDate, new Date())
+                        const isSelected = selectedSlot === slot.code
+                        return (
+                          <button
+                            key={slot.code}
+                            type="button"
+                            role="radio"
+                            aria-checked={isSelected}
+                            disabled={!available}
+                            className={`support-time-pill${isSelected ? ' is-selected' : ''}${!available ? ' is-disabled' : ''}`}
+                            onClick={() => handleSelectSlot(slot.code)}
+                            title={!available ? 'This 2-hour slot has already passed today' : `${slot.label} (${slot.period})`}
+                          >
+                            <span className="support-time-range">{slot.label}</span>
+                            <span className="support-time-period">{slot.period}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="support-slot-section">
+                    <label className="support-slot-step-label" htmlFor="support-callback-note">
+                      3. Note (optional)
+                    </label>
+                    <input
+                      id="support-callback-note"
+                      type="text"
+                      maxLength={250}
+                      className="support-slot-note-input"
+                      placeholder="Briefly share what you need help with (optional)"
+                      value={callbackNote}
+                      onChange={(event) => setCallbackNote(event.target.value)}
+                    />
+                  </div>
+
+                  {selectedDayMeta && selectedSlotMeta && (
+                    <div className="support-slot-summary">
+                      <span>Selected slot:</span>
+                      <strong>
+                        {selectedDayMeta.dayName}, {selectedDayMeta.monthDay} · {selectedSlotMeta.label}
+                      </strong>
+                    </div>
+                  )}
+
+                  {callbackError && <p className="support-phone-error" role="alert">{callbackError}</p>}
+
+                  <div className="support-phone-actions">
+                    <button
+                      type="submit"
+                      className="support-phone-action support-phone-action--call"
+                      disabled={callbackBusy || !selectedSlot}
+                    >
+                      {callbackBusy ? 'Booking slot…' : 'Confirm Call Slot'}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
 
             <button type="button" className="support-upgrade-cancel" onClick={closePhoneOptions} disabled={callbackBusy}>
               Close

@@ -16,10 +16,12 @@ vi.mock('@/context/AuthContext', () => ({
 }))
 const apiPut = vi.fn()
 const apiPost = vi.fn()
+const apiGet = vi.fn()
 const apiDelete = vi.fn()
 vi.mock('@/api/axios', () => ({
   default: {
     delete: (...args) => apiDelete(...args),
+    get: (...args) => apiGet(...args),
     post: (...args) => apiPost(...args),
     put: (...args) => apiPut(...args),
   },
@@ -40,7 +42,23 @@ describe('Settings page', () => {
     expect(screen.getByText(/manage your account, identity, and security/i)).toBeInTheDocument()
     expect(screen.queryByText(/discovery & pair preferences/i)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /account & security/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /rate us/i })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /contact customer care/i })).not.toBeInTheDocument()
+
+    apiGet.mockResolvedValue({ status: 204, data: null })
+    await user.click(screen.getByRole('button', { name: /rate us/i }))
+    expect(await screen.findByRole('heading', { name: /^rate us$/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: /5 stars/i }))
+    await user.type(screen.getByLabelText(/suggestions/i), 'Amazing matching experience')
+    apiPost.mockResolvedValueOnce({ data: { id: 1, stars: 5 } })
+    await user.click(screen.getByRole('button', { name: /submit rating/i }))
+    expect(apiPost).toHaveBeenCalledWith('/ratings', {
+      stars: 5,
+      suggestion: 'Amazing matching experience',
+    })
+    expect(await screen.findByRole('heading', { name: /thank you/i })).toBeInTheDocument()
+    expect(screen.queryByText(/you rated socialpairly/i)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^close$/i }))
 
     await user.click(screen.getByRole('button', { name: /delete account/i }))
     expect(screen.getByRole('heading', { name: /delete account\?/i })).toBeInTheDocument()
