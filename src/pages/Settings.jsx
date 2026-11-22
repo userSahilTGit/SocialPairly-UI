@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronRight, Eye, EyeOff, Images, Shield, Trash2, UserRound, X } from 'lucide-react'
+import { ChevronRight, Eye, EyeOff, Images, Shield, Star, Trash2, UserRound, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import SiteFooter from '../components/SiteFooter'
+import RateUsModal from '../components/RateUsModal'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 
@@ -104,6 +105,7 @@ export default function Settings() {
   const [otpVerifying, setOtpVerifying] = useState(false)
   const [codeVerified, setCodeVerified] = useState(false)
   const [securityInfo, setSecurityInfo] = useState('')
+  const [rateOpen, setRateOpen] = useState(false)
 
   const openDeleteModal = () => {
     setDeleteStep('send')
@@ -186,6 +188,8 @@ export default function Settings() {
     resetSecurityForm()
     setSecurityOpen(true)
   }
+
+  const openRateModal = () => setRateOpen(true)
 
   const toggleEmailOtp = () => {
     setUseEmailOtp((enabled) => {
@@ -321,6 +325,13 @@ export default function Settings() {
                 iconClass="settings-row-icon--security"
                 title="Account & Security"
                 description="Password and email verification."
+              />
+              <SettingsRow
+                onClick={openRateModal}
+                icon={Star}
+                iconClass="settings-row-icon--rate"
+                title="Rate Us"
+                description="Share or update your 1–5 star rating and suggestions. Saving overwrites your previous review."
               />
             </div>
           </section>
@@ -467,6 +478,8 @@ export default function Settings() {
         </div>,
         document.body
       )}
+
+      <RateUsModal open={rateOpen} onClose={() => setRateOpen(false)} />
 
       {deleteModalOpen && createPortal(
         <div className="plan-modal-overlay" onClick={!deleteLoading ? closeDeleteModal : undefined}>

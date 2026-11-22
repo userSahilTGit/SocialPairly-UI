@@ -10,10 +10,11 @@ export const SUPPORT_PHONE_TEL = `tel:+${SUPPORT_PHONE_E164}`
 export const SUPPORT_WHATSAPP_URL = `https://wa.me/${SUPPORT_PHONE_E164}`
 
 export const DEFAULT_SUPPORT_EMAIL = CUSTOMER_CARE_EMAIL
-export const PREMIUM_SUPPORT_EMAIL = 'salmaan.razzak@socialpairly.com'
-export const SUPPORT_EMAIL = PREMIUM_SUPPORT_EMAIL
+/** Same inbox for free and premium members. */
+export const PREMIUM_SUPPORT_EMAIL = DEFAULT_SUPPORT_EMAIL
+export const SUPPORT_EMAIL = DEFAULT_SUPPORT_EMAIL
 export const SUPPORT_EMAIL_MAILTO = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('SocialPairly Support')}`
 
-export function getSupportEmailForMember(isPremium) {
-  return isPremium ? PREMIUM_SUPPORT_EMAIL : DEFAULT_SUPPORT_EMAIL
+export function getSupportEmailForMember(_isPremium) {
+  return DEFAULT_SUPPORT_EMAIL
 }

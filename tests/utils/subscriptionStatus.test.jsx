@@ -67,7 +67,8 @@ describe('subscriptionStatus & premium customer care routing', () => {
     expect(isActiveSubscriptionPayload({ active: true })).toBe(true)
 
     expect(getSupportEmailForMember(false)).toBe(DEFAULT_SUPPORT_EMAIL)
-    expect(getSupportEmailForMember(true)).toBe(PREMIUM_SUPPORT_EMAIL)
+    expect(getSupportEmailForMember(true)).toBe(DEFAULT_SUPPORT_EMAIL)
+    expect(PREMIUM_SUPPORT_EMAIL).toBe(DEFAULT_SUPPORT_EMAIL)
 
     expect(readCachedPremiumStatus(null)).toEqual({ isPremium: false, resolved: true })
     expect(readCachedPremiumStatus({ id: 1, role: 'ADMIN' })).toEqual({ isPremium: false, resolved: true })
@@ -121,14 +122,14 @@ describe('subscriptionStatus & premium customer care routing', () => {
     await user.click(freeEmailOption)
 
     expect(await screen.findByRole('heading', { name: /tell us what you need help with/i })).toBeInTheDocument()
-    expect(screen.getByTestId('support-recipient-banner')).toHaveTextContent('customercare@socialpairly.com')
+    expect(screen.queryByTestId('support-recipient-banner')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'customercare@socialpairly.com' })).toHaveAttribute(
       'href',
       'mailto:customercare@socialpairly.com',
     )
   })
 
-  it('redirects existing and newly subscribed premium users from Support FAB email button to /contact with salmaan.razzak@socialpairly.com persistently', async () => {
+  it('routes premium users to the same customercare inbox as free users', async () => {
     const user = userEvent.setup()
     mockUser = {
       ...mockUser,
@@ -151,17 +152,16 @@ describe('subscriptionStatus & premium customer care routing', () => {
     const fab = await screen.findByRole('button', { name: /contact support/i })
     await user.click(fab)
 
-    const emailOption = screen.getByRole('menuitem', { name: /email support at salmaan\.razzak@socialpairly\.com/i })
+    const emailOption = screen.getByRole('menuitem', { name: /email support at customercare@socialpairly\.com/i })
     await user.click(emailOption)
 
     expect(await screen.findByRole('heading', { name: /tell us what you need help with/i })).toBeInTheDocument()
-    expect(screen.getByTestId('support-recipient-banner')).toHaveTextContent('salmaan.razzak@socialpairly.com')
-    expect(screen.getByRole('link', { name: 'salmaan.razzak@socialpairly.com' })).toHaveAttribute(
+    expect(screen.queryByTestId('support-recipient-banner')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'customercare@socialpairly.com' })).toHaveAttribute(
       'href',
-      'mailto:salmaan.razzak@socialpairly.com',
+      'mailto:customercare@socialpairly.com',
     )
 
-    // Simulating a full browser reload directly on /contact — premium email stays persistent
     unmount()
     mockUser = { id: 24, role: 'USER', firstName: 'Rohan', email: 'rohan@example.com' }
     render(
@@ -170,7 +170,8 @@ describe('subscriptionStatus & premium customer care routing', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByTestId('support-recipient-banner')).toHaveTextContent('salmaan.razzak@socialpairly.com')
+    expect(screen.queryByTestId('support-recipient-banner')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'customercare@socialpairly.com' })).toBeInTheDocument()
   })
 
   it('updates live hook state immediately when notifySubscriptionChanged fires and handles edge branches', async () => {

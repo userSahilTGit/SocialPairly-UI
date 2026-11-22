@@ -14,6 +14,7 @@ const DASHBOARD_LABELS = {
   [DASHBOARD_KEYS.EVENTS]: 'Events & Groups',
   [DASHBOARD_KEYS.FINANCE]: 'Finance',
   [DASHBOARD_KEYS.CUSTOMER_SUPPORT]: 'Customer Support',
+  [DASHBOARD_KEYS.RATINGS]: 'Ratings',
   [DASHBOARD_KEYS.ROLE_ACCESS]: 'Role & Access',
 }
 
@@ -378,9 +379,14 @@ export default function AdminRoleAccess() {
                       {dashboards.map((dashboardKey) => {
                         const mapKey = `${roleCode}::${dashboardKey}`
                         const checked = draftAccess.get(mapKey) === true
+                        const supportOpsRole = ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SUPPORT'].includes(roleCode)
+                        const supportOpsDashboard =
+                          dashboardKey === DASHBOARD_KEYS.CUSTOMER_SUPPORT
+                          || dashboardKey === DASHBOARD_KEYS.RATINGS
                         const disableToggle =
                           roleCode === 'SUPER_ADMIN'
                           || (dashboardKey === DASHBOARD_KEYS.ROLE_ACCESS && roleCode !== 'SUPER_ADMIN' && !checked)
+                          || (supportOpsDashboard && !supportOpsRole && !checked)
                         return (
                           <td key={`${roleCode}-${dashboardKey}`} className="matrix-cell">
                             <input

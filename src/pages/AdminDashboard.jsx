@@ -3,7 +3,10 @@ import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import SiteFooter from '../components/SiteFooter'
 import api from '../api/axios'
+import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
+import { formatCallbackSchedule } from '../utils/callbackSlots'
+import { canViewCallRequests } from '../utils/employeeAccess'
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, Legend, CartesianGrid,
@@ -35,11 +38,12 @@ function getJoinedTimestamp(dateValue) {
 }
 
 export default function AdminDashboard() {
+    const { user } = useAuth()
     const { isDark } = useTheme()
+    const canViewCallbacks = canViewCallRequests(user)
     const [stats, setStats] = useState(null)
     const [users, setUsers] = useState([])
-    const [callbackAlerts, setCallbackAlerts] = useState([])
-    const [pendingCallbacks, setPendingCallbacks] = useState(0)
+    const [scheduledCallbacks, setScheduledCallbacks] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     // null = API order; 'desc' = newest first; 'asc' = oldest first
@@ -60,20 +64,19 @@ export default function AdminDashboard() {
                 setLoading(false)
             }
 
-            try {
-                const [summaryRes, notificationsRes] = await Promise.all([
-                    api.get('/admin/callback-alerts/summary'),
-                    api.get('/admin/callback-alerts/notifications'),
-                ])
-                setPendingCallbacks(summaryRes.data?.pendingCount || 0)
-                setCallbackAlerts((notificationsRes.data || []).filter((item) => !item.read).slice(0, 5))
-            } catch {
-                setPendingCallbacks(0)
-                setCallbackAlerts([])
+            if (canViewCallbacks) {
+                try {
+                    const callbacksRes = await api.get('/admin/callback-alerts/callbacks')
+                    setScheduledCallbacks(callbacksRes.data || [])
+                } catch {
+                    setScheduledCallbacks([])
+                }
+            } else {
+                setScheduledCallbacks([])
             }
         }
         load()
-    }, [])
+    }, [canViewCallbacks])
 
     const sortedUsers = !dateSort
         ? users
@@ -139,33 +142,54 @@ export default function AdminDashboard() {
                             <h1>Admin Dashboard</h1>
                             <p>Monitor user growth, profile completion, and subscription activity at a glance.</p>
                         </div>
-                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                            <Link to="/admin/customer-support" className="btn-dashboard-action">
-                                Customer Support
-                            </Link>
-                            <Link to="/admin/identity-documents" className="btn-dashboard-action">
-                                Identity Documents
-                            </Link>
-                            <Link to="/admin/plans" className="btn-dashboard-action">
-                                Manage Subscription Plans
-                            </Link>
-                        </div>
                     </div>
 
-                    {(pendingCallbacks > 0 || callbackAlerts.length > 0) && (
-                        <div className="dashboard-callback-banner" role="status">
-                            <div>
-                                <strong>
-                                    {pendingCallbacks} pending premium callback{pendingCallbacks === 1 ? '' : 's'}
-                                </strong>
-                                <p>
-                                    {callbackAlerts[0]?.message
-                                        || 'A premium member requested a phone callback.'}
-                                </p>
+                    {canViewCallbacks && scheduledCallbacks.length > 0 && (
+                        <div className="dashboard-callbacks-card" aria-labelledby="dashboard-callbacks-heading">
+                            <div className="dashboard-callbacks-head">
+                                <div>
+                                    <h2 id="dashboard-callbacks-heading">
+                                        Scheduled Phone Callbacks ({scheduledCallbacks.length})
+                                    </h2>
+                                    <p>24/7 member-selected 2-hour callback windows across Super Admin, Admin &amp; Customer Support.</p>
+                                </div>
                             </div>
-                            <Link to="/admin/customer-support" className="btn-dashboard-action">
-                                Open support queue
-                            </Link>
+                            <div className="dashboard-table-wrapper">
+                                <table className="dashboard-table dashboard-callbacks-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Member</th>
+                                            <th>Phone</th>
+                                            <th>Selected Day</th>
+                                            <th>2-Hour Time Slot</th>
+                                            <th>Note</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {scheduledCallbacks.slice(0, 10).map((row) => {
+                                            const schedule = formatCallbackSchedule(row)
+                                            return (
+                                                <tr key={row.id}>
+                                                    <td>
+                                                        <div className="dashboard-cb-member">{row.userName}</div>
+                                                        <div className="dashboard-cb-email">{row.userEmail}</div>
+                                                    </td>
+                                                    <td>
+                                                        <a href={`tel:${row.phoneNumber}`} className="dashboard-cb-phone">
+                                                            {row.phoneNumber}
+                                                        </a>
+                                                    </td>
+                                                    <td>{schedule.dayLine}</td>
+                                                    <td>
+                                                        <span className="dashboard-cb-slot-pill">{schedule.slotLine}</span>
+                                                    </td>
+                                                    <td>{row.note || '—'}</td>
+                                                </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
 
@@ -174,7 +198,14 @@ export default function AdminDashboard() {
                         <StatCard value={stats.completedProfiles} label="Completed Profiles" icon="✓" iconClass="icon-green" />
                         <StatCard value={stats.incompleteProfiles} label="Incomplete Profiles" icon="○" iconClass="icon-pink" />
                         <StatCard value={stats.newUsersLast7Days ?? stats.newUsersLastDays} label="New (7 days)" icon="⚡" iconClass="icon-violet" />
-                        <StatCard value={pendingCallbacks} label="Pending Callbacks" icon="☎" iconClass="icon-violet" />
+                        {canViewCallbacks && (
+                            <StatCard
+                                value={scheduledCallbacks.length}
+                                label="Pending Callbacks"
+                                icon="☎"
+                                iconClass="icon-violet"
+                            />
+                        )}
                     </div>
 
                     <div className="dashboard-charts-grid">

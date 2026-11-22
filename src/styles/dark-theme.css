@@ -232,11 +232,15 @@
 [data-theme="dark"] .navbar .nav-links a {
   color: #f1f5f9;
 }
-[data-theme="dark"] .navbar .nav-links a:hover,
+[data-theme="dark"] .navbar .nav-links a:hover {
+  color: #e879f9;
+  background: rgba(217, 70, 239, 0.14);
+}
 [data-theme="dark"] .navbar .nav-links a.active,
 [data-theme="dark"] .navbar .nav-links a.nav-active {
-  color: #e879f9;
-  background: #1a2236;
+  color: #fff;
+  background: var(--primary, #d946ef);
+  box-shadow: 0 6px 16px rgba(217, 70, 239, 0.32);
 }
 [data-theme="dark"] .navbar .profile-dropdown {
   border-top-color: #1f293d;
@@ -352,6 +356,8 @@
 [data-theme="dark"] .dashboard-section-title,
 [data-theme="dark"] .dashboard-chart-card h3,
 [data-theme="dark"] .dashboard-users-card h2,
+[data-theme="dark"] .dashboard-callbacks-head h2,
+[data-theme="dark"] .dashboard-cb-member,
 [data-theme="dark"] .questions-card h2,
 [data-theme="dark"] .stat-value,
 [data-theme="dark"] .stat-card .value {
@@ -389,6 +395,7 @@
 [data-theme="dark"] .stat-card,
 [data-theme="dark"] .dashboard-chart-card,
 [data-theme="dark"] .dashboard-users-card,
+[data-theme="dark"] .dashboard-callbacks-card,
 [data-theme="dark"] .questions-card,
 [data-theme="dark"] .plans-controls-bar,
 [data-theme="dark"] .plan-admin-card,
@@ -406,6 +413,20 @@
 
 [data-theme="dark"] .admin-access-form label {
   color: #94a3b8;
+}
+
+[data-theme="dark"] .dashboard-callbacks-head p,
+[data-theme="dark"] .dashboard-cb-email {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .dashboard-cb-phone {
+  color: #c4b5fd;
+}
+
+[data-theme="dark"] .dashboard-cb-slot-pill {
+  background: rgba(139, 92, 246, 0.22);
+  color: #ddd6fe;
 }
 
 [data-theme="dark"] .admin-access-form input,

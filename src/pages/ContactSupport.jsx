@@ -23,8 +23,7 @@ import Navbar from '../components/Navbar'
 import SiteFooter from '../components/SiteFooter'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
-import { getSupportEmailForMember } from '../config/supportContacts'
-import { usePremiumStatus } from '../utils/subscriptionStatus'
+import { DEFAULT_SUPPORT_EMAIL } from '../config/supportContacts'
 
 const ISSUE_OPTIONS = [
   { label: 'Account & sign-in', icon: User },
@@ -53,8 +52,7 @@ function fileAllowed(file) {
 
 export default function ContactSupport() {
   const { user } = useAuth()
-  const { isPremium } = usePremiumStatus(user)
-  const supportEmail = getSupportEmailForMember(isPremium)
+  const supportEmail = DEFAULT_SUPPORT_EMAIL
   const fileInputRef = useRef(null)
 
   const accountName = useMemo(() => {
@@ -205,13 +203,6 @@ export default function ContactSupport() {
                 <span>{success}</span>
               </div>
             )}
-
-            <div className={`cc-recipient-banner${isPremium ? ' is-premium' : ''}`} data-testid="support-recipient-banner">
-              <Mail size={15} aria-hidden />
-              <span>
-                Support inbox: <strong>{supportEmail}</strong>
-              </span>
-            </div>
 
             <div className="cc-grid-2">
               <div className="cc-field">

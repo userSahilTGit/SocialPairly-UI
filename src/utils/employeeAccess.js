@@ -8,18 +8,20 @@ export const DASHBOARD_KEYS = {
   EVENTS: 'EVENTS',
   FINANCE: 'FINANCE',
   CUSTOMER_SUPPORT: 'CUSTOMER_SUPPORT',
+  RATINGS: 'RATINGS',
   ROLE_ACCESS: 'ROLE_ACCESS',
 }
 
 export const DASHBOARD_NAV = [
   { key: DASHBOARD_KEYS.DASHBOARD, path: '/admin', label: 'Dashboard', end: true },
   { key: DASHBOARD_KEYS.QUESTIONS, path: '/admin/questions', label: 'Questions' },
-  { key: DASHBOARD_KEYS.MODERATION, path: '/admin/media', label: '🛡️ Moderation Center' },
+  { key: DASHBOARD_KEYS.MODERATION, path: '/admin/media', label: 'Moderation Center' },
   { key: DASHBOARD_KEYS.IDENTITY_DOCS, path: '/admin/identity-documents', label: 'Identity Docs' },
   { key: DASHBOARD_KEYS.PLANS, path: '/admin/plans', label: 'Plan & Subscriptions' },
   { key: DASHBOARD_KEYS.EVENTS, path: '/admin/events', label: 'Events & Groups' },
   { key: DASHBOARD_KEYS.FINANCE, path: '/admin/finance', label: 'Finance' },
   { key: DASHBOARD_KEYS.CUSTOMER_SUPPORT, path: '/admin/customer-support', label: 'Customer Support' },
+  { key: DASHBOARD_KEYS.RATINGS, path: '/admin/ratings', label: 'Ratings' },
   { key: DASHBOARD_KEYS.ROLE_ACCESS, path: '/admin/access', label: 'Role & Access' },
 ]
 
@@ -34,15 +36,41 @@ export const EMPLOYEE_ROLE_LABELS = {
   QC_LEGAL: 'Quality Control / Legal',
 }
 
+/** Only these roles may see call requests and member ratings. */
+export const SUPPORT_OPS_ROLES = ['SUPER_ADMIN', 'ADMIN', 'CUSTOMER_SUPPORT']
+
 export function isEmployeeUser(user) {
   return user?.role === 'ADMIN'
 }
 
+export function isSupportOpsUser(user) {
+  if (!isEmployeeUser(user)) return false
+  return SUPPORT_OPS_ROLES.includes(String(user.employeeRole || '').toUpperCase())
+}
+
 export function hasDashboardAccess(user, dashboardKey) {
   if (!isEmployeeUser(user) || !dashboardKey) return false
+  if (
+    (dashboardKey === DASHBOARD_KEYS.CUSTOMER_SUPPORT || dashboardKey === DASHBOARD_KEYS.RATINGS)
+    && !isSupportOpsUser(user)
+  ) {
+    return false
+  }
   const allowed = user.allowedDashboards
-  if (!Array.isArray(allowed)) return true
+  if (!Array.isArray(allowed)) {
+    // Without an explicit allow-list, never expose support-ops dashboards.
+    return dashboardKey !== DASHBOARD_KEYS.CUSTOMER_SUPPORT
+      && dashboardKey !== DASHBOARD_KEYS.RATINGS
+  }
   return allowed.includes(dashboardKey)
+}
+
+export function canViewCallRequests(user) {
+  return isSupportOpsUser(user) && hasDashboardAccess(user, DASHBOARD_KEYS.CUSTOMER_SUPPORT)
+}
+
+export function canViewRatings(user) {
+  return isSupportOpsUser(user) && hasDashboardAccess(user, DASHBOARD_KEYS.RATINGS)
 }
 
 export function getEmployeeNavItems(user) {

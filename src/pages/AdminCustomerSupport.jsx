@@ -3,6 +3,12 @@ import { RefreshCw } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import SiteFooter from '../components/SiteFooter'
 import api from '../api/axios'
+import {
+  DAYS_OF_WEEK,
+  TWO_HOUR_SLOTS,
+  filterCallbacksBySchedule,
+  formatCallbackSchedule,
+} from '../utils/callbackSlots'
 import { notifySupportInboxChanged } from '../utils/supportInbox'
 import './AdminCustomerSupport.css'
 
@@ -59,6 +65,8 @@ export default function AdminCustomerSupport() {
   const [callbacks, setCallbacks] = useState([])
   const [notifications, setNotifications] = useState([])
   const [statusFilter, setStatusFilter] = useState('PENDING')
+  const [dayFilter, setDayFilter] = useState('ALL')
+  const [slotFilter, setSlotFilter] = useState('ALL')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [updatingId, setUpdatingId] = useState(null)
@@ -100,9 +108,16 @@ export default function AdminCustomerSupport() {
     return () => clearInterval(timer)
   }, [load])
 
-  const unreadCount = useMemo(
-    () => notifications.filter((item) => !item.read).length,
+  const activeNotifications = useMemo(
+    () => notifications.filter((item) => !item.read),
     [notifications],
+  )
+
+  const unreadCount = activeNotifications.length
+
+  const filteredCallbacks = useMemo(
+    () => filterCallbacksBySchedule(callbacks, dayFilter, slotFilter),
+    [callbacks, dayFilter, slotFilter],
   )
 
   const handleRefresh = async () => {
@@ -129,6 +144,8 @@ export default function AdminCustomerSupport() {
 
   const jumpToCallback = (notification) => {
     if (!notification.relatedCallbackId) return
+    setDayFilter('ALL')
+    setSlotFilter('ALL')
     setStatusFilter(notification.callbackStatus && notification.callbackStatus !== 'PENDING' ? 'ALL' : 'PENDING')
     setHighlightId(notification.relatedCallbackId)
     queueRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -145,7 +162,7 @@ export default function AdminCustomerSupport() {
               <p className="cs-eyebrow">Employee Console</p>
               <h1>Customer Support</h1>
               <p className="cs-subtitle">
-                Premium callback requests and staff notifications for Super Admin, Admin, and Customer Support.
+                24/7 scheduled callback slots and staff notifications for Super Admin, Admin, and Customer Support.
               </p>
             </div>
             <button type="button" className="cs-btn-refresh" onClick={handleRefresh} disabled={loading && spin}>
@@ -162,46 +179,46 @@ export default function AdminCustomerSupport() {
               <span className="cs-unread-pill">{unreadCount} unread</span>
             </div>
             <p className="cs-card-hint">
-              A notification clears only after someone marks its callback <strong>contacted</strong> or{' '}
-              <strong>closed</strong> in the queue below.
+              Unread alerts only. Mark a callback <strong>contacted</strong> or <strong>closed</strong> below
+              to clear it here — the record stays in the database and the callback queue for future reference.
             </p>
 
             {loading && notifications.length === 0 ? (
               <p className="cs-empty">Loading notifications…</p>
-            ) : notifications.length === 0 ? (
-              <p className="cs-empty">No callback notifications yet.</p>
+            ) : activeNotifications.length === 0 ? (
+              <p className="cs-empty">No unread callback notifications.</p>
             ) : (
               <ul className="cs-notification-list">
-                {notifications.slice(0, 20).map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      className={`cs-notification${item.read ? '' : ' is-unread'}`}
-                      onClick={() => jumpToCallback(item)}
-                      title="Show in callback queue"
-                    >
-                      <div className="cs-notification-body">
-                        <div className="cs-notification-title">
-                          {!item.read && <span className="cs-dot" aria-hidden="true" />}
-                          <h3>{item.title}</h3>
+                {activeNotifications.slice(0, 20).map((item) => {
+                  const notifSchedule = formatCallbackSchedule(item)
+                  return (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className="cs-notification is-unread"
+                        onClick={() => jumpToCallback(item)}
+                        title="Show in callback queue"
+                      >
+                        <div className="cs-notification-body">
+                          <div className="cs-notification-title">
+                            <span className="cs-dot" aria-hidden="true" />
+                            <h3>{item.title}</h3>
+                          </div>
+                          <p>{item.message}</p>
+                          {notifSchedule.hasSchedule && (
+                            <span className="cs-slot-chip">
+                              {notifSchedule.dayLine} · {notifSchedule.slotLine}
+                            </span>
+                          )}
+                          <span className="cs-time">{formatWhen(item.createdAt)}</span>
                         </div>
-                        <p>{item.message}</p>
-                        <span className="cs-time">{formatWhen(item.createdAt)}</span>
-                        {item.read && (item.handledByName || item.handledByUserId) && (
-                          <span className="cs-handled">
-                            {STATUS_VERBS[item.callbackStatus] || 'Handled'} by{' '}
-                            <strong>{item.handledByName || item.handledByEmail}</strong>{' '}
-                            (ID #{item.handledByUserId ?? '—'} · {roleLabel(item.handledByRole)}) ·{' '}
-                            {formatWhen(item.handledAt)}
-                          </span>
-                        )}
-                      </div>
-                      <span className={`cs-notification-state${item.read ? '' : ' is-pending'}`}>
-                        {item.read ? 'Read' : 'Awaiting action'}
-                      </span>
-                    </button>
-                  </li>
-                ))}
+                        <span className="cs-notification-state is-pending">
+                          Awaiting action
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </section>
@@ -209,19 +226,45 @@ export default function AdminCustomerSupport() {
           <section className="cs-card" aria-labelledby="cs-queue-heading" ref={queueRef}>
             <div className="cs-card-head cs-card-head--queue">
               <h2 id="cs-queue-heading">Callback queue</h2>
-              <div role="tablist" aria-label="Callback queue filter" className="cs-filters">
-                {FILTERS.map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    role="tab"
-                    aria-selected={statusFilter === value}
-                    className={`cs-filter${statusFilter === value ? ' is-active' : ''}`}
-                    onClick={() => setStatusFilter(value)}
+              <div className="cs-queue-controls">
+                <div role="tablist" aria-label="Callback queue filter" className="cs-filters">
+                  {FILTERS.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="tab"
+                      aria-selected={statusFilter === value}
+                      className={`cs-filter${statusFilter === value ? ' is-active' : ''}`}
+                      onClick={() => setStatusFilter(value)}
+                    >
+                      {value}
+                    </button>
+                  ))}
+                </div>
+                <div className="cs-schedule-filters">
+                  <select
+                    aria-label="Filter by callback day"
+                    className="cs-select"
+                    value={dayFilter}
+                    onChange={(e) => setDayFilter(e.target.value)}
                   >
-                    {value}
-                  </button>
-                ))}
+                    <option value="ALL">All Days</option>
+                    {DAYS_OF_WEEK.map((day) => (
+                      <option key={day} value={day}>{day}</option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="Filter by 2-hour slot"
+                    className="cs-select"
+                    value={slotFilter}
+                    onChange={(e) => setSlotFilter(e.target.value)}
+                  >
+                    <option value="ALL">All 2-Hour Slots (24/7)</option>
+                    {TWO_HOUR_SLOTS.map((slot) => (
+                      <option key={slot.code} value={slot.code}>{slot.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -231,6 +274,7 @@ export default function AdminCustomerSupport() {
                   <tr>
                     <th>Member</th>
                     <th>Phone</th>
+                    <th>Scheduled Slot (24/7)</th>
                     <th>Note</th>
                     <th>Requested</th>
                     <th>Status</th>
@@ -240,75 +284,110 @@ export default function AdminCustomerSupport() {
                 </thead>
                 <tbody>
                   {loading && callbacks.length === 0 ? (
-                    <tr><td colSpan={7} className="cs-empty-row">Loading callbacks…</td></tr>
-                  ) : callbacks.length === 0 ? (
+                    <tr><td colSpan={8} className="cs-empty-row">Loading callbacks…</td></tr>
+                  ) : filteredCallbacks.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="cs-empty-row">
-                        No callback requests in <strong>{statusFilter}</strong> status.
+                      <td colSpan={8} className="cs-empty-row">
+                        No callback requests matching <strong>{statusFilter}</strong>
+                        {dayFilter !== 'ALL' ? ` · ${dayFilter}` : ''}
+                        {slotFilter !== 'ALL' ? ` · ${slotFilter}` : ''}.
                       </td>
                     </tr>
                   ) : (
-                    callbacks.map((row) => (
-                      <tr key={row.id} className={highlightId === row.id ? 'is-highlighted' : undefined}>
-                        <td>
-                          <div className="cs-member">{row.userName}</div>
-                          <div className="cs-muted">{row.userEmail}</div>
-                        </td>
-                        <td className="cs-nowrap">
-                          <a href={`tel:${row.phoneNumber}`}>{row.phoneNumber}</a>
-                        </td>
-                        <td className="cs-note">{row.note || '—'}</td>
-                        <td className="cs-nowrap cs-small">{formatWhen(row.createdAt)}</td>
-                        <td className="cs-nowrap">
-                          <span className={`cs-status cs-status--${String(row.status).toLowerCase()}`}>
-                            {row.status}
-                          </span>
-                        </td>
-                        <td>
-                          <StaffStamp
-                            name={row.statusUpdatedByName}
-                            userId={row.statusUpdatedByUserId}
-                            email={row.statusUpdatedByEmail || row.resolvedByEmail}
-                            role={row.statusUpdatedByRole}
-                            at={row.statusUpdatedAt || row.resolvedAt}
-                            status={row.status}
-                          />
-                        </td>
-                        <td>
-                          <div className="cs-actions">
-                            {row.status === 'PENDING' && (
-                              <button
-                                type="button"
+                    filteredCallbacks.map((row) => {
+                      const schedule = formatCallbackSchedule(row)
+                      return (
+                        <tr key={row.id} className={highlightId === row.id ? 'is-highlighted' : undefined}>
+                          <td>
+                            <div className="cs-member">{row.userName}</div>
+                            <div className="cs-muted">{row.userEmail}</div>
+                          </td>
+                          <td className="cs-nowrap">
+                            <a href={`tel:${row.phoneNumber}`}>{row.phoneNumber}</a>
+                          </td>
+                          <td>
+                            <div className="cs-slot-cell">
+                              <span className="cs-slot-day">{schedule.dayLine}</span>
+                              <span className={`cs-slot-badge${schedule.hasSchedule ? '' : ' is-unscheduled'}`}>
+                                {schedule.slotLine}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="cs-note">{row.note || '—'}</td>
+                          <td className="cs-nowrap cs-small">{formatWhen(row.createdAt)}</td>
+                          <td className="cs-nowrap">
+                            <div className="cs-status-cell">
+                              <span className={`cs-status cs-status--${String(row.status).toLowerCase()}`}>
+                                {row.status}
+                              </span>
+                              <label className="cs-status-label" htmlFor={`cs-status-${row.id}`}>
+                                Change status
+                              </label>
+                              <select
+                                id={`cs-status-${row.id}`}
+                                className="cs-status-select"
+                                aria-label={`Update status for ${row.userName}`}
+                                value={row.status}
                                 disabled={updatingId === row.id}
-                                onClick={() => updateStatus(row, 'CONTACTED')}
+                                onChange={(event) => {
+                                  const next = event.target.value
+                                  if (next && next !== row.status) {
+                                    updateStatus(row, next)
+                                  }
+                                }}
                               >
-                                Mark contacted
-                              </button>
-                            )}
-                            {row.status !== 'CLOSED' && (
-                              <button
-                                type="button"
-                                className="is-close"
-                                disabled={updatingId === row.id}
-                                onClick={() => updateStatus(row, 'CLOSED')}
-                              >
-                                Close
-                              </button>
-                            )}
-                            {row.status === 'CLOSED' && (
-                              <button
-                                type="button"
-                                className="is-reopen"
-                                disabled={updatingId === row.id}
-                                onClick={() => updateStatus(row, 'PENDING')}
-                              >
-                                Reopen
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                                <option value="PENDING">Pending</option>
+                                <option value="CONTACTED">Contacted</option>
+                                <option value="CLOSED">Closed</option>
+                              </select>
+                            </div>
+                          </td>
+                          <td>
+                            <StaffStamp
+                              name={row.statusUpdatedByName}
+                              userId={row.statusUpdatedByUserId}
+                              email={row.statusUpdatedByEmail || row.resolvedByEmail}
+                              role={row.statusUpdatedByRole}
+                              at={row.statusUpdatedAt || row.resolvedAt}
+                              status={row.status}
+                            />
+                          </td>
+                          <td className="cs-actions-cell">
+                            <div className="cs-actions">
+                              {row.status === 'PENDING' && (
+                                <button
+                                  type="button"
+                                  disabled={updatingId === row.id}
+                                  onClick={() => updateStatus(row, 'CONTACTED')}
+                                >
+                                  Mark contacted
+                                </button>
+                              )}
+                              {row.status !== 'CLOSED' && (
+                                <button
+                                  type="button"
+                                  className="is-close"
+                                  disabled={updatingId === row.id}
+                                  onClick={() => updateStatus(row, 'CLOSED')}
+                                >
+                                  Close request
+                                </button>
+                              )}
+                              {row.status === 'CLOSED' && (
+                                <button
+                                  type="button"
+                                  className="is-reopen"
+                                  disabled={updatingId === row.id}
+                                  onClick={() => updateStatus(row, 'PENDING')}
+                                >
+                                  Reopen
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
                   )}
                 </tbody>
               </table>
