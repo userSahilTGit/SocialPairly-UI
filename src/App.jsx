@@ -28,7 +28,7 @@ import AdminEvents from './pages/AdminEvents'
 import AdminCustomerSupport from './pages/AdminCustomerSupport'
 import AdminRoleAccess from './pages/AdminRoleAccess'
 import EventWorkspace from './pages/EventWorkspace'
-import { DASHBOARD_KEYS } from './utils/employeeAccess'
+import { DASHBOARD_KEYS, isEmployeeUser } from './utils/employeeAccess'
 import IdentityBackgroundPage from './pages/onboarding/IdentityBackgroundPage'
 import PersonalityLifestylePage from './pages/onboarding/PersonalityLifestylePage'
 import FaithOnboardingPage from './pages/onboarding/FaithOnboardingPage'
@@ -207,7 +207,7 @@ export default function App() {
         onClose={() => setShowPhoneModal(false)}
         onVerified={() => setShowPhoneModal(false)}
       />
-      {user && user.role !== 'ADMIN' && <SupportContactFab />}
+      {user && !isEmployeeUser(user) && <SupportContactFab />}
       <SessionTimeoutDialog />
     </GoogleOAuthProvider>
   )

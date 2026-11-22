@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronRight, Eye, EyeOff, Headphones, Images, Shield, Trash2, UserRound, X } from 'lucide-react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { ChevronRight, Eye, EyeOff, Images, Shield, Trash2, UserRound, X } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import SiteFooter from '../components/SiteFooter'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
-import { CUSTOMER_CARE_EMAIL } from '../config/oauth'
 
 function SettingsRow({ icon: Icon, iconClass, title, titleClass, description, to, onClick, rowClass }) {
   const className = `settings-row${rowClass ? ` ${rowClass}` : ''}`
@@ -81,7 +80,6 @@ function PasswordInput({
 export default function Settings() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [deleteStep, setDeleteStep] = useState('send') // 'send' | 'otp'
   const [deleteOtp, setDeleteOtp] = useState('')
@@ -106,15 +104,6 @@ export default function Settings() {
   const [otpVerifying, setOtpVerifying] = useState(false)
   const [codeVerified, setCodeVerified] = useState(false)
   const [securityInfo, setSecurityInfo] = useState('')
-
-  useEffect(() => {
-    if (location.hash !== '#support') return
-    const el = document.getElementById('support')
-    if (!el) return
-    requestAnimationFrame(() => {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-  }, [location.hash])
 
   const openDeleteModal = () => {
     setDeleteStep('send')
@@ -299,7 +288,7 @@ export default function Settings() {
         <div className="settings-shell">
           <header className="settings-hero">
             <h1>Settings</h1>
-            <p>Manage your account, identity, and support.</p>
+            <p>Manage your account, identity, and security.</p>
           </header>
           {securitySuccess && (
             <div className="success settings-banner" role="status">{securitySuccess}</div>
@@ -332,23 +321,6 @@ export default function Settings() {
                 iconClass="settings-row-icon--security"
                 title="Account & Security"
                 description="Password and email verification."
-              />
-            </div>
-          </section>
-
-          <section id="support" className="settings-section" aria-labelledby="settings-support-heading">
-            <h2 id="settings-support-heading">Support</h2>
-            <div className="settings-group">
-              <SettingsRow
-                to="/contact"
-                icon={Headphones}
-                iconClass="settings-row-icon--support"
-                title="Contact Customer Care"
-                description={(
-                  <>
-                    Account, billing, matching, safety, and other help. We reply at <b>{CUSTOMER_CARE_EMAIL}</b>.
-                  </>
-                )}
               />
             </div>
           </section>
